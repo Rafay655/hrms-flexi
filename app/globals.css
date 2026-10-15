@@ -1,0 +1,272 @@
+@import "tailwindcss";
+
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  /* base */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* ✅ FLEXI OFFICIAL BRAND PALETTE */
+  --brand-900: #1E1A3A;   /* deepest purple — shadows, overlays */
+  --brand-800: #322E53;   /* Flexi dark purple — PRIMARY brand color */
+  --brand-700: #49426E;   /* Flexi mid purple — active states, hover */
+  --brand-600: #5c5490;   /* lighter purple — secondary hover */
+  --brand-500: #EEC293;   /* Flexi peach — PRIMARY CTA, buttons, highlights */
+  --brand-400: #F3AB9D;   /* Flexi salmon — pending, alerts, warm states */
+  --brand-300: #f7c9b9;   /* light salmon — soft backgrounds */
+  --brand-100: #F5F4F8;   /* Flexi background — page background */
+
+  /* Semantic aliases */
+  --brand-dark:    var(--brand-800); /* #322E53 */
+  --brand-darker:  var(--brand-900); /* #1E1A3A */
+  --brand-light:   var(--brand-300); /* #f7c9b9 */
+  --brand-lightest:var(--brand-100); /* #F5F4F8 */
+  --brand-other-1: var(--brand-400); /* #F3AB9D */
+  --brand-other-2: var(--brand-600); /* #5c5490 */
+  --brand-sage:    var(--brand-700); /* #49426E */
+  --brand-gold:    var(--brand-500); /* #EEC293 */
+
+  /* Gradient stops */
+  --brand-gradient-from: #322E53;
+  --brand-gradient-mid:  #49426E;
+  --brand-gradient-to:   #EEC293;
+
+  /* ✅ shadcn token mapping */
+  --primary: var(--brand-800);
+  --primary-foreground: #ffffff;
+
+  --secondary: var(--brand-300);
+  --secondary-foreground: var(--brand-800);
+
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+
+  --accent: var(--brand-500);
+  --accent-foreground: var(--brand-900);
+
+  --destructive: oklch(0.577 0.245 27.325);
+
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  --chart-1: #322E53;
+  --chart-2: #49426E;
+  --chart-3: #EEC293;
+  --chart-4: #F3AB9D;
+  --chart-5: #f7c9b9;
+
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: #1E1A3A;
+  --foreground: #F5F4F8;
+
+  --card: #322E53;
+  --card-foreground: #F5F4F8;
+
+  --popover: #322E53;
+  --popover-foreground: #F5F4F8;
+
+  /* palette stays the same in dark */
+  --brand-900: #1E1A3A;
+  --brand-800: #322E53;
+  --brand-700: #49426E;
+  --brand-600: #5c5490;
+  --brand-500: #EEC293;
+  --brand-400: #F3AB9D;
+  --brand-300: #f7c9b9;
+  --brand-100: #F5F4F8;
+
+  /* dark token flips */
+  --primary: var(--brand-300);
+  --primary-foreground: var(--brand-900);
+
+  --secondary: var(--brand-800);
+  --secondary-foreground: #ffffff;
+
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+
+  --accent: var(--brand-700);
+  --accent-foreground: #ffffff;
+
+  --destructive: oklch(0.704 0.191 22.216);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  --chart-1: #322E53;
+  --chart-2: #49426E;
+  --chart-3: #EEC293;
+  --chart-4: #F3AB9D;
+  --chart-5: #f7c9b9;
+
+  --sidebar: #322E53;
+  --sidebar-foreground: #F5E6D0;
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+
+  --color-destructive: var(--destructive);
+
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* ✅ Full palette exposed as Tailwind utilities */
+  /* Usage: bg-brand-900, text-brand-500, border-brand-300, etc. */
+  --color-brand-900: var(--brand-900); /* #1E1A3A - deepest purple   */
+  --color-brand-800: var(--brand-800); /* #322E53 - Flexi dark purple*/
+  --color-brand-700: var(--brand-700); /* #49426E - Flexi mid purple */
+  --color-brand-600: var(--brand-600); /* #5c5490 - lighter purple   */
+  --color-brand-500: var(--brand-500); /* #EEC293 - Flexi peach      */
+  --color-brand-400: var(--brand-400); /* #F3AB9D - Flexi salmon     */
+  --color-brand-300: var(--brand-300); /* #f7c9b9 - light salmon     */
+  --color-brand-100: var(--brand-100); /* #F5F4F8 - page background  */
+
+  /* Semantic aliases as Tailwind colors too */
+  --color-brand-dark:     var(--brand-dark);
+  --color-brand-darker:   var(--brand-darker);
+  --color-brand-light:    var(--brand-light);
+  --color-brand-lightest: var(--brand-lightest);
+  --color-brand-sage:     var(--brand-sage);
+  --color-brand-gold:     var(--brand-gold);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "League Spartan", var(--font-sans), sans-serif;
+  }
+}
+
+@keyframes shake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-6px); }
+  40%  { transform: translateX(6px); }
+  60%  { transform: translateX(-4px); }
+  80%  { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+.animate-shake {
+  animation: shake 450ms ease-in-out;
+}
+
+/* Smooth page scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Thin custom scrollbar */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--brand-500) transparent; /* Firefox */
+}
+
+/* Chrome, Edge, Safari */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--brand-500);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--brand-600);
+}
+
+/* Dark mode scrollbar */
+.dark * {
+  scrollbar-color: var(--brand-300) transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background-color: var(--brand-300);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--brand-400);
+}
