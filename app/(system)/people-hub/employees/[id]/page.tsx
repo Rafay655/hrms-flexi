@@ -384,7 +384,7 @@ function generateAnalytics(id: number): AnalyticsBundle {
   const modules: ModuleCardData[] = [
     {
       title: "TimeSync",
-      route: `/time-sync/daily-report`,
+      route: `/time-sync`,
       subtitle: "Attendance & punctuality",
       value: `${96 + shift * 0.3}%`,
       helper: "Attendance compliance this month",

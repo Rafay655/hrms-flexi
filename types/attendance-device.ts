@@ -40,6 +40,16 @@ export interface AttendanceDevice {
     // ... etc
   } | null;
   internal_location_name: string | null;
+  db_host: string | null;
+  db_port: number | null;
+  db_name: string | null;
+  db_username: string | null;
+  db_password_set: boolean;
+  sync_cursor: number | null;
+  webhook_endpoint: string | null;
+  api_key_available: boolean;
+  last_synced_at: string | null;
+  last_sync_count: number | null;
   sync_protocol: SyncProtocol;
   device_driver: DeviceDriver;
   ip_address: string | null;
@@ -67,6 +77,12 @@ export interface AttendanceDeviceFormData {
   sync_protocol: SyncProtocol | '';
   device_driver: DeviceDriver | '';
   ip_address: string;
+  db_host: string;
+  db_port: string;
+  db_name: string;
+  db_username: string;
+  db_password: string;
+  sync_cursor: string;
   port: string;                     // number as string for input
   sync_frequency_minutes: string;
   ip_whitelist: string;
@@ -77,6 +93,10 @@ export interface AttendanceDeviceFormData {
   mappings: DeviceMapping[];
 }
 
-export interface AttendanceDeviceApiPayload {
-  // same structure, but port etc. converted to number
+export interface AttendanceDeviceFilters { page?: number; per_page?: number; search?: string; is_active?: number }
+export interface DeviceEnvelope<T> { success: boolean; message: string; data: T }
+export interface DeviceListResponse extends DeviceEnvelope<AttendanceDevice[]> {
+  meta: { current_page: number; per_page: number; total: number; last_page: number; from?: number | null; to?: number | null };
 }
+export type DeviceOperationResult = Record<string, unknown>;
+export interface RotateDeviceKeyResponse extends DeviceEnvelope<AttendanceDevice> { one_time_api_key: string }

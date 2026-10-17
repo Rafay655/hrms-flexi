@@ -496,7 +496,7 @@ export const modules: ModuleItem[] = [
       },
 
       // ═══════════════════════════════════════════════════════════════════
-      // 2. MY ATTENDANCE (7 items - unchanged)
+      // 2. MY ATTENDANCE (7 items)
       // ═══════════════════════════════════════════════════════════════════
       {
         id: 50300,
@@ -539,13 +539,6 @@ export const modules: ModuleItem[] = [
             title: "Roaster Change",
             pathname: "/time-sync/roaster-changes",
           },
-         
-          {
-            id: 50307,
-            icon: "Calendar",
-            title: "My Calendar",
-            pathname: "/time-sync/my-calendar",
-          },
           {
             id: 50308,
             icon: "CalendarDays",
@@ -556,7 +549,7 @@ export const modules: ModuleItem[] = [
       },
 
       // ═══════════════════════════════════════════════════════════════════
-      // 3. TEAM (2 items - Pending Approvals moved to Approvals Inbox)
+      // 3. TEAM
       // ═══════════════════════════════════════════════════════════════════
       {
         id: 50400,
@@ -565,23 +558,11 @@ export const modules: ModuleItem[] = [
         subMenu: [
           {
             id: 50401,
-            icon: "Gauge",
-            title: "Team Dashboard",
-            pathname: "/time-sync/team-dashboard",
-          },
-          {
-            id: 50402,
-            icon: "CalendarRange",
-            title: "Team Calendar",
-            pathname: "/time-sync/team-calendar",
+            icon: "Users",
+            title: "My Team",
+            pathname: "/time-sync/my-team",
           },
         ],
-      },
-      {
-        id: 50500,
-        icon: "Inbox",
-        title: "APPROVALS INBOX",
-        pathname: "/time-sync/approvals-inbox",
       },
       // {
       //   id: 5,
@@ -624,7 +605,6 @@ export const modules: ModuleItem[] = [
 
       // ═══════════════════════════════════════════════════════════════════
       // 6. SHIFT STUDIO (6 items - trimmed from 15)
-      // Removed: AI Optimizer, Demand Planning → WORKFORCE AI
       // Removed: Flexi Rules, Break Configs, Weekly Off, Alt Sat, Holidays, Special → SCHEDULING RULES
       // Removed: Swap Management (duplicate of Shift Swaps)
       // ═══════════════════════════════════════════════════════════════════
@@ -668,84 +648,6 @@ export const modules: ModuleItem[] = [
             icon: "DoorOpen",
             title: "Open Shifts",
             pathname: "/time-sync/open-shifts",
-          },
-        ],
-      },
-
-      // ═══════════════════════════════════════════════════════════════════
-      // 7. SCHEDULING RULES (6 items - NEW MODULE extracted from Shift Studio)
-      // ═══════════════════════════════════════════════════════════════════
-      // {
-      //   id: 13,
-      //   icon: "CalendarCog",
-      //   title: "SCHEDULING RULES",
-      //   subMenu: [
-      //     {
-      //       id: 131,
-      //       icon: "Sliders",
-      //       title: "Flexi Rules",
-      //       pathname: "/timesync/flexi-rules",
-      //     },
-      //     {
-      //       id: 132,
-      //       icon: "Coffee",
-      //       title: "Break Configs",
-      //       pathname: "/timesync/break-configs",
-      //     },
-      //     {
-      //       id: 133,
-      //       icon: "CalendarOff",
-      //       title: "Weekly Off Rules",
-      //       pathname: "/timesync/weekly-off",
-      //     },
-      //     {
-      //       id: 134,
-      //       icon: "Calendar",
-      //       title: "Alternate Saturdays",
-      //       pathname: "/timesync/alt-saturdays",
-      //     },
-      //     {
-      //       id: 135,
-      //       icon: "PartyPopper",
-      //       title: "Holiday Calendars",
-      //       pathname: "/timesync/holiday-calendars",
-      //     },
-      //     {
-      //       id: 136,
-      //       icon: "Star",
-      //       title: "Special Shifts",
-      //       pathname: "/timesync/special-shifts",
-      //     },
-      //   ],
-      // },
-
-      // ═══════════════════════════════════════════════════════════════════
-      // 8. WORKFORCE AI (3 items - NEW MODULE)
-      // Consolidated: AI Optimizer, Demand Planning from Shift Studio
-      // Consolidated: OT Forecast from Reports
-      // ═══════════════════════════════════════════════════════════════════
-      {
-        id: 50700,
-        icon: "Brain",
-        title: "WORKFORCE AI",
-        subMenu: [
-          {
-            id: 50701,
-            icon: "Sparkles",
-            title: "AI Optimizer",
-            pathname: "/time-sync/roster-optimizer",
-          },
-          {
-            id: 50702,
-            icon: "TrendingUp",
-            title: "Demand Planning",
-            pathname: "/time-sync/demand-grid",
-          },
-          {
-            id: 50703,
-            icon: "LineChart",
-            title: "OT Forecast",
-            pathname: "/time-sync/ot-forcast",
           },
         ],
       },
@@ -798,6 +700,12 @@ export const modules: ModuleItem[] = [
             pathname: "/time-sync/device-management",
           },
           {
+            id: 50904,
+            icon: "IdCard",
+            title: "Employee Badges",
+            pathname: "/time-sync/employee-badges",
+          },
+          {
             id: 50902,
             icon: "HeartPulse",
             title: "Device Health",
@@ -810,115 +718,6 @@ export const modules: ModuleItem[] = [
             pathname: "/time-sync/ingestion-jobs",
           },
         ],
-      },
-
-      // ═══════════════════════════════════════════════════════════════════
-      // 12. REPORTS (6 items - removed OT Forecast, renamed Anomalies)
-      // ═══════════════════════════════════════════════════════════════════
-      {
-        id: 51000,
-        icon: "BarChart3",
-        title: "REPORTS",
-        subMenu: [
-          {
-            id: 51001,
-            icon: "FileSpreadsheet",
-            title: "Daily Attendance",
-            pathname: "/time-sync/daily-report",
-          },
-          {
-            id: 51002,
-            icon: "CalendarRange",
-            title: "Monthly Summary",
-            pathname: "/time-sync/monthly-report",
-          },
-          {
-            id: 51003,
-            icon: "TimerReset",
-            title: "OT Analysis",
-            pathname: "/time-sync/ot-report",
-          },
-          {
-            id: 51004,
-            icon: "Hourglass",
-            title: "Punctuality",
-            pathname: "/time-sync/late-early-report",
-          },
-          {
-            id: 51005,
-            icon: "AlertTriangle",
-            title: "Anomaly Reports",
-            pathname: "/time-sync/anomaly-report",
-          },
-          {
-            id: 51006,
-            icon: "CalendarClock",
-            title: "Scheduled Reports",
-            pathname: "/time-sync/scheduled-reports",
-          },
-        ],
-      },
-
-      // ═══════════════════════════════════════════════════════════════════
-      // 13. SYSTEM SETTINGS (7 items - added Payroll Control from Workflows)
-      // ═══════════════════════════════════════════════════════════════════
-      {
-        id: 51100,
-        icon: "Settings",
-        title: "SYSTEM SETTINGS",
-        subMenu: [
-          {
-            id: 51101,
-            icon: "PenTool",
-            title: "Approvals Designer",
-            pathname: "/time-sync/workflows",
-          },
-          {
-            id: 51102,
-            icon: "Bell",
-            title: "Notifications",
-            pathname: "/time-sync/notif-templates",
-          },
-          {
-            id: 51103,
-            icon: "Send",
-            title: "Delivery Logs",
-            pathname: "/time-sync/notif-logs",
-          },
-          {
-            id: 51104,
-            icon: "Plug",
-            title: "Integrations",
-            pathname: "/time-sync/integrations",
-          },
-          {
-            id: 51105,
-            icon: "Wallet",
-            title: "Payroll Control",
-            pathname: "/time-sync/payroll-periods",
-          },
-          {
-            id: 51106,
-            icon: "CreditCard",
-            title: "Plan & Entitlements",
-            pathname: "/time-sync/entitlements",
-          },
-          {
-            id: 51107,
-            icon: "UserCog",
-            title: "User Access",
-            pathname: "/time-sync/user-access",
-          },
-        ],
-      },
-
-      
-      {
-        id: 51200,
-        icon: "Cpu",
-        title: "AI ASSISTANT",
-        pathname: "/time-sync/ai-chat",
-      
       },
     ],
   },

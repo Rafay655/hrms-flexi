@@ -98,16 +98,6 @@ const tickStyle = { fill: CHART.sage };
 
 const KPI_CARDS = [
   {
-    title: "Total Clocked Today",
-    value: "1,084",
-    sub: "of 1,247 employees",
-    icon: Clock,
-    change: "+2.1%",
-    up: true,
-    bg: "bg-gradient-to-br from-[#322E53] to-[#49426E]",
-    href: "/time-sync/daily-report",
-  },
-  {
     title: "Pending Regularizations",
     value: "138",
     sub: "missing punches",
@@ -127,17 +117,6 @@ const KPI_CARDS = [
     bg: "bg-gradient-to-br from-[#EEC293] to-[#e8b57a]",
     textColor: "text-[#322E53]",
     href: "/time-sync/exceptions-inbox",
-  },
-  {
-    title: "Overtime Hours (MTD)",
-    value: "2,847",
-    sub: "hrs approved",
-    icon: Zap,
-    change: "+341",
-    up: false,
-    bg: "bg-gradient-to-br from-[#F3AB9D] to-[#ef9083]",
-    textColor: "text-[#322E53]",
-    href: "/time-sync/ot-report",
   },
   {
     title: "Machines Online",
@@ -432,29 +411,13 @@ export default function TimeSyncDashboard() {
       </TooltipContent>
     </TooltipPrimitive>
 
-    <TooltipPrimitive>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          asChild
-          size="icon"
-          className="h-8 w-8 border-brand-500 text-brand-500 hover:bg-brand-100"
-        >
-          <Link href="/time-sync/approvals-inbox">
-            <Zap className="h-4 w-4" />
-          </Link>
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <p className="text-xs">OT Approvals</p>
-      </TooltipContent>
-    </TooltipPrimitive>
+
   </TooltipProvider>
 </div>
       </motion.div>
 
       {/* ── KPI Cards (PeopleHub style) ─────────────────── */}
-      <motion.div variants={itemVariants} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <motion.div variants={itemVariants} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {KPI_CARDS.map((stat) => {
           const Icon = stat.icon;
           const TrendIcon = stat.up ? ArrowUpRight : ArrowDownRight;
@@ -497,9 +460,9 @@ export default function TimeSyncDashboard() {
           </Link>
         </Button>
         <Button variant="outline" asChild className="border-brand-700 text-brand-700 hover:bg-brand-100">
-          <Link href="/time-sync/team-dashboard">
+          <Link href="/time-sync/my-team">
             <Users className="mr-2 h-4 w-4" />
-            Team View
+            My Team
           </Link>
         </Button>
         <Button variant="outline" asChild className="border-brand-600 text-brand-600 hover:bg-brand-100">
@@ -518,12 +481,6 @@ export default function TimeSyncDashboard() {
           <Link href="/time-sync/device-management">
             <Cpu className="mr-2 h-4 w-4" />
             Machine Health
-          </Link>
-        </Button>
-        <Button variant="outline" asChild className="border-brand-500 text-brand-800 hover:bg-brand-100">
-          <Link href="/time-sync/ot-report">
-            <BarChart3 className="mr-2 h-4 w-4" />
-            OT Reports
           </Link>
         </Button>
       </motion.div>

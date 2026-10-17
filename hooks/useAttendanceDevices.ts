@@ -1,56 +1,40 @@
-import { showApiError } from "@/lib/error-toast";
+'use client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceDeviceService } from '@/services/attendance-device.service';
+import { useAppSelector } from '@/store/hooks';
 import toast from 'react-hot-toast';
-import type { AttendanceDeviceFormData } from '@/types/attendance-device';
-
+import type { AttendanceDeviceFormData, AttendanceDeviceFilters } from '@/types/attendance-device';
 export const attendanceDeviceKeys = {
   all: ['attendance-devices'] as const,
-  lists: () => [...attendanceDeviceKeys.all, 'list'] as const,
-  list: (params: any) => [...attendanceDeviceKeys.lists(), params] as const,
+  lists: () => ['attendance-devices', 'list'] as const,
+  list: (params: AttendanceDeviceFilters) => ['attendance-devices', 'list', params] as const,
 };
-
-export function useAttendanceDevices(params?: { page?: number; per_page?: number; search?: string; is_active?: number }) {
-  return useQuery({
-    queryKey: attendanceDeviceKeys.list(params || {}),
-    queryFn: () => attendanceDeviceService.getAll(params),
-    placeholderData: (prev) => prev,
-  });
+export function useDeviceScope() {
+  const company = useAppSelector(state => state.auth.company?.id);
+  const user = useAppSelector(state => state.auth.user?.id);
+  return [company, user] as const;
 }
-
+export function useAttendanceDevices(params: AttendanceDeviceFilters = {}) {
+  const scope = useDeviceScope();
+  return useQuery({ queryKey: [...attendanceDeviceKeys.list(params), ...scope], queryFn: ({ signal }) => attendanceDeviceService.getAll(params, signal),
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey.slice(-2).every((value, index) => value === scope[index]) ? previous : undefined });
+}
+export function useAttendanceDevice(uuid: string | null) {
+  const scope = useDeviceScope();
+  return useQuery({ queryKey: [...attendanceDeviceKeys.all, 'detail', uuid, ...scope], queryFn: ({ signal }) => attendanceDeviceService.getById(uuid!, signal), enabled: Boolean(uuid), staleTime: 0 });
+}
 export function useCreateAttendanceDevice() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: AttendanceDeviceFormData) => attendanceDeviceService.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: attendanceDeviceKeys.lists() });
-      toast.success('Device created successfully');
-    },
-    onError: (error: any) => showApiError(error, { fallbackMessage: error.response?.data?.message || 'Failed to create device' }),
-  });
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (form: AttendanceDeviceFormData) => attendanceDeviceService.create(form), retry: false,
+    onSuccess: () => { void client.invalidateQueries({ queryKey: attendanceDeviceKeys.all }); toast.success('Device created successfully'); } });
 }
-
 export function useUpdateAttendanceDevice() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ uuid, data }: { uuid: string; data: AttendanceDeviceFormData }) =>
-      attendanceDeviceService.update(uuid, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: attendanceDeviceKeys.lists() });
-      toast.success('Device updated successfully');
-    },
-    onError: (error: any) => showApiError(error, { fallbackMessage: error.response?.data?.message || 'Failed to update device' }),
-  });
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ uuid, data, includeMappings }: { uuid: string; data: AttendanceDeviceFormData; includeMappings?: boolean }) => attendanceDeviceService.update(uuid, data, includeMappings), retry: false,
+    onSuccess: () => { void client.invalidateQueries({ queryKey: attendanceDeviceKeys.all }); toast.success('Device updated successfully'); } });
 }
-
 export function useDeleteAttendanceDevice() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (uuid: string) => attendanceDeviceService.delete(uuid),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: attendanceDeviceKeys.lists() });
-      toast.success('Device deleted successfully');
-    },
-    onError: (error: any) => showApiError(error, { fallbackMessage: error.response?.data?.message || 'Failed to delete device' }),
-  });
+  const client = useQueryClient();
+  return useMutation({ mutationFn: attendanceDeviceService.delete, retry: false,
+    onSuccess: () => { void client.invalidateQueries({ queryKey: attendanceDeviceKeys.all }); toast.success('Device deleted successfully'); } });
 }
