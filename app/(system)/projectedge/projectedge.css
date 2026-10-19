@@ -1,0 +1,285 @@
+/* ProjectEdge design foundation — scoped so other Flexi HRMS modules keep their own theme. */
+/* Contain absolute table labels without overriding the drawer's fixed positioning. */
+.projectedge-shell:not([role="dialog"]) { position: relative; }
+.projectedge-shell {
+  /* Approved brand board palette. */
+  --pe-brand-900: #322e53;
+  --pe-brand-700: #4a436d;
+  --pe-brand-500: #5b5585;
+  --pe-accent-100: #eec293;
+  --pe-accent-200: #f3ab9d;
+  --pe-canvas: #ebebeb;
+  --pe-white: #ffffff;
+  --pe-ink: #17151f;
+  --pe-muted-ink: #625f6b;
+  --pe-border: #dedce4;
+
+  /* Accessible semantic pairs; the visible label remains the primary signal. */
+  --pe-success: #166534;
+  --pe-success-surface: #dcfce7;
+  --pe-success-border: #86efac;
+  --pe-warning: #92400e;
+  --pe-warning-surface: #fef3c7;
+  --pe-warning-border: #fcd34d;
+  --pe-danger: #b91c1c;
+  --pe-danger-surface: #fee2e2;
+  --pe-danger-border: #fca5a5;
+  --pe-info: #1d4ed8;
+  --pe-info-surface: #dbeafe;
+  --pe-info-border: #93c5fd;
+
+  /* Type scale. */
+  --pe-text-xs: 0.75rem;
+  --pe-leading-xs: 1rem;
+  --pe-text-sm: 0.875rem;
+  --pe-leading-sm: 1.25rem;
+  --pe-text-base: 1rem;
+  --pe-leading-base: 1.5rem;
+  --pe-text-lg: 1.125rem;
+  --pe-leading-lg: 1.75rem;
+  --pe-text-xl: 1.25rem;
+  --pe-leading-xl: 1.75rem;
+  --pe-text-2xl: 1.5rem;
+  --pe-leading-2xl: 2rem;
+  --pe-text-3xl: 1.875rem;
+  --pe-leading-3xl: 2.25rem;
+
+  --pe-radius-card: 0.75rem;
+  --pe-radius-control: 0.5rem;
+  --pe-shadow-card: 0 1px 2px rgb(23 21 31 / 6%), 0 8px 24px rgb(50 46 83 / 5%);
+  --pe-focus-ring: 0 0 0 3px rgb(91 85 133 / 24%);
+
+  /* Existing PE-0401 utilities now resolve to the approved palette. */
+  --color-indigo-50: color-mix(
+    in srgb,
+    var(--pe-brand-500) 8%,
+    var(--pe-white)
+  );
+  --color-indigo-200: var(--pe-border);
+  --color-indigo-400: var(--pe-brand-500);
+  --color-indigo-600: var(--pe-brand-500);
+  --color-indigo-700: var(--pe-brand-700);
+  --color-indigo-800: var(--pe-brand-900);
+  --color-indigo-900: var(--pe-brand-900);
+
+  min-width: 0;
+  /* User-authored names/titles must not set the page's intrinsic minimum width.
+     Keep wide schedules/tables scrollable inside their existing containers. */
+  overflow-wrap: anywhere;
+  /* Clip escaped absolute screen-reader labels, not the nested table scrollers. */
+  overflow-x: clip;
+  color: var(--pe-ink);
+  font-family: var(--font-league-spartan), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--pe-text-base);
+  line-height: var(--pe-leading-base);
+  font-synthesis: none;
+}
+
+.projectedge-shell h1 {
+  color: var(--pe-ink);
+  font-size: var(--pe-text-3xl);
+  font-weight: 700;
+  line-height: var(--pe-leading-3xl);
+}
+
+.projectedge-shell h2 {
+  font-size: var(--pe-text-xl);
+  font-weight: 600;
+  line-height: var(--pe-leading-xl);
+}
+
+.projectedge-shell h3,
+.projectedge-shell .pe-card-title {
+  font-size: var(--pe-text-lg);
+  font-weight: 600;
+  line-height: var(--pe-leading-lg);
+}
+
+.projectedge-shell .pe-card {
+  border-color: var(--pe-border);
+  border-radius: var(--pe-radius-card);
+  background: var(--pe-white);
+  box-shadow: var(--pe-shadow-card);
+}
+
+.projectedge-shell
+  :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-height: 2.75rem;
+  border-color: var(--pe-border);
+  border-radius: var(--pe-radius-control);
+  background-color: var(--pe-white);
+  color: var(--pe-ink);
+  font: inherit;
+}
+
+.projectedge-shell
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea
+  )::placeholder {
+  color: var(--pe-muted-ink);
+  opacity: 0.78;
+}
+
+.projectedge-shell
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea
+  ):focus-visible {
+  border-color: var(--pe-brand-500);
+  box-shadow: var(--pe-focus-ring);
+  outline: none;
+}
+
+.projectedge-shell [data-slot="button"] {
+  min-height: 2.75rem;
+  cursor: pointer;
+  border-radius: var(--pe-radius-control);
+  font-family: inherit;
+  font-weight: 600;
+  transition-duration: 200ms;
+}
+
+.projectedge-shell [data-slot="button"]:disabled {
+  cursor: not-allowed;
+}
+
+.projectedge-shell .pe-button-primary {
+  background: var(--pe-brand-900);
+  color: var(--pe-white);
+}
+
+.projectedge-shell .pe-button-primary:hover:not(:disabled) {
+  background: var(--pe-brand-700);
+}
+
+.projectedge-shell .pe-button-accent {
+  background: var(--pe-accent-100);
+  color: var(--pe-brand-900);
+}
+
+.projectedge-shell .pe-button-accent:hover:not(:disabled) {
+  background: var(--pe-accent-200);
+}
+
+.projectedge-shell .pe-state-neutral {
+  border-color: var(--pe-border);
+  background: var(--pe-canvas);
+  color: var(--pe-muted-ink);
+}
+
+.projectedge-shell .pe-state-success {
+  border-color: var(--pe-success-border);
+  background: var(--pe-success-surface);
+  color: var(--pe-success);
+}
+
+.projectedge-shell .pe-state-warning {
+  border-color: var(--pe-warning-border);
+  background: var(--pe-warning-surface);
+  color: var(--pe-warning);
+}
+
+.projectedge-shell .pe-state-danger {
+  border-color: var(--pe-danger-border);
+  background: var(--pe-danger-surface);
+  color: var(--pe-danger);
+}
+
+.projectedge-shell .pe-state-info {
+  border-color: var(--pe-info-border);
+  background: var(--pe-info-surface);
+  color: var(--pe-info);
+}
+
+.projectedge-shell .pe-gantt-track {
+  background-image: linear-gradient(
+    to right,
+    var(--pe-border) 1px,
+    transparent 1px
+  );
+}
+
+.projectedge-shell .pe-gantt-bar {
+  border-color: var(--pe-brand-500);
+  background-color: var(--pe-canvas);
+  color: var(--pe-brand-900);
+}
+
+.projectedge-shell .pe-gantt-bar button {
+  touch-action: pan-y;
+}
+
+.projectedge-shell .pe-gantt-critical {
+  border-color: var(--pe-danger);
+  color: var(--pe-danger);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--pe-danger-surface) 0 8px,
+    #fff 8px 10px
+  );
+}
+
+@media (max-width: 639px) {
+  .projectedge-shell h1 {
+    font-size: var(--pe-text-2xl);
+    line-height: var(--pe-leading-2xl);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .projectedge-shell *,
+  .projectedge-shell *::before,
+  .projectedge-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+.projectedge-shell .pe-task-workspace h3 {
+  margin-bottom: 0.75rem;
+  font-size: var(--pe-text-lg);
+  font-weight: 600;
+}
+.projectedge-shell .pe-task-workspace p,
+.projectedge-shell .pe-task-workspace dl {
+  overflow-wrap: anywhere;
+}
+.projectedge-shell .pe-task-workspace dt {
+  font-weight: 500;
+}
+.projectedge-shell .pe-task-workspace form > label,
+.projectedge-shell .pe-task-workspace form > select,
+.projectedge-shell .pe-task-workspace form > textarea,
+.projectedge-shell .pe-task-workspace form > input:not([type="checkbox"]) {
+  display: block;
+  width: 100%;
+}
+.projectedge-shell .pe-task-workspace select,
+.projectedge-shell .pe-task-workspace textarea,
+.projectedge-shell .pe-task-workspace input:not([type="checkbox"]) {
+  min-height: 44px;
+  border: 1px solid var(--pe-border, #dedce4);
+  border-radius: 8px;
+  padding: 0.65rem;
+  background: white;
+}
+.projectedge-shell .pe-task-workspace textarea {
+  min-height: 96px;
+}
+.projectedge-shell .pe-milestone-form > label:not(:has(input[type="checkbox"])),
+.projectedge-shell .pe-milestone-form > input,
+.projectedge-shell .pe-milestone-form > textarea,
+.projectedge-shell .pe-milestone-form > select {
+  display: block;
+  width: 100%;
+}
+.projectedge-shell .pe-milestone-form > input,
+.projectedge-shell .pe-milestone-form > textarea,
+.projectedge-shell .pe-milestone-form > select {
+  border: 1px solid var(--pe-border);
+  padding: 0.65rem;
+}
