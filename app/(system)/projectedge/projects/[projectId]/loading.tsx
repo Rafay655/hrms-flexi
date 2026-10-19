@@ -1,0 +1,1 @@
+export default function ProjectWorkspaceLoading() { return <div aria-busy="true" className="space-y-4" role="status"><span className="sr-only">Loading project workspace</span><div className="h-40 animate-pulse rounded-2xl bg-slate-200" /><div className="h-14 animate-pulse rounded-xl bg-slate-200" /><div className="h-72 animate-pulse rounded-2xl bg-slate-200" /></div>; }

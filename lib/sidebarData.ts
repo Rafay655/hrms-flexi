@@ -1828,25 +1828,89 @@ export const modules: ModuleItem[] = [
     Menu: [
       {
         id: 130100,
-        icon: "Zap",
-        title: "PulseCheck",
+        icon: "LayoutDashboard",
+        title: "Dashboard",
+        pathname: "/engageboard",
+      },
+      {
+        id: 130200,
+        icon: "ClipboardList",
+        title: "Surveys",
+        pathname: "/engageboard/surveys",
+      },
+      {
+        id: 130300,
+        icon: "Gauge",
+        title: "eNPS",
+        pathname: "/engageboard/enps",
+      },
+      {
+        id: 130400,
+        icon: "Wallet",
+        title: "Points & Rewards",
         subMenu: [
           {
-            id: 130101,
-            icon: "Zap",
-            title: "Engage Surveys",
+            id: 130401,
+            icon: "Wallet",
+            title: "My Wallet",
+            pathname: "/engageboard/points",
           },
           {
-            id: 130102,
-            icon: "Zap",
-            title: "TeamEvents",
+            id: 130402,
+            icon: "Wallet",
+            title: "Rewards Catalog",
+            pathname: "/engageboard/points/catalog",
           },
           {
-            id: 130103,
-            icon: "Zap",
-            title: "Rewards & Recognition",
+            id: 130403,
+            icon: "Wallet",
+            title: "My Redemptions",
+            pathname: "/engageboard/points/redemptions",
+          },
+          {
+            id: 130404,
+            icon: "Wallet",
+            title: "Admin",
+            pathname: "/engageboard/points/admin",
           },
         ],
+      },
+      {
+        id: 130500,
+        icon: "Newspaper",
+        title: "Company Feed",
+        pathname: "/engageboard/feed",
+      },
+      {
+        id: 130600,
+        icon: "Megaphone",
+        title: "Announcements",
+        pathname: "/engageboard/announcements",
+      },
+      {
+        id: 130700,
+        icon: "Award",
+        title: "Recognitions",
+        subMenu: [
+          {
+            id: 130701,
+            icon: "Award",
+            title: "Give Recognition",
+            pathname: "/engageboard/recognitions",
+          },
+          {
+            id: 130702,
+            icon: "Award",
+            title: "Badges (Admin)",
+            pathname: "/engageboard/recognitions/badges",
+          },
+        ],
+      },
+      {
+        id: 130800,
+        icon: "PartyPopper",
+        title: "Celebrations",
+        pathname: "/engageboard/celebrations",
       },
     ],
     admin: false,
@@ -1857,41 +1921,43 @@ export const modules: ModuleItem[] = [
   {
     id: 11,
     name: "ProjectEdge",
-    icon: "LayoutDashboard",
+    icon: "FolderKanban",
     Menu: [
       {
         id: 110100,
-        icon: "Zap",
-        title: "ProjectPlanner",
-        subMenu: [
-          {
-            id: 110101,
-            icon: "Zap",
-            title: "Project Suite",
-          },
-          {
-            id: 110102,
-            icon: "Zap",
-            title: "TaskMaster",
-          },
-        ],
+        icon: "LayoutDashboard",
+        title: "Overview",
+        pathname: "/projectedge",
       },
       {
         id: 110200,
-        icon: "Zap",
-        title: "Reports",
-        subMenu: [
-          {
-            id: 110201,
-            icon: "Zap",
-            title: "Project Profitability",
-          },
-          {
-            id: 110202,
-            icon: "Zap",
-            title: "Delay Tracker",
-          },
-        ],
+        icon: "FolderKanban",
+        title: "Projects",
+        pathname: "/projectedge/projects",
+      },
+      {
+        id: 110300,
+        icon: "ListChecks",
+        title: "My tasks",
+        pathname: "/projectedge/my-tasks",
+      },
+      {
+        id: 110400,
+        icon: "Clock3",
+        title: "Timesheets",
+        pathname: "/projectedge/timesheets",
+      },
+      {
+        id: 110500,
+        icon: "TriangleAlert",
+        title: "Delay tracker",
+        pathname: "/projectedge/delays",
+      },
+      {
+        id: 110600,
+        icon: "UsersRound",
+        title: "Resources",
+        pathname: "/projectedge/resources",
       },
     ],
     admin: false,
@@ -1995,7 +2061,72 @@ export const modules: ModuleItem[] = [
     icon: "Package",
     admin: false,
     Menu: [
-      { id: 340100, icon: "Package", title: "Overview" },
+      {
+        id: 340100,
+        icon: "LayoutDashboard",
+        title: "Dashboard",
+        pathname: "/ams/dashboard",
+      },
+      {
+        id: 340200,
+        icon: "Layers",
+        title: "Categories",
+        pathname: "/ams/categories",
+      },
+      {
+        id: 340300,
+        icon: "Building2",
+        title: "Vendors",
+        pathname: "/ams/vendors",
+      },
+      {
+        id: 340400,
+        icon: "Package",
+        title: "Assets",
+        pathname: "/ams/assets",
+      },
+      {
+        id: 340500,
+        icon: "UserRound",
+        title: "Assignments",
+        pathname: "/ams/assignments",
+      },
+      {
+        id: 340600,
+        icon: "FileText",
+        title: "Handover Notes",
+        pathname: "/ams/handover-notes",
+      },
+      {
+        id: 340700,
+        icon: "Trash2",
+        title: "Disposals",
+        pathname: "/ams/disposals",
+      },
+      {
+        id: 340800,
+        icon: "KeyRound",
+        title: "Licenses",
+        pathname: "/ams/licenses",
+      },
+      {
+        id: 340850,
+        icon: "Boxes",
+        title: "Bundles",
+        pathname: "/ams/settings/bundles",
+      },
+      {
+        id: 340860,
+        icon: "ClipboardList",
+        title: "Outstanding Bundles",
+        pathname: "/ams/bundles/outstanding",
+      },
+      {
+        id: 340900,
+        icon: "BarChart3",
+        title: "Reports",
+        pathname: "/ams/reports/utilization",
+      },
     ],
   },
   {
@@ -2003,8 +2134,17 @@ export const modules: ModuleItem[] = [
     name: "FlexiDesk",
     icon: "Headset",
     admin: false,
+    // Expands the existing FlexiDesk entry (do not add a second one). Employees use FlexiDesk through
+    // the ESS portal (/ess/tickets); this system entry is for HR / resolvers. Only pages that exist
+    // are linked: more items land with the resolver workspace (Sprint 2) and settings (Sprint 6, now built).
     Menu: [
-      { id: 350100, icon: "Headset", title: "Overview" },
+      { id: 350050, icon: "LayoutDashboard", title: "Overview", pathname: "/flexi-desk/admin" },
+      { id: 350100, icon: "Headset", title: "Tickets", pathname: "/flexi-desk/tickets" },
+      { id: 350200, icon: "Scale", title: "Grievances", pathname: "/flexi-desk/grievances" },
+      { id: 350300, icon: "BookOpen", title: "Knowledge base", pathname: "/flexi-desk/knowledge-base" },
+      { id: 350400, icon: "Heart", title: "Satisfaction", pathname: "/flexi-desk/csat" },
+      { id: 350500, icon: "Settings", title: "Settings", pathname: "/flexi-desk/settings/categories" },
+      { id: 350600, icon: "BarChart3", title: "Reports", pathname: "/flexi-desk/reports" },
     ],
   },
 
