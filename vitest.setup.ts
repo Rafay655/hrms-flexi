@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom/vitest';
 import { vi } from "vitest";
 
 // Node 22+ ships an experimental global `localStorage` (gated on
