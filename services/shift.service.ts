@@ -1,85 +1,42 @@
 import { api } from '@/lib/api';
-import type {
-  Shift,
-  ShiftFormData,
-  ShiftApiPayload,
-  PaginatedShiftsResponse,
-  Weekday,
-} from '@/types/shift';
-
-const BASE_PATH = '/time-sync/shifts';
-
-// Normalise working_days – API may return a JSON string or an array
-const normaliseWorkingDays = (days: any): Weekday[] => {
-  if (!days) return [];
-  if (Array.isArray(days)) return days as Weekday[];
-  if (typeof days === 'string') {
-    try {
-      const parsed = JSON.parse(days);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
+import type { Shift, ShiftFormData, Weekday, ShiftBreakWindow, PaginatedShiftsResponse } from '@/types/shift';
+const ROOT = '/time-sync/shifts';
+interface Envelope<T> { success: boolean; message: string; data: T }
+function checked<T extends { success: boolean; message: string }>(data: T): T {
+  if (!data.success) throw new Error(data.message || 'The shift request failed.');
+  return data;
+}
+function workingDays(value: unknown): Weekday[] {
+  if (Array.isArray(value)) return value as Weekday[];
+  if (typeof value === 'string') { try { const result: unknown = JSON.parse(value); return Array.isArray(result) ? result as Weekday[] : []; } catch { return []; } }
   return [];
-};
-
-const toApiPayload = (data: ShiftFormData): ShiftApiPayload => ({
-  shift_archetype_id: data.shift_archetype_id || null,
-  name: data.name.trim(),
-  code: data.code.trim(),
-  shift_type: data.shift_type as ShiftApiPayload['shift_type'],
-  start_time: data.start_time,
-  end_time: data.end_time,
-  is_night_shift: data.is_night_shift,
-  grace_minutes: data.grace_minutes,
-  early_out_grace_minutes: data.early_out_grace_minutes,
-  break_duration_minutes: data.break_duration_minutes,
-  overtime_allowed: data.overtime_allowed,
-  ot_threshold_minutes: data.ot_threshold_minutes,
-  max_ot_minutes_per_day: data.max_ot_minutes_per_day
-    ? parseInt(data.max_ot_minutes_per_day)
-    : null,
-  working_days: data.working_days,
-  is_active: data.is_active,
-  attendance_policy_id: data.attendance_policy_id,
-});
-
+}
+function breakWindows(raw: unknown): ShiftBreakWindow[] {
+  if (raw == null || raw === '') return [];
+  let value: unknown = raw;
+  if (typeof value === 'string') { try { value = JSON.parse(value); } catch { throw new Error('The shift returned an invalid break schedule.'); } }
+  if (!Array.isArray(value)) throw new Error('The shift returned an invalid break schedule.');
+  return value.map((item: unknown) => {
+    if (!item || typeof item !== 'object' || !('days' in item) || !Array.isArray(item.days) || !('start' in item) || typeof item.start !== 'string' || !('end' in item) || typeof item.end !== 'string') throw new Error('The shift returned an incomplete break window.');
+    return { days: workingDays(item.days), start: item.start.slice(0, 5), end: item.end.slice(0, 5), paid: 'paid' in item && (item.paid === true || item.paid === 1), label: 'label' in item && typeof item.label === 'string' ? item.label : '' };
+  });
+}
+const normalize = (shift: Shift): Shift => ({ ...shift, working_days: workingDays(shift.working_days), break_windows: breakWindows(shift.break_windows) });
+const payload = (data: ShiftFormData): Record<string, unknown> => ({ ...data, name: data.name.trim(), code: data.code.trim(), attendance_policy_id: data.attendance_policy_id || null, start_time: data.start_time.slice(0, 5), end_time: data.end_time.slice(0, 5), max_ot_minutes_per_day: data.max_ot_minutes_per_day === '' ? null : Number(data.max_ot_minutes_per_day) });
 export const shiftService = {
-  getAll: async (params?: {
-    page?: number;
-    per_page?: number;
-    search?: string;
-    is_active?: number;
-  }) => {
-    const response = await api.get<PaginatedShiftsResponse>(BASE_PATH, { params });
-    // Normalise working_days for every record
-    if (response.data?.data?.data) {
-      response.data.data.data = response.data.data.data.map((s: any) => ({
-        ...s,
-        working_days: normaliseWorkingDays(s.working_days),
-      }));
-    }
-    return response.data;
+  async getAll(params?: { page?: number; per_page?: number; search?: string; is_active?: number }): Promise<PaginatedShiftsResponse> {
+    const response = checked((await api.get<Envelope<Shift[] | PaginatedShiftsResponse['data']> & { meta?: PaginatedShiftsResponse['data']['meta'] }>(ROOT, { params })).data);
+    const rows = Array.isArray(response.data) ? response.data : response.data?.data;
+    const meta = Array.isArray(response.data) ? response.meta : response.data?.meta;
+    if (!Array.isArray(rows) || !meta) throw new Error('Unexpected shift listing response.');
+    return { ...response, data: { data: rows.map(normalize), meta, links: null } };
   },
-
-  getById: async (uuid: string) => {
-    const response = await api.get(`${BASE_PATH}/${uuid}`);
-    const item = response.data.data;
-    return { ...item, working_days: normaliseWorkingDays(item.working_days) };
+  async getById(uuid: string): Promise<Shift> { return normalize(checked((await api.get<Envelope<Shift>>(`${ROOT}/${uuid}`)).data).data); },
+  async save({ uuid, payload }: { uuid?: string; payload: Record<string, unknown> }): Promise<Shift> {
+    const response = uuid ? await api.put<Envelope<Shift>>(`${ROOT}/${uuid}`, payload) : await api.post<Envelope<Shift>>(ROOT, payload);
+    return normalize(checked(response.data).data);
   },
-
-  create: async (payload: ShiftFormData) => {
-    const response = await api.post(BASE_PATH, toApiPayload(payload));
-    return response.data.data;
-  },
-
-  update: async (uuid: string, payload: ShiftFormData) => {
-    const response = await api.put(`${BASE_PATH}/${uuid}`, toApiPayload(payload));
-    return response.data.data;
-  },
-
-  delete: async (uuid: string) => {
-    await api.delete(`${BASE_PATH}/${uuid}`);
-  },
+  async create(data: ShiftFormData) { return shiftService.save({ payload: payload(data) }); },
+  async update(uuid: string, data: ShiftFormData) { return shiftService.save({ uuid, payload: payload(data) }); },
+  async delete(uuid: string) { const response = await api.delete<Envelope<unknown>>(`${ROOT}/${uuid}`); if (response.data) checked(response.data); },
 };

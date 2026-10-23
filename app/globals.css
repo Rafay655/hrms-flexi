@@ -6,7 +6,6 @@
 :root {
   --radius: 0.625rem;
 
-  /* base */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
 
@@ -26,7 +25,6 @@
   --brand-300: #f7c9b9;   /* light salmon — soft backgrounds */
   --brand-100: #F5F4F8;   /* Flexi background — page background */
 
-  /* Semantic aliases */
   --brand-dark:    var(--brand-800); /* #322E53 */
   --brand-darker:  var(--brand-900); /* #1E1A3A */
   --brand-light:   var(--brand-300); /* #f7c9b9 */
@@ -36,7 +34,7 @@
   --brand-sage:    var(--brand-700); /* #49426E */
   --brand-gold:    var(--brand-500); /* #EEC293 */
 
-  /* Gradient stops */
+
   --brand-gradient-from: #322E53;
   --brand-gradient-mid:  #49426E;
   --brand-gradient-to:   #EEC293;

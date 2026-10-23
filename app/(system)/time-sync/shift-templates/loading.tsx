@@ -1,0 +1,2 @@
+import { AppLoader } from '@/components/ui/app-loader';
+export default function Loading() { return <AppLoader variant="page" label="Loading shift templates…" />; }

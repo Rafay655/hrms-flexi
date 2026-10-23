@@ -1,186 +1,79 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarCheck, Users, Save } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { addMonths, format, parseISO } from 'date-fns';
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Clock3, LayoutGrid, List, Moon, RefreshCw, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import SearchableSelect from '@/components/ui/searchable-select';
+import { AppLoader } from '@/components/ui/app-loader';
+import { ApiErrorState } from '@/components/ui/api-error-state';
+import { useAppSelector } from '@/store/hooks';
+import { attendanceCalendarService } from '@/services/attendance-calendar.service';
+import { calendarLabel, duration, monthDates, monthRange, statusTone } from '@/lib/attendance-calendar';
+import type { AttendanceCalendarDay, CalendarEmployee } from '@/types/attendance-calendar';
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const TEAMS = ["Production Floor A", "Production Floor B", "QC Team", "Warehouse", "Admin"];
-
-const SAMPLE_CALENDAR = [
-  { day: 1, shift: "M", color: "bg-amber-100 text-amber-700" },
-  { day: 2, shift: "M", color: "bg-amber-100 text-amber-700" },
-  { day: 3, shift: "E", color: "bg-orange-100 text-orange-700" },
-  { day: 4, shift: "E", color: "bg-orange-100 text-orange-700" },
-  { day: 5, shift: "N", color: "bg-indigo-100 text-indigo-700" },
-  { day: 6, shift: "OFF", color: "bg-slate-100 text-slate-500" },
-  { day: 7, shift: "OFF", color: "bg-slate-100 text-slate-500" },
-];
+const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const time = (value?: string | null) => value ? value.slice(0, 5) : '—';
 
 export default function CalendarAssignmentPage() {
-  const [month, setMonth] = useState("April 2026");
+  const company = useAppSelector(state => state.auth.company?.id);
+  return <AttendanceCalendar key={company} company={company} />;
+}
+function AttendanceCalendar({ company }: { company?: string }) {
+  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [employeeId, setEmployeeId] = useState('');
+  const [view, setView] = useState<'month' | 'team'>('month');
+  const [detail, setDetail] = useState<{ employee: CalendarEmployee['employee']; day: AttendanceCalendarDay } | null>(null);
+  const range = monthRange(month);
+  const query = useQuery({ queryKey: ['attendance-calendar', company, month, page, perPage], queryFn: ({ signal }) => attendanceCalendarService.get({ ...range, page, per_page: perPage }, signal), retry: false });
+  const employees = query.data?.data.employees ?? [];
+  const employee = employees.find(item => String(item.employee.id) === employeeId) ?? employees[0];
+  const meta = query.data?.meta;
+  const days = monthDates(month);
+  const offset = (parseISO(days[0]).getDay() + 6) % 7;
+  const byDate = new Map(employee?.days.map(day => [day.date, day]) ?? []);
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const setPeriod = (value: string) => { if (!/^\d{4}-\d{2}$/.test(value) || Number(value.slice(0, 4)) < 1 || Number(value.slice(5)) < 1 || Number(value.slice(5)) > 12) return; setMonth(value); setPage(1); setEmployeeId(''); };
+  const moveMonth = (amount: number) => setPeriod(format(addMonths(parseISO(`${month}-01`), amount), 'yyyy-MM'));
+  const summary = employee?.summary;
+  const from = employees.length ? (page - 1) * perPage + 1 : 0;
+  const to = employees.length ? from + employees.length - 1 : 0;
+  const lastPage = Math.max(1, meta?.last_page ?? 1);
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Calendar Assignment</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Assign shift patterns across calendar dates for teams and departments. Perfect for
-            planning public holidays, seasonal schedules, and recurring rotations.
-          </p>
-        </div>
-        <Button className="bg-indigo-900 hover:bg-indigo-800 text-white">
-          <Save className="h-4 w-4 mr-2" />
-          Save Calendar
-        </Button>
+  return <div className="p-3"><Card className="overflow-hidden border-gray-100 shadow-sm">
+    <CardHeader className="border-b"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><div className="mb-1 flex items-center gap-2 text-xs font-medium text-brand-700"><CalendarDays className="h-4 w-4" />TimeSync</div><CardTitle className="text-2xl font-semibold text-gray-900">Attendance Calendar</CardTitle><p className="mt-1 text-sm text-muted-foreground">Your team’s shifts, attendance, and exceptions in one view.</p></div><Button variant="outline" size="sm" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`} />Refresh</Button></div></CardHeader>
+    <CardContent className="space-y-5 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2"><Button variant="outline" size="icon" aria-label="Previous month" onClick={() => moveMonth(-1)}><ChevronLeft className="h-4 w-4" /></Button><div><label htmlFor="calendar-month" className="sr-only">Calendar month</label><Input id="calendar-month" type="month" value={month} onChange={event => setPeriod(event.target.value)} className="w-44 font-medium" /></div><Button variant="outline" size="icon" aria-label="Next month" onClick={() => moveMonth(1)}><ChevronRight className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => setPeriod(format(new Date(), 'yyyy-MM'))}>This month</Button></div>
+        <div className="flex rounded-lg border bg-brand-100 p-1" aria-label="Calendar view">{[{ value: 'month', label: 'Monthly', icon: LayoutGrid }, { value: 'team', label: 'Team overview', icon: List }].map(({ value, label, icon: Icon }) => <Button key={value} variant="ghost" size="sm" aria-pressed={view === value} className={view === value ? 'bg-brand-900 text-white hover:bg-brand-800 hover:text-white' : 'text-brand-700'} onClick={() => setView(value as 'month' | 'team')}><Icon className="mr-2 h-4 w-4" />{label}</Button>)}</div>
       </div>
+      {query.isPending ? <AppLoader label="Loading attendance calendar…" /> : query.isError ? <ApiErrorState error={query.error} onRetry={() => void query.refetch()} /> : !employees.length ? <div className="rounded-xl border border-dashed bg-brand-100/40 px-6 py-16 text-center"><CalendarDays className="mx-auto h-10 w-10 text-brand-600" /><h2 className="mt-4 font-semibold">No calendar records for this month</h2><p className="mt-1 text-sm text-muted-foreground">Choose another month to explore attendance and shift schedules.</p></div> : <>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-600/15 bg-brand-100/60 p-3"><p className="text-sm text-brand-800"><strong>{format(parseISO(`${month}-01`), 'MMMM yyyy')}</strong><span className="mx-2 text-brand-600/40">/</span>{meta?.total.toLocaleString()} employees</p><div className="flex items-center gap-2 text-xs text-muted-foreground"><span>Employees per page</span><SearchableSelect aria-label="Employees per page" allowAll={false} widthClass="w-24" value={String(perPage)} options={[10, 25, 50].map(value => ({ value: String(value), label: String(value) }))} onChange={value => { setPerPage(Number(value)); setPage(1); setEmployeeId(''); }} /></div></div>
+        {view === 'month' && employee && <>
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div className="flex min-w-0 items-center gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-900 text-sm font-semibold text-[#EEC293]">{employee.employee.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</div><div className="min-w-0"><h2 className="truncate text-base font-semibold text-gray-900">{employee.employee.name}</h2><p className="truncate text-xs text-muted-foreground">{employee.employee.employee_code} · {employee.employee.department || 'No department'}</p></div></div><SearchableSelect aria-label="Select employee on this page" widthClass="w-full sm:w-72" allowAll={false} value={String(employee.employee.id)} options={employees.map(item => ({ value: String(item.employee.id), label: `${item.employee.name} · ${item.employee.employee_code}` }))} onChange={setEmployeeId} /></div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[{ label: 'Present days', value: summary?.present_days ?? 0, caption: `${summary?.working_days ?? 0} working days`, icon: Users }, { label: 'Hours worked', value: duration(summary?.total_work_minutes), caption: 'Recorded this month', icon: Clock3 }, { label: 'Leave / holidays', value: `${summary?.leave_days ?? 0} / ${summary?.holiday_days ?? 0}`, caption: `${summary?.weekly_off_days ?? 0} weekly off days`, icon: CalendarDays }, { label: 'Anomalies', value: summary?.anomaly_count ?? 0, caption: `${summary?.absent_days ?? 0} absent days`, icon: AlertCircle }].map(({ label, value, caption, icon: Icon }) => <div key={label} className="rounded-xl border border-brand-600/10 bg-brand-100/40 p-4"><div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>{label}</span><Icon className="h-4 w-4 text-brand-600" /></div><p className="mt-2 text-2xl font-semibold tracking-tight text-brand-900">{value}</p><p className="mt-1 text-xs text-muted-foreground">{caption}</p></div>)}</div>
+          <div className="overflow-x-auto rounded-xl border border-gray-200"><div className="min-w-[630px]"><div className="grid grid-cols-7 border-b bg-brand-100/70">{weekdays.map(day => <div key={day} className="px-3 py-3 text-center text-xs font-semibold text-brand-700">{day}</div>)}</div><div className="grid grid-cols-7 gap-px bg-gray-200">{Array.from({ length: offset }, (_, index) => <div key={`blank-${index}`} className="min-h-32 bg-gray-50" aria-hidden="true" />)}{days.map(date => {
+            const day = byDate.get(date);
+            return <button key={date} type="button" disabled={!day} aria-label={`${date}: ${day ? calendarLabel(day.status) : 'No record'}`} onClick={() => day && setDetail({ employee: employee.employee, day })} className={`group flex min-h-32 min-w-0 flex-col bg-white p-2.5 text-left transition hover:bg-brand-100/70 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-brand-700 disabled:cursor-default disabled:bg-gray-50/80 ${date === today ? 'ring-2 ring-inset ring-brand-600' : ''}`}><span className="flex w-full items-center justify-between gap-1"><span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${date === today ? 'bg-brand-900 text-white' : 'text-gray-700'}`}>{Number(date.slice(-2))}</span>{day && day.anomalies.length > 0 && <span title={`${day.anomalies.length} anomalies`} className="flex items-center gap-1 text-[10px] text-amber-700"><AlertCircle className="h-3 w-3" />{day.anomalies.length}</span>}</span>{day ? <><span className="mt-2 flex items-center gap-1 truncate text-xs font-semibold text-brand-900">{day.shift?.is_night_shift && <Moon className="h-3 w-3 shrink-0" />}{day.display_code || day.shift_code || 'No shift'}</span><span className={`mt-1 max-w-full truncate rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${statusTone(day.status)}`}>{calendarLabel(day.status)}</span>{day.holiday ? <span className="mt-1 max-w-full truncate text-[10px] text-violet-700" title={day.holiday.name}>{day.holiday.name}</span> : day.leave ? <span className="mt-1 text-[10px] text-violet-700">On leave</span> : <span className="mt-1 text-[10px] text-muted-foreground">{day.attendance?.first_in ? `${time(day.attendance.first_in)} – ${time(day.attendance.last_out)}` : calendarLabel(day.day_type)}</span>}</> : <span className="mt-3 text-[10px] text-muted-foreground">No record</span>}</button>;
+          })}{Array.from({ length: (7 - (offset + days.length) % 7) % 7 }, (_, index) => <div key={`end-${index}`} className="min-h-32 bg-gray-50" aria-hidden="true" />)}</div></div></div><p className="text-xs text-muted-foreground">Select a day to review details. On smaller screens, scroll the calendar horizontally.</p>
+        </>}
+        {view === 'team' && <div className="max-h-[65vh] overflow-auto rounded-xl border"><table className="w-full border-separate border-spacing-0 text-xs"><caption className="sr-only">Team attendance for {month}</caption><thead className="sticky top-0 z-20"><tr><th className="sticky left-0 z-30 min-w-52 border-b border-r bg-brand-100 p-3 text-left text-brand-900">Employee</th>{days.map(date => <th key={date} className="min-w-20 border-b bg-brand-100 p-2 text-center"><span className="block text-[10px] font-normal text-muted-foreground">{format(parseISO(date), 'EEE')}</span><span className="text-brand-900">{Number(date.slice(-2))}</span></th>)}</tr></thead><tbody>{employees.map(item => { const map = new Map(item.days.map(day => [day.date, day])); return <tr key={item.employee.id}><th scope="row" className="sticky left-0 z-10 border-b border-r bg-white p-3 text-left"><span className="block font-semibold">{item.employee.name}</span><span className="mt-1 block text-[10px] font-normal text-muted-foreground">{item.employee.employee_code}</span></th>{days.map(date => { const day = map.get(date); return <td key={date} className="border-b p-1.5 text-center">{day ? <button className={`relative w-full rounded-lg border p-2 ${statusTone(day.status)}`} aria-label={`${item.employee.name}, ${date}: ${calendarLabel(day.status)}`} onClick={() => setDetail({ employee: item.employee, day })}><span className="block font-semibold">{day.display_code || day.shift_code || '—'}</span><span className="mt-1 block whitespace-nowrap text-[9px]">{calendarLabel(day.status)}</span>{day.anomalies.length > 0 && <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-600" />}</button> : <span className="text-gray-400">—</span>}</td>; })}</tr>; })}</tbody></table></div>}
+        <div className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-4 text-xs text-muted-foreground" aria-label="Attendance status legend">{['present', 'late_in', 'early_out', 'absent', 'leave', 'weekend'].map(status => <span key={status} className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded border ${statusTone(status)}`} />{calendarLabel(status)}</span>)}</div>
+        {!!query.data?.data.shift_legend.length && <div className="flex flex-wrap gap-2" aria-label="Shift legend">{query.data.data.shift_legend.map(shift => <span key={shift.id} className="rounded-md border bg-white px-2.5 py-1.5 text-xs text-muted-foreground"><strong className="mr-1 text-brand-800">{shift.code}</strong>{shift.name} · {time(shift.start_time)}–{time(shift.end_time)}{shift.is_night_shift ? ' · Night' : ''}</span>)}</div>}
+      </>}
+      {meta && <div className="flex flex-col items-center justify-between gap-3 border-t pt-4 text-sm text-muted-foreground sm:flex-row"><span>Employees {from}–{to} of {meta.total.toLocaleString()}</span><div className="flex items-center gap-3"><Button variant="outline" size="sm" disabled={query.isFetching || page <= 1} onClick={() => { setPage(page - 1); setEmployeeId(''); }}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><span>Page {page} of {lastPage}</span><Button variant="outline" size="sm" disabled={query.isFetching || page >= lastPage} onClick={() => { setPage(page + 1); setEmployeeId(''); }}>Next<ChevronRight className="ml-1 h-4 w-4" /></Button></div></div>}
+    </CardContent>
+  </Card>{detail && <DayDetails {...detail} onClose={() => setDetail(null)} />}</div>;
+}
 
-      {/* Controls */}
-      <Card>
-        <CardContent className="pt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="text-xs font-medium text-slate-600 uppercase">Team / Group</label>
-            <Select defaultValue={TEAMS[0]}>
-              <SelectTrigger className="mt-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TEAMS.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600 uppercase">Template</label>
-            <Select defaultValue="standard">
-              <SelectTrigger className="mt-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="standard">Standard 5-Day Rotation</SelectItem>
-                <SelectItem value="factory">Factory 3-Shift</SelectItem>
-                <SelectItem value="weekend">Weekend-Off 6 Day</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600 uppercase">Period</label>
-            <div className="flex items-center gap-2 mt-1.5">
-              <Button variant="outline" size="icon" className="h-9 w-9">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex-1 text-center font-semibold text-slate-800 h-9 flex items-center justify-center border border-slate-200 rounded-md bg-white">
-                {month}
-              </div>
-              <Button variant="outline" size="icon" className="h-9 w-9">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-xs">
-        <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded bg-amber-100 border border-amber-200"></div>
-          <span className="text-slate-600">Morning</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded bg-orange-100 border border-orange-200"></div>
-          <span className="text-slate-600">Evening</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded bg-indigo-100 border border-indigo-200"></div>
-          <span className="text-slate-600">Night</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-3 w-3 rounded bg-slate-100 border border-slate-200"></div>
-          <span className="text-slate-600">Off</span>
-        </div>
-      </div>
-
-      {/* Calendar Grid */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarCheck className="h-4 w-4" />
-            {month} Schedule
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {DAYS.map((day) => (
-              <div
-                key={day}
-                className="text-center text-xs font-semibold text-slate-500 uppercase py-2"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: 30 }).map((_, i) => {
-              const sample = SAMPLE_CALENDAR[i % 7];
-              return (
-                <button
-                  key={i}
-                  className={`aspect-square rounded-md border border-slate-200 p-2 text-left hover:border-indigo-400 transition-colors ${sample.color}`}
-                >
-                  <div className="text-xs font-semibold">{i + 1}</div>
-                  <div className="text-[10px] font-bold mt-1">{sample.shift}</div>
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Coverage Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-amber-50 rounded-lg p-3">
-            <p className="text-xs text-amber-700 font-medium">Morning</p>
-            <p className="text-xl font-bold text-amber-900">8 days</p>
-            <p className="text-xs text-amber-600">64 emp-days</p>
-          </div>
-          <div className="bg-orange-50 rounded-lg p-3">
-            <p className="text-xs text-orange-700 font-medium">Evening</p>
-            <p className="text-xl font-bold text-orange-900">8 days</p>
-            <p className="text-xs text-orange-600">56 emp-days</p>
-          </div>
-          <div className="bg-indigo-50 rounded-lg p-3">
-            <p className="text-xs text-indigo-700 font-medium">Night</p>
-            <p className="text-xl font-bold text-indigo-900">4 days</p>
-            <p className="text-xs text-indigo-600">24 emp-days</p>
-          </div>
-          <div className="bg-slate-50 rounded-lg p-3">
-            <p className="text-xs text-slate-600 font-medium">Off Days</p>
-            <p className="text-xl font-bold text-slate-800">10 days</p>
-            <p className="text-xs text-slate-500">weekends + holidays</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+function DayDetails({ employee, day, onClose }: { employee: CalendarEmployee['employee']; day: AttendanceCalendarDay; onClose: () => void }) {
+  const attendance = day.attendance;
+  const values = [{ label: 'Shift', value: day.shift ? `${day.shift.name} (${day.shift.code})` : day.shift_code || 'Not assigned' }, { label: 'Scheduled time', value: day.shift ? `${time(day.shift.start_time)} – ${time(day.shift.end_time)}${day.shift.is_night_shift ? ' · Night shift' : ''}` : '—' }, { label: 'Check in', value: time(attendance?.first_in) }, { label: 'Check out', value: time(attendance?.last_out) }, { label: 'Worked', value: duration(attendance?.work_minutes) }, { label: 'Overtime', value: duration(attendance?.overtime_minutes) }, { label: 'Late arrival', value: duration(attendance?.late_minutes) }, { label: 'Early departure', value: duration(attendance?.early_out_minutes) }, { label: 'Breaks', value: duration(attendance?.break_minutes) }, { label: 'Day type', value: calendarLabel(day.day_type) }, { label: 'Shift source', value: calendarLabel(day.shift_source) }, { label: 'Roster status', value: calendarLabel(day.roster?.status) }];
+  return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"><DialogHeader className="border-b bg-brand-100/60 px-6 py-5 pr-14 text-left"><DialogTitle>{format(parseISO(day.date), 'EEEE, d MMMM yyyy')}</DialogTitle><DialogDescription>{employee.name} · {employee.employee_code}</DialogDescription></DialogHeader><div className="min-h-0 space-y-5 overflow-y-auto p-6"><div className="flex flex-wrap gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusTone(day.status)}`}>{calendarLabel(day.status)}</span>{day.roster?.is_weekly_off && <span className="rounded-full border px-3 py-1 text-xs">Roster weekly off</span>}{attendance?.is_regularized && <span className="rounded-full border px-3 py-1 text-xs">Regularized</span>}{attendance?.is_locked && <span className="rounded-full border px-3 py-1 text-xs">Locked</span>}</div><dl className="grid grid-cols-2 gap-4 rounded-xl border bg-brand-100/30 p-4">{values.map(({ label, value }) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm font-medium text-brand-900">{value}</dd></div>)}</dl>{day.holiday && <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-800"><strong>Holiday:</strong> {day.holiday.name}{day.holiday.is_optional ? ' · Optional' : ''}</div>}{day.leave && <section><h3 className="text-sm font-semibold">Leave</h3><dl className="mt-2 grid grid-cols-2 gap-3 text-sm">{Object.entries(day.leave).filter(([, value]) => value !== null && ['string', 'number', 'boolean'].includes(typeof value)).map(([key, value]) => <div key={key}><dt className="text-xs text-muted-foreground">{calendarLabel(key)}</dt><dd className="mt-1 break-words">{String(value)}</dd></div>)}</dl></section>}{day.anomalies.length > 0 && <section><h3 className="flex items-center gap-2 text-sm font-semibold"><AlertCircle className="h-4 w-4 text-amber-700" />Reported anomalies</h3><div className="mt-2 flex flex-wrap gap-2">{day.anomalies.map((value, index) => <span key={`${value}-${index}`} className="rounded-md border border-[#EEC293] bg-[#EEC293]/20 px-2 py-1 text-xs text-brand-900">{calendarLabel(value)}</span>)}</div><p className="mt-2 text-xs text-muted-foreground">These flags are reported by the attendance system and may coexist with a day’s status.</p></section>}{day.roster?.notes && <div><h3 className="text-xs text-muted-foreground">Roster notes</h3><p className="mt-1 whitespace-pre-wrap break-words text-sm">{day.roster.notes}</p></div>}</div><DialogFooter className="border-t bg-muted/30 px-6 py-4"><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter></DialogContent></Dialog>;
 }

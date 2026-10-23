@@ -1,6 +1,8 @@
 "use client";
 
-import { showApiError } from "@/lib/error-toast";
+import { AppLoader } from "@/components/ui/app-loader";
+import { ApiErrorState } from "@/components/ui/api-error-state";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,18 +35,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  DownloadIcon,
-  SearchIcon,
+  MoreVertical,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Loader2,
   PlusIcon,
   Eye,
   Pencil,
   Trash2,
-  CalendarIcon,
 } from "lucide-react";
 import {
   flexRender,
@@ -91,16 +91,18 @@ const RosterListingPage: React.FC = () => {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  const changePage = (value: React.SetStateAction<number>) => { setSelectedIds([]); setPage(value); };
+
   // Fetch dropdown data
   const { data: employeesRaw, isLoading: isLoadingEmployees } = useEmployees({
     per_page: 1000,
     detailed: 0,
   });
-  const employees = employeesRaw ?? [];
+  const employees = useMemo(() => employeesRaw ?? [], [employeesRaw]);
   const employeeOptions: Option[] = useMemo(
     () =>
       employees.map((e) => ({
-        value: e.uuid,
+        value: String(e.uuid),
         label: `${e.employee_code} – ${e.name}`,
       })),
     [employees]
@@ -111,8 +113,8 @@ const RosterListingPage: React.FC = () => {
   const shiftOptions: Option[] = useMemo(
     () => [
       { value: "", label: "— None —" },
-      ...shifts.map((s: any) => ({
-        value: s.uuid ?? s.id,
+      ...shifts.map((s) => ({
+        value: String(s.uuid ?? s.id),
         label: `${s.name} (${s.code})`,
       })),
     ],
@@ -126,8 +128,8 @@ const RosterListingPage: React.FC = () => {
   const templateOptions: Option[] = useMemo(
     () => [
       { value: "", label: "— None —" },
-      ...templates.map((t: any) => ({
-        value: t.uuid ?? t.id,
+      ...templates.map((t) => ({
+        value: String(t.id),
         label: t.name,
       })),
     ],
@@ -135,7 +137,7 @@ const RosterListingPage: React.FC = () => {
   );
 
   // Fetch roster data
-  const { data, isLoading, isFetching, error } = useRosters({
+  const { data, isLoading, isFetching, error, refetch } = useRosters({
     page,
     per_page: perPage,
     date_from: dateFrom || undefined,
@@ -144,7 +146,7 @@ const RosterListingPage: React.FC = () => {
     employee_id: employeeFilterId || undefined,
   });
 
-  const rosters = data?.data ?? [];
+  const rosters = useMemo(() => data?.data ?? [], [data]);
   const totalEntries = data?.meta?.total ?? 0;
   const totalPages = data?.meta?.last_page ?? 1;
 
@@ -153,6 +155,8 @@ const RosterListingPage: React.FC = () => {
   const updateMutation = useUpdateRoster();
   const deleteMutation = useDeleteRoster();
   const publishMutation = usePublishRosters();
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -174,24 +178,23 @@ const RosterListingPage: React.FC = () => {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
+    setSelectedIds([]);
   }, [perPage, dateFrom, dateTo, statusFilter, employeeFilterId]);
 
-  useEffect(() => {
-    if (error) showApiError(error, { fallbackMessage: "Failed to load rosters" });
-  }, [error]);
+
 
   // CRUD handlers
   const handleView = (item: RosterAssignment) => {
     setSelectedItem(item);
     setFormData({
-      employee_id: item.employee_id,
-      shift_id: item.shift_id ?? "",
-      roster_date: item.roster_date.split("T")[0] ?? item.roster_date.split(" ")[0],
+      employee_id: String(item.employee_id),
+      shift_id: item.shift_id == null ? "" : String(item.shift_id),
+      roster_date: item.roster_date.slice(0, 10),
       is_weekly_off: item.is_weekly_off,
       is_holiday: item.is_holiday,
       status: item.status,
       notes: item.notes ?? "",
-      template_id: item.template_id ?? "",
+      template_id: item.template_id == null ? "" : String(item.template_id),
     });
     setModalMode("view");
     setIsModalOpen(true);
@@ -200,14 +203,14 @@ const RosterListingPage: React.FC = () => {
   const handleEdit = (item: RosterAssignment) => {
     setSelectedItem(item);
     setFormData({
-      employee_id: item.employee_id,
-      shift_id: item.shift_id ?? "",
-      roster_date: item.roster_date.split("T")[0] ?? item.roster_date.split(" ")[0],
+      employee_id: String(item.employee_id),
+      shift_id: item.shift_id == null ? "" : String(item.shift_id),
+      roster_date: item.roster_date.slice(0, 10),
       is_weekly_off: item.is_weekly_off,
       is_holiday: item.is_holiday,
       status: item.status,
       notes: item.notes ?? "",
-      template_id: item.template_id ?? "",
+      template_id: item.template_id == null ? "" : String(item.template_id),
     });
     setModalMode("edit");
     setIsModalOpen(true);
@@ -218,7 +221,7 @@ const RosterListingPage: React.FC = () => {
     setFormData({
       employee_id: "",
       shift_id: "",
-      roster_date: new Date().toISOString().slice(0, 10),
+      roster_date: new Date().toLocaleDateString("en-CA"),
       is_weekly_off: false,
       is_holiday: false,
       status: "draft",
@@ -233,7 +236,7 @@ const RosterListingPage: React.FC = () => {
 
   const confirmDelete = () => {
     if (deleteUuid) {
-      deleteMutation.mutate(deleteUuid, { onSuccess: () => setDeleteUuid(null) });
+      deleteMutation.mutate(deleteUuid, { onSuccess: () => { setDeleteUuid(null); setSelectedIds(ids => ids.filter(id => id !== deleteUuid)); if (rosters.length === 1 && page > 1) setPage(page - 1); } });
     }
   };
 
@@ -247,6 +250,7 @@ const RosterListingPage: React.FC = () => {
       return;
     }
 
+    if (isSaving) return;
     const payload = { ...formData };
 
     if (modalMode === "create") {
@@ -277,6 +281,7 @@ const RosterListingPage: React.FC = () => {
         id: "select",
         header: ({ table }) => (
           <Checkbox
+            aria-label="Select all assignments on this page"
             checked={
               table.getIsAllRowsSelected() ||
               (table.getIsSomeRowsSelected() && "indeterminate")
@@ -295,13 +300,14 @@ const RosterListingPage: React.FC = () => {
         ),
         cell: ({ row }) => (
           <Checkbox
+            aria-label={`Select assignment for ${row.original.employee?.name ?? row.original.employee_id}`}
             checked={row.getIsSelected()}
             onCheckedChange={(value) => {
               row.toggleSelected(!!value);
               const id = row.original.id;
               setSelectedIds((prev) =>
                 value
-                  ? [...prev, id]
+                  ? [...new Set([...prev, id])]
                   : prev.filter((uid) => uid !== id)
               );
             }}
@@ -328,7 +334,7 @@ const RosterListingPage: React.FC = () => {
               <div>
                 <div className="font-semibold">{row.original.shift.name}</div>
                 <div className="text-xs text-gray-500">
-                  {row.original.shift.start_time} – {row.original.shift.end_time}
+                  {row.original.shift.start_time?.slice(0, 5)} – {row.original.shift.end_time?.slice(0, 5)}
                 </div>
               </div>
             ) : (
@@ -376,19 +382,9 @@ const RosterListingPage: React.FC = () => {
       },
       {
         id: "actions",
-        header: () => <div className="text-center">Actions</div>,
+        header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => (
-          <div className="flex justify-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => handleView(row.original)}>
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleEdit(row.original)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleDelete(row.original.id)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${row.original.employee?.name ?? row.original.employee_id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem onSelect={() => handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem onSelect={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
         ),
       },
     ],
@@ -397,18 +393,18 @@ const RosterListingPage: React.FC = () => {
 
   const rows = useMemo(() => {
     const startSr = (page - 1) * perPage;
-    return rosters.map((r: any, idx: number) => ({ ...r, sr: startSr + idx + 1 }));
+    return rosters.map((r, idx: number) => ({ ...r, sr: startSr + idx + 1 }));
   }, [rosters, page, perPage]);
 
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting },
+    state: { sorting, rowSelection: Object.fromEntries(selectedIds.map(id => [id, true])) },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     manualPagination: true,
-    getRowId: (row) => row.id,
+    getRowId: (row) => String(row.id),
   });
 
   const showingFrom = totalEntries > 0 ? (page - 1) * perPage + 1 : 0;
@@ -420,14 +416,14 @@ const RosterListingPage: React.FC = () => {
         <CardHeader className="border-b">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-900">
-                Roster Management
+              <CardTitle className="text-2xl font-semibold text-gray-900">
+                Roster Planner Directory
               </CardTitle>
               <p className="text-sm text-gray-500 mt-1">
                 {totalEntries.toLocaleString()} assignments
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {selectedIds.length > 0 && (
                 <Button
                   variant="secondary"
@@ -435,12 +431,13 @@ const RosterListingPage: React.FC = () => {
                   disabled={publishMutation.isPending}
                 >
                   {publishMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <AppLoader variant="inline" label="Saving…" />
                   ) : null}
                   Publish Selected ({selectedIds.length})
                 </Button>
               )}
-              <Button onClick={handleCreate} disabled={createMutation.isPending}>
+              <Button size="sm" variant="outline" disabled={isFetching} onClick={() => void refetch()}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button>
+              <Button size="sm" className="bg-brand-900 hover:bg-brand-800" onClick={handleCreate} disabled={createMutation.isPending}>
                 <PlusIcon className="mr-2 h-4 w-4" /> Add Assignment
               </Button>
             </div>
@@ -448,90 +445,28 @@ const RosterListingPage: React.FC = () => {
         </CardHeader>
 
         <CardContent className="p-6">
-          {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="w-full md:w-48">
-              <label className="text-xs text-gray-500">From</label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div className="w-full md:w-48">
-              <label className="text-xs text-gray-500">To</label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div className="w-full md:w-48">
-              <label className="text-xs text-gray-500">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full md:w-64">
-              <label className="text-xs text-gray-500">Employee</label>
-              <SearchableSelect
-                options={employeeOptions}
-                value={employeeFilterId}
-                onChange={setEmployeeFilterId}
-                placeholder="All employees"
-                groupLabel="Employees"
-                allowAll={true}
-                allLabel="All Employees"
-                allValue=""
-                widthClass="w-full mt-1"
-                disabled={isLoadingEmployees}
-                multiple={false}
-              />
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-sm text-gray-600">Show</span>
-              <Select
-                value={perPage.toString()}
-                onValueChange={(v) => setPerPage(Number(v))}
-              >
-                <SelectTrigger className="w-20">
-                  <SelectValue placeholder="10" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {[10, 15, 25, 50, 100].map((s) => (
-                    <SelectItem key={s} value={String(s)}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-gray-600">entries</span>
-            </div>
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <div className="min-w-[180px] flex-1 space-y-1.5"><label htmlFor="planner-employee" className="text-xs font-medium text-gray-600">Employee</label><SearchableSelect id="planner-employee" options={employeeOptions} value={employeeFilterId} onChange={setEmployeeFilterId} allLabel="All employees" widthClass="w-full" disabled={isLoadingEmployees} /></div>
+            <div className="w-full space-y-1.5 sm:w-40"><label htmlFor="planner-from" className="text-xs font-medium text-gray-600">From date</label><Input id="planner-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={event => setDateFrom(event.target.value)} /></div>
+            <div className="w-full space-y-1.5 sm:w-40"><label htmlFor="planner-to" className="text-xs font-medium text-gray-600">To date</label><Input id="planner-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={event => setDateTo(event.target.value)} /></div>
+            <div className="w-full space-y-1.5 sm:w-40"><label htmlFor="planner-status" className="text-xs font-medium text-gray-600">Status</label><SearchableSelect id="planner-status" options={STATUS_OPTIONS} value={statusFilter === "all" ? "" : statusFilter} allLabel="All statuses" widthClass="w-full" onChange={value => setStatusFilter(value || "all")} /></div>
+            <div className="flex h-9 items-center gap-2 text-sm text-gray-600"><span>Show</span><SearchableSelect aria-label="Assignments per page" allowAll={false} widthClass="w-28" options={[10,25,50,100].map(value => ({ value: String(value), label: String(value) }))} value={String(perPage)} onChange={value => setPerPage(Number(value))} /><span>entries</span></div>
+            {(dateFrom || dateTo || employeeFilterId || statusFilter !== "all") && <Button variant="ghost" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); setEmployeeFilterId(""); setStatusFilter("all"); }}>Clear filters</Button>}
           </div>
 
           {/* Stats */}
-          <div className="bg-blue-50 p-4 rounded-lg mb-4 flex justify-between items-center">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 mb-4 flex flex-wrap gap-3 justify-between items-center text-gray-600">
             <span className="text-sm">
               Showing {showingFrom} to {showingTo} of {totalEntries} entries
             </span>
             {(isLoading || isFetching) && (
-              <Loader2 className="animate-spin h-5 w-5" />
+              <AppLoader variant="inline" label="Loading assignments…" />
             )}
           </div>
 
           {/* Table */}
-          <div className="border rounded-lg overflow-x-auto">
-            <table className="w-full">
+          <div className="border border-gray-200 rounded-lg overflow-x-auto" aria-busy={isFetching}>
+            <table className="w-full min-w-[1000px]"><caption className="sr-only">Roster assignments</caption>
               <thead className="bg-gray-50">
                 {table.getHeaderGroups().map((hg) => (
                   <tr key={hg.id}>
@@ -558,10 +493,10 @@ const RosterListingPage: React.FC = () => {
                 {isLoading ? (
                   <tr>
                     <td colSpan={columns.length} className="py-12 text-center">
-                      <Loader2 className="animate-spin mx-auto" />
+                      <AppLoader label="Loading roster assignments…" />
                     </td>
                   </tr>
-                ) : rows.length === 0 ? (
+                ) : error ? (<tr><td colSpan={columns.length} className="p-6"><ApiErrorState error={error} onRetry={() => void refetch()} /></td></tr>) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={columns.length} className="py-12 text-center">
                       No roster assignments found
@@ -587,24 +522,24 @@ const RosterListingPage: React.FC = () => {
 
           {/* Pagination */}
           {!isLoading && rows.length > 0 && (
-            <div className="flex justify-between items-center mt-4">
+            <div className="flex flex-col gap-4 sm:flex-row justify-between items-center mt-4 border-t bg-gray-50 p-4">
               <span>
                 Page {page} of {totalPages}
               </span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(1)}
-                  disabled={page === 1}
+                  onClick={() => changePage(1)}
+                  disabled={isFetching || page === 1}
                 >
                   <ChevronsLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
+                  onClick={() => changePage((p) => Math.max(1, p - 1))}
+                  disabled={isFetching || page === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -619,7 +554,7 @@ const RosterListingPage: React.FC = () => {
                       key={num}
                       variant={page === num ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setPage(num)}
+                      onClick={() => changePage(num)}
                     >
                       {num}
                     </Button>
@@ -628,16 +563,16 @@ const RosterListingPage: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
+                  onClick={() => changePage((p) => Math.min(totalPages, p + 1))}
+                  disabled={isFetching || page === totalPages}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(totalPages)}
-                  disabled={page === totalPages}
+                  onClick={() => changePage(totalPages)}
+                  disabled={isFetching || page === totalPages}
                 >
                   <ChevronsRight className="h-4 w-4" />
                 </Button>
@@ -648,9 +583,9 @@ const RosterListingPage: React.FC = () => {
       </Card>
 
       {/* Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
+      <Dialog open={isModalOpen} onOpenChange={open => { if (!isSaving) setIsModalOpen(open); }}>
+        <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b bg-muted/30 px-6 py-5 pr-14 text-left">
             <DialogTitle>
               {modalMode === "create"
                 ? "Add Assignment"
@@ -661,15 +596,16 @@ const RosterListingPage: React.FC = () => {
             <DialogDescription>
               {modalMode === "view"
                 ? "Read‑only view."
-                : "Fill in the details."}
+                : "Choose an employee and date, then assign a shift and scheduling options."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <fieldset disabled={isSaving} className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto px-6 py-5 sm:grid-cols-2">
             {/* Employee */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Employee *</label>
+            <div className="min-w-0 space-y-1.5">
+              <label htmlFor="assignment-employee" className="text-sm font-medium">Employee *</label>
               <SearchableSelect
-                options={employeeOptions}
+                id="assignment-employee"
+                options={employeeOptions.some(option => option.value === formData.employee_id) || !formData.employee_id ? employeeOptions : [...employeeOptions, { value: formData.employee_id, label: selectedItem?.employee?.name ?? `Saved employee (${formData.employee_id})` }]}
                 value={formData.employee_id}
                 onChange={(v) =>
                   setFormData((p) => ({ ...p, employee_id: v as string }))
@@ -683,10 +619,11 @@ const RosterListingPage: React.FC = () => {
               />
             </div>
             {/* Shift */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Shift</label>
+            <div className="min-w-0 space-y-1.5">
+              <label htmlFor="assignment-shift" className="text-sm font-medium">Shift</label>
               <SearchableSelect
-                options={shiftOptions}
+                id="assignment-shift"
+                options={shiftOptions.some(option => option.value === formData.shift_id) || !formData.shift_id ? shiftOptions : [...shiftOptions, { value: formData.shift_id, label: selectedItem?.shift?.name ?? `Saved shift (${formData.shift_id})` }]}
                 value={formData.shift_id}
                 onChange={(v) =>
                   setFormData((p) => ({ ...p, shift_id: v as string }))
@@ -700,9 +637,9 @@ const RosterListingPage: React.FC = () => {
               />
             </div>
             {/* Date */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Date *</label>
-              <Input
+            <div className="min-w-0 space-y-1.5">
+              <label htmlFor="assignment-date" className="text-sm font-medium">Date *</label>
+              <Input id="assignment-date"
                 type="date"
                 value={formData.roster_date}
                 onChange={(e) =>
@@ -712,7 +649,7 @@ const RosterListingPage: React.FC = () => {
               />
             </div>
             {/* Checkboxes */}
-            <div className="flex gap-4">
+            <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-gray-50 p-3 sm:col-span-2">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={formData.is_weekly_off}
@@ -735,8 +672,8 @@ const RosterListingPage: React.FC = () => {
               </label>
             </div>
             {/* Status */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Status</label>
+            <div className="min-w-0 space-y-1.5">
+              <label htmlFor="assignment-status" className="text-sm font-medium">Status</label>
               <Select
                 value={formData.status}
                 onValueChange={(v) =>
@@ -744,7 +681,7 @@ const RosterListingPage: React.FC = () => {
                 }
                 disabled={modalMode === "view"}
               >
-                <SelectTrigger>
+                <SelectTrigger id="assignment-status" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -756,23 +693,12 @@ const RosterListingPage: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
-            {/* Notes */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Notes</label>
-              <Input
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, notes: e.target.value }))
-                }
-                disabled={modalMode === "view"}
-                maxLength={2000}
-              />
-            </div>
             {/* Template */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Template</label>
+            <div className="min-w-0 space-y-1.5">
+              <label htmlFor="assignment-template" className="text-sm font-medium">Template</label>
               <SearchableSelect
-                options={templateOptions}
+                id="assignment-template"
+                options={templateOptions.some(option => option.value === formData.template_id) || !formData.template_id ? templateOptions : [...templateOptions, { value: formData.template_id, label: selectedItem?.template?.name ?? `Saved template (${formData.template_id})` }]}
                 value={formData.template_id}
                 onChange={(v) =>
                   setFormData((p) => ({ ...p, template_id: v as string }))
@@ -785,11 +711,23 @@ const RosterListingPage: React.FC = () => {
                 multiple={false}
               />
             </div>
-          </div>
-          <DialogFooter>
+            {/* Notes */}
+            <div className="min-w-0 space-y-1.5 sm:col-span-2">
+              <label htmlFor="assignment-notes" className="text-sm font-medium">Notes</label>
+              <textarea id="assignment-notes" className="min-h-24 w-full rounded-md border border-input px-3 py-2 text-sm"
+                value={formData.notes}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, notes: e.target.value }))
+                }
+                disabled={modalMode === "view"}
+                maxLength={2000}
+              />
+            </div>
+          </fieldset>
+          <DialogFooter className="shrink-0 border-t bg-muted/30 px-6 py-4">
             {modalMode !== "view" ? (
               <>
-                <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                <Button variant="outline" disabled={isSaving} onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </Button>
                 <Button
@@ -799,9 +737,9 @@ const RosterListingPage: React.FC = () => {
                   }
                 >
                   {(createMutation.isPending || updateMutation.isPending) && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <AppLoader variant="inline" label="Please wait…" />
                   )}
-                  Save
+                  {modalMode === "create" ? "Create assignment" : "Save changes"}
                 </Button>
               </>
             ) : (
@@ -816,7 +754,7 @@ const RosterListingPage: React.FC = () => {
       {/* Delete Confirmation */}
       <AlertDialog
         open={!!deleteUuid}
-        onOpenChange={() => setDeleteUuid(null)}
+        onOpenChange={open => { if (!open && !deleteMutation.isPending) setDeleteUuid(null); }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -830,12 +768,12 @@ const RosterListingPage: React.FC = () => {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={event => { event.preventDefault(); confirmDelete(); }}
               className="bg-red-600 hover:bg-red-700"
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <AppLoader variant="inline" label="Please wait…" />
               )}
               Delete
             </AlertDialogAction>

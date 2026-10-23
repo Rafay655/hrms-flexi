@@ -1,666 +1,586 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import toast, { Toaster } from "react-hot-toast";
-import {
-  Calendar,
-  Clock,
-  FileText,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  ChevronRight,
-  ChevronLeft,
-  Plus,
-  Eye,
-  ThumbsUp,
-  ThumbsDown,
-  User,
-  Users,
-  TrendingUp,
-  Upload,
-  AlertTriangle,
-} from "lucide-react";
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { 
+  Plus, Eye, Pencil, X, ChevronLeft, ChevronRight, 
+  ChevronsLeft, ChevronsRight, FileClock, MoreVertical, 
+  RefreshCw, Search, Users, User, CheckCircle2, XCircle
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import SearchableSelect from '@/components/ui/searchable-select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AppLoader } from '@/components/ui/app-loader';
+import { ApiErrorState } from '@/components/ui/api-error-state';
+import { useAppSelector } from '@/store/hooks';
+import { attendanceTimelineService } from '@/services/attendance-timeline.service';
+import { 
+  myRegularizationsService as service, 
+  correctionOptions, 
+  type MyRegularization, 
+  type RegularizationPayload 
+} from '@/services/my-regularizations.service';
+import { attendanceDate, attendanceTime } from '@/lib/attendance-timeline';
+import { companyDate } from '@/lib/web-punch';
+import { showApiError } from '@/lib/error-toast';
 
-// ------------------------------------------------------------------
-// Types
-// ------------------------------------------------------------------
-type RegularizationStatus = "pending" | "approved" | "rejected";
-type IssueType =
-  | "Missing In-Punch"
-  | "Missing Out-Punch"
-  | "Wrong Punch Time"
-  | "Late Arrival"
-  | "Early Departure"
-  | "Short Day"
-  | "Other";
+const typeLabel = (value: string) => correctionOptions.find(option => option.value === value)?.label ?? value.replaceAll('_', ' ');
+const statusTone = (status: string) => status === 'approved' ? 'bg-emerald-50 text-emerald-700' : status === 'rejected' ? 'bg-rose-50 text-rose-700' : status === 'pending' ? 'bg-amber-50 text-amber-800' : 'bg-gray-100 text-gray-700';
 
-interface RegularizationRequest {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  date: string; // YYYY-MM-DD
-  issueType: IssueType;
-  proposedInTime: string; // HH:MM
-  proposedOutTime: string;
-  reason: string;
-  evidenceUrl?: string; // optional
-  status: RegularizationStatus;
-  approvedBy?: string;
-  approvedAt?: string;
-  rejectionReason?: string;
-  createdAt: string;
+// Helper to extract HH:mm from a datetime string
+function extractTime(value: string | null | undefined) {
+  if (!value) return '';
+  const parts = value.split(' ');
+  if (parts.length > 1) return parts[1].slice(0, 5);
+  const tParts = value.split('T');
+  if (tParts.length > 1) return tParts[1].slice(0, 5);
+  return value.slice(0, 5);
 }
 
-interface RegularizationStats {
-  pendingCount: number;
-  approvedCount: number;
-  rejectedCount: number;
+export default function MyRegularizationsPage() {
+  const company = useAppSelector(state => state.auth.company);
+  const user = useAppSelector(state => state.auth.user?.id);
+  return <Directory key={`${company?.id}-${user}`} company={company?.id} user={user} timeZone={company?.timezone || 'Asia/Karachi'} />;
 }
 
-// ------------------------------------------------------------------
-// Mock Data
-// ------------------------------------------------------------------
-const mockRequests: RegularizationRequest[] = [
-  {
-    id: "reg1",
-    employeeId: "emp101",
-    employeeName: "John Doe",
-    department: "IT",
-    date: "2025-03-24",
-    issueType: "Missing Out-Punch",
-    proposedInTime: "09:05",
-    proposedOutTime: "18:15",
-    reason: "Forgot to punch out while leaving, remembered later. I left at 6:15 PM.",
-    status: "pending",
-    createdAt: "2025-03-24T20:00:00Z",
-  },
-  {
-    id: "reg2",
-    employeeId: "emp101",
-    employeeName: "John Doe",
-    department: "IT",
-    date: "2025-03-20",
-    issueType: "Late Arrival",
-    proposedInTime: "09:10",
-    proposedOutTime: "18:10",
-    reason: "Traffic due to road construction, arrived 10 mins late but stayed extra to compensate.",
-    status: "approved",
-    approvedBy: "Manager A",
-    approvedAt: "2025-03-21T10:00:00Z",
-    createdAt: "2025-03-20T12:00:00Z",
-  },
-  {
-    id: "reg3",
-    employeeId: "emp102",
-    employeeName: "Jane Smith",
-    department: "Finance",
-    date: "2025-03-22",
-    issueType: "Missing In-Punch",
-    proposedInTime: "09:00",
-    proposedOutTime: "18:00",
-    reason: "Biometric device was offline, used web punch but it didn't register.",
-    status: "pending",
-    createdAt: "2025-03-22T09:30:00Z",
-  },
-  {
-    id: "reg4",
-    employeeId: "emp101",
-    employeeName: "John Doe",
-    department: "IT",
-    date: "2025-03-18",
-    issueType: "Wrong Punch Time",
-    proposedInTime: "09:02",
-    proposedOutTime: "18:15",
-    reason: "Punched out at 6:15 but system recorded 5:45 due to device glitch.",
-    status: "rejected",
-    rejectionReason: "Insufficient evidence; please provide logs.",
-    createdAt: "2025-03-18T19:00:00Z",
-  },
-];
-
-// Mock current user (in real app from auth)
-const currentUser = {
-  id: "emp101",
-  name: "John Doe",
-  department: "IT",
-  role: "employee", // or "manager"
-};
-
-// Helper to calculate stats
-const calculateStats = (requests: RegularizationRequest[], userId: string): RegularizationStats => {
-  const userRequests = requests.filter(r => r.employeeId === userId);
-  const pendingCount = userRequests.filter(r => r.status === "pending").length;
-  const approvedCount = userRequests.filter(r => r.status === "approved").length;
-  const rejectedCount = userRequests.filter(r => r.status === "rejected").length;
-  return { pendingCount, approvedCount, rejectedCount };
-};
-
-// Simulated API functions
-const fetchRegularizationRequests = async (): Promise<RegularizationRequest[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return mockRequests;
-};
-
-const submitRegularizationRequest = async (data: Omit<RegularizationRequest, "id" | "status" | "createdAt">): Promise<RegularizationRequest> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  const newRequest: RegularizationRequest = {
-    ...data,
-    id: `reg${Date.now()}`,
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  };
-  mockRequests.unshift(newRequest);
-  return newRequest;
-};
-
-const approveRequest = async (id: string, approverName: string): Promise<RegularizationRequest> => {
-  await new Promise(resolve => setTimeout(resolve, 600));
-  const req = mockRequests.find(r => r.id === id);
-  if (req) {
-    req.status = "approved";
-    req.approvedBy = approverName;
-    req.approvedAt = new Date().toISOString();
-  }
-  return req!;
-};
-
-const rejectRequest = async (id: string, reason: string): Promise<RegularizationRequest> => {
-  await new Promise(resolve => setTimeout(resolve, 600));
-  const req = mockRequests.find(r => r.id === id);
-  if (req) {
-    req.status = "rejected";
-    req.rejectionReason = reason;
-  }
-  return req!;
-};
-
-// ------------------------------------------------------------------
-// Components
-// ------------------------------------------------------------------
-
-// Regularization Request Form Modal
-function RequestFormModal({ isOpen, onClose, onSubmit }: { isOpen: boolean; onClose: () => void; onSubmit: (data: any) => void }) {
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    issueType: "Missing Out-Punch" as IssueType,
-    proposedInTime: "09:00",
-    proposedOutTime: "18:00",
-    reason: "",
-    evidenceUrl: "",
-  });
-  const [characterCount, setCharacterCount] = useState(0);
-  const [file, setFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setCharacterCount(val.length);
-    setFormData({ ...formData, reason: val });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      // In real app, upload file and get URL
-      setFormData({ ...formData, evidenceUrl: URL.createObjectURL(e.target.files[0]) });
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (characterCount < 20) {
-      toast.error("Reason must be at least 20 characters");
-      return;
-    }
-    if (!formData.date || !formData.issueType || !formData.proposedInTime || !formData.proposedOutTime) {
-      toast.error("Please fill all required fields");
-      return;
-    }
-    onSubmit({
-      ...formData,
-      employeeId: currentUser.id,
-      employeeName: currentUser.name,
-      department: currentUser.department,
-    });
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="w-full max-w-md rounded-2xl bg-white shadow-xl max-h-[90vh] overflow-y-auto"
-      >
-        <div className="sticky top-0 bg-white border-b border-gray-100 p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-800">Request Regularization</h3>
-            <button onClick={onClose} className="rounded-full p-1 hover:bg-gray-100">
-              <XCircle size={20} className="text-gray-400" />
-            </button>
-          </div>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-              Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-              required
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-              Issue Type <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.issueType}
-              onChange={(e) => setFormData({ ...formData, issueType: e.target.value as IssueType })}
-              className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-              required
-            >
-              <option>Missing In-Punch</option>
-              <option>Missing Out-Punch</option>
-              <option>Wrong Punch Time</option>
-              <option>Late Arrival</option>
-              <option>Early Departure</option>
-              <option>Short Day</option>
-              <option>Other</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                Proposed In Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={formData.proposedInTime}
-                onChange={(e) => setFormData({ ...formData, proposedInTime: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                Proposed Out Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={formData.proposedOutTime}
-                onChange={(e) => setFormData({ ...formData, proposedOutTime: e.target.value })}
-                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                required
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-              Reason for Correction <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              rows={3}
-              value={formData.reason}
-              onChange={handleReasonChange}
-              className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-              placeholder="Explain why the record is incorrect or missing (Minimum 20 characters)..."
-              required
-            />
-            <div className={`mt-1 text-right text-xs ${characterCount >= 20 ? "text-green-600" : "text-red-500"}`}>
-              {characterCount} / 20 characters minimum
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-              Upload Evidence (Optional)
-            </label>
-            <div className="mt-1 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-              >
-                <Upload size={14} /> Choose File
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,.pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              {file && <span className="text-xs text-gray-500">{file.name}</span>}
-            </div>
-            <p className="mt-1 text-[10px] text-gray-400">Supporting documents like screenshots, logs, or notes</p>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="submit" className="flex-1 rounded-xl bg-[#3E3B6F] py-2 text-sm font-bold text-white hover:bg-[#2C2A4A]">
-              Submit Request
-            </button>
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-bold text-gray-600 hover:bg-gray-50">
-              Cancel
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </div>
-  );
-}
-
-// Request Card (for listings)
-function RequestCard({ request, onView, showActions = false, onApprove, onReject }: { request: RegularizationRequest; onView: () => void; showActions?: boolean; onApprove?: () => void; onReject?: () => void }) {
-  const statusColors = {
-    pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    approved: "bg-green-100 text-green-800 border-green-200",
-    rejected: "bg-red-100 text-red-800 border-red-200",
-  };
-
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:shadow-md">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#3E3B6F]/10">
-            <AlertTriangle size={18} className="text-[#3E3B6F]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-800">{request.employeeName}</span>
-              <span className="text-xs text-gray-400">{request.department}</span>
-            </div>
-            <div className="text-xs text-gray-500">
-              {formatDate(request.date)} • {request.issueType}
-            </div>
-          </div>
-        </div>
-        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${statusColors[request.status]}`}>
-          {request.status}
-        </span>
-      </div>
-      <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-        <Clock size={12} /> Proposed: {request.proposedInTime} – {request.proposedOutTime}
-      </div>
-      <div className="mt-2 text-sm text-gray-600 line-clamp-2">{request.reason}</div>
-      {request.evidenceUrl && (
-        <div className="mt-2 flex items-center gap-1 text-xs text-gray-400">
-          <Upload size={12} /> Evidence attached
-        </div>
-      )}
-      <div className="mt-3 flex justify-between items-center">
-        <button onClick={onView} className="text-xs text-[#3E3B6F] hover:underline flex items-center gap-1">
-          <Eye size={12} /> View Details
-        </button>
-        {showActions && request.status === "pending" && (
-          <div className="flex gap-2">
-            <button onClick={onApprove} className="flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100">
-              <ThumbsUp size={12} /> Approve
-            </button>
-            <button onClick={onReject} className="flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100">
-              <ThumbsDown size={12} /> Reject
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------
-// Main Component
-// ------------------------------------------------------------------
-export default function RegularizationManagementPage() {
-  const [requests, setRequests] = useState<RegularizationRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"my-requests" | "pending-approvals" | "history">("my-requests");
-  const [showRequestModal, setShowRequestModal] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<RegularizationRequest | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [stats, setStats] = useState<RegularizationStats>({ pendingCount: 0, approvedCount: 0, rejectedCount: 0 });
-
-  // Pagination
+function Directory({ company, user, timeZone }: { company?: string; user?: string; timeZone: string }) {
+  const client = useQueryClient();
+  
+  // Tab State
+  const [scope, setScope] = useState<'my' | 'team'>('my');
+  
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [correction, setCorrection] = useState('');
   const [page, setPage] = useState(1);
-  const itemsPerPage = 5;
-
-  // Load data
+  
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const data = await fetchRegularizationRequests();
-      setRequests(data);
-      setStats(calculateStats(data, currentUser.id));
-      setLoading(false);
-    };
-    load();
-  }, []);
+    const timer = setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+  
+  const [perPage, setPerPage] = useState(10);
+  const [editor, setEditor] = useState<MyRegularization | 'new' | null>(null);
+  const [detail, setDetail] = useState<MyRegularization | null>(null);
+  
+  // Cancel State (My tab)
+  const [cancel, setCancel] = useState<MyRegularization | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  
+  // Reject State (Team tab)
+  const [rejectRow, setRejectRow] = useState<MyRegularization | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  
+  // Query
+  const key = ['time-sync', 'regularizations', scope, company, user];
+  const list = useQuery({ 
+    queryKey: [...key, page, perPage, debouncedSearch, status, correction], 
+    queryFn: ({ signal }) => service.list(page, perPage, signal, { 
+      search: debouncedSearch || undefined, 
+      status: status || undefined, 
+      correction_type: correction || undefined,
+      scope: scope
+    }), 
+    retry: false 
+  });
+  
+  const profile = useQuery({ 
+    queryKey: ['time-sync', 'my-timeline', company, user, 'today'], 
+    queryFn: ({ signal }) => attendanceTimelineService.today(signal), 
+    retry: false 
+  });
+  
+  // Mutations
+  const cancelMutation = useMutation({ 
+    mutationFn: service.cancel, 
+    retry: false, 
+    onError: (error) => showApiError(error), 
+    onSuccess: response => {
+      toast.success(response.message); 
+      setCancel(null); 
+      setCancelReason('');
+      if ((list.data?.data.length ?? 0) === 1 && page > 1) setPage(page - 1);
+      void client.invalidateQueries({ queryKey: ['time-sync'] });
+    } 
+  });
 
-  // Filter requests based on active tab
-  const filteredRequests = useCallback(() => {
-    if (activeTab === "my-requests") {
-      return requests.filter(r => r.employeeId === currentUser.id);
-    } else if (activeTab === "pending-approvals") {
-      // For demo, show all pending (if manager) – here we show all pending for simplicity
-      return requests.filter(r => r.status === "pending");
-    } else {
-      return requests.filter(r => r.status !== "pending");
+  const approveMutation = useMutation({
+    mutationFn: service.approve,
+    retry: false,
+    onError: (error) => showApiError(error),
+    onSuccess: response => {
+      toast.success(response.message || 'Request approved successfully.');
+      void client.invalidateQueries({ queryKey: ['time-sync'] });
     }
-  }, [requests, activeTab]);
+  });
 
-  const currentRequests = filteredRequests();
-  const totalPages = Math.ceil(currentRequests.length / itemsPerPage);
-  const paginatedRequests = currentRequests.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const rejectMutation = useMutation({
+    mutationFn: service.reject,
+    retry: false,
+    onError: (error) => showApiError(error),
+    onSuccess: response => {
+      toast.success(response.message || 'Request rejected successfully.');
+      setRejectRow(null);
+      setRejectReason('');
+      void client.invalidateQueries({ queryKey: ['time-sync'] });
+    }
+  });
+  
+  const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
+  const pages = Math.max(1, meta?.last_page ?? 1);
+  const first = rows.length ? (page - 1) * perPage + 1 : 0;
+  const numbers = Array.from({ length: Math.min(5, pages) }, (_, index) => Math.max(1, Math.min(page - 2, pages - 4)) + index);
+  const columnCount = scope === 'team' ? 8 : 7;
 
-  const handleSubmitRequest = async (data: any) => {
-    const newRequest = await submitRegularizationRequest(data);
-    setRequests(prev => [newRequest, ...prev]);
-    setStats(calculateStats([...requests, newRequest], currentUser.id));
-    toast.success("Regularization request submitted", { icon: <CheckCircle2 size={18} /> });
-  };
-
-  const handleApprove = async (id: string) => {
-    const updated = await approveRequest(id, "Manager");
-    setRequests(prev => prev.map(r => r.id === id ? updated : r));
-    toast.success("Request approved", { icon: <CheckCircle2 size={18} /> });
-    setStats(calculateStats(requests.map(r => r.id === id ? updated : r), currentUser.id));
-  };
-
-  const handleReject = async (id: string, reason: string) => {
-    const updated = await rejectRequest(id, reason);
-    setRequests(prev => prev.map(r => r.id === id ? updated : r));
-    toast.error("Request rejected", { icon: <XCircle size={18} /> });
-    setStats(calculateStats(requests.map(r => r.id === id ? updated : r), currentUser.id));
-    setShowRejectModal(false);
-  };
-
-  const openRejectModal = (request: RegularizationRequest) => {
-    setSelectedRequest(request);
-    setRejectionReason("");
-    setShowRejectModal(true);
-  };
-
-  const viewDetails = (request: RegularizationRequest) => {
-    setSelectedRequest(request);
-    setShowRejectModal(false); // Use same modal for view? Better separate modal.
-    // For now, simple alert.
-    toast(`Reason: ${request.reason}`, { duration: 5000 });
-  };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3E3B6F] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading regularization requests...</p>
+  return <div className="p-3">
+    <Card className="border border-gray-100 shadow-sm">
+      <CardHeader className="border-b pb-0">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+          <div>
+            <CardTitle className="text-2xl font-semibold text-gray-900">Regularizations Directory</CardTitle>
+            <p className="mt-1 text-sm text-gray-500">{(meta?.total ?? 0).toLocaleString()} requests • Real-time data</p>
+          </div>
+          <div className="flex items-center gap-2 mb-4 md:mb-0">
+            <Button variant="outline" size="sm" disabled={list.isFetching} onClick={() => void list.refetch()}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${list.isFetching ? 'animate-spin' : ''}`} />Refresh
+            </Button>
+            <Button size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" disabled={!profile.data?.data?.employee.uuid} onClick={() => setEditor('new')}>
+              <Plus className="mr-2 h-4 w-4" />Create request
+            </Button>
+          </div>
         </div>
-      </div>
-    );
-  }
 
-  return (
-    <>
-     
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 md:p-8">
-        <div className="mx-auto max-w-6xl space-y-8">
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-800">Attendance Regularization</h1>
-              <p className="text-sm text-gray-500">Correct missing or incorrect attendance records</p>
-            </div>
-            <button
-              onClick={() => setShowRequestModal(true)}
-              className="flex items-center gap-2 rounded-xl bg-[#3E3B6F] px-4 py-2 text-sm font-bold text-white shadow-lg hover:bg-[#2C2A4A] transition-colors"
-            >
-              <Plus size={16} /> New Request
-            </button>
+        {/* Tabs */}
+        <div className="flex space-x-1 border-b border-gray-200 mt-4">
+          <button
+            onClick={() => { setScope('my'); setPage(1); }}
+            className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              scope === 'my' 
+                ? 'border-[#1E1B4B] text-[#1E1B4B]' 
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+          >
+            <User className="h-4 w-4" />
+            My Requests
+          </button>
+          <button
+            onClick={() => { setScope('team'); setPage(1); }}
+            className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              scope === 'team' 
+                ? 'border-[#1E1B4B] text-[#1E1B4B]' 
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            Team Requests
+          </button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4 p-6">
+        {profile.isError && <ApiErrorState error={profile.error} onRetry={() => void profile.refetch()} />}
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input aria-label="Search regularizations" placeholder="Search regularizations…" value={search} onChange={event => setSearch(event.target.value)} className="pl-10" />
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Pending</span>
-                <Clock size={18} className="text-yellow-600" />
-              </div>
-              <div className="mt-2 text-2xl font-bold text-yellow-600">{stats.pendingCount}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Approved</span>
-                <CheckCircle2 size={18} className="text-green-600" />
-              </div>
-              <div className="mt-2 text-2xl font-bold text-green-600">{stats.approvedCount}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Rejected</span>
-                <XCircle size={18} className="text-red-600" />
-              </div>
-              <div className="mt-2 text-2xl font-bold text-red-600">{stats.rejectedCount}</div>
-            </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Show</span>
+            <SearchableSelect aria-label="Requests per page" allowAll={false} widthClass="w-28" value={String(perPage)} options={[10, 25, 50, 100].map(size => ({ value: String(size), label: String(size) }))} onChange={value => { setPerPage(Number(value)); setPage(1); }} />
+            <span>entries</span>
           </div>
-
-          {/* Tabs */}
-          <div className="flex gap-2 border-b border-gray-200 pb-2">
-            {[
-              { id: "my-requests", label: "My Requests", icon: User },
-              { id: "pending-approvals", label: "Pending Approvals", icon: Users },
-              { id: "history", label: "History", icon: Clock },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => { setActiveTab(tab.id as any); setPage(1); }}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === tab.id ? "bg-[#3E3B6F] text-white" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Listing */}
-          <div className="space-y-4">
-            {paginatedRequests.length === 0 ? (
-              <div className="rounded-2xl bg-white p-8 text-center text-gray-400">
-                <AlertTriangle size={40} className="mx-auto mb-2 opacity-30" />
-                <p>No requests found</p>
-              </div>
-            ) : (
-              paginatedRequests.map(req => (
-                <RequestCard
-                  key={req.id}
-                  request={req}
-                  onView={() => viewDetails(req)}
-                  showActions={activeTab === "pending-approvals"}
-                  onApprove={() => handleApprove(req.id)}
-                  onReject={() => openRejectModal(req)}
-                />
-              ))
-            )}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-gray-200 pt-4">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-600 disabled:opacity-50"
-              >
-                <ChevronLeft size={14} /> Previous
-              </button>
-              <span className="text-xs text-gray-500">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-600 disabled:opacity-50"
-              >
-                Next <ChevronRight size={14} />
-              </button>
-            </div>
+          <div className="basis-full" />
+          <SearchableSelect aria-label="Filter by status" allLabel="All statuses" value={status} onChange={value => { setStatus(value); setPage(1); }} options={['pending', 'approved', 'rejected', 'escalated'].map(value => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) }))} widthClass="w-full sm:w-56" />
+          <SearchableSelect aria-label="Filter by correction type" allLabel="All correction types" value={correction} onChange={value => { setCorrection(value); setPage(1); }} options={correctionOptions} widthClass="w-full sm:w-56" />
+          {(search || status || correction) && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setDebouncedSearch(''); setStatus(''); setCorrection(''); setPage(1); }}>
+              Clear filters
+            </Button>
           )}
         </div>
-      </div>
 
-      {/* Request Form Modal */}
-      <RequestFormModal
-        isOpen={showRequestModal}
-        onClose={() => setShowRequestModal(false)}
-        onSubmit={handleSubmitRequest}
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-gray-600">
+          <span>Showing <strong className="text-gray-900">{first}</strong> to <strong className="text-gray-900">{rows.length ? first + rows.length - 1 : 0}</strong> of <strong className="text-gray-900">{(meta?.total ?? 0).toLocaleString()}</strong> entries</span>
+          {list.isFetching && <AppLoader variant="inline" label="Loading…" />}
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-gray-200" aria-busy={list.isFetching}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1100px] text-left">
+              <caption className="sr-only">Attendance regularizations</caption>
+              <thead className="border-b border-gray-200 bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-700">SR. NO.</th>
+                  {scope === 'team' && (
+                    <th scope="col" className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-700">Employee</th>
+                  )}
+                  <th scope="col" className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-700">Attendance date</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-700">Correction</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-700">Requested times</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-700">Reason</th>
+                  <th scope="col" className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-700">Status</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {list.isPending ? (
+                  <tr><td colSpan={columnCount} className="py-12"><AppLoader label="Loading regularizations…" /></td></tr>
+                ) : list.isError ? (
+                  <tr><td colSpan={columnCount} className="px-6 py-12"><ApiErrorState error={list.error} onRetry={() => void list.refetch()} /></td></tr>
+                ) : !rows.length ? (
+                  <tr>
+                    <td colSpan={columnCount} className="py-12 text-center">
+                      <FileClock className="mx-auto h-8 w-8 text-muted-foreground" />
+                      <p className="mt-2 font-medium">No requests found</p>
+                      <p className="text-sm text-muted-foreground">{search || status || correction ? 'Try another search or clear your filters.' : 'No regularization requests to show.'}</p>
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row, index) => {
+                    const isPending = row.status === 'pending';
+
+                    return (
+                      <tr key={row.id} className="group text-sm transition-colors hover:bg-gray-50">
+                        <td className="px-6 py-4 font-medium text-muted-foreground">{first + index}</td>
+                        
+                        {scope === 'team' && (
+                          <td className="px-6 py-4 align-top">
+                            <p className="font-semibold text-gray-900">{row.employee?.name ?? 'Unknown'}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{row.employee?.employee_code ?? ''}</p>
+                          </td>
+                        )}
+
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-gray-900">{attendanceDate(row.attendance_date, 'short')}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{row.attendance_date.slice(0, 4)}</p>
+                        </td>
+                        <td className="px-6 py-4 align-top">{typeLabel(row.correction_type)}</td>
+                        <td className="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-muted-foreground">
+                          <p>In: {attendanceTime(row.requested_in, timeZone)}</p>
+                          <p className="mt-1">Out: {attendanceTime(row.requested_out, timeZone)}</p>
+                        </td>
+                        <td className="px-6 py-4 align-top">
+                          <p className="line-clamp-2 max-w-[240px] break-words text-muted-foreground" title={row.reason}>{row.reason}</p>
+                        </td>
+                        <td className="px-6 py-4 align-top">
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${statusTone(row.status)}`}>
+                            {row.status.replaceAll('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${row.attendance_date}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuItem onSelect={() => setDetail(row)}>
+                                <Eye className="mr-2 h-4 w-4" />View details
+                              </DropdownMenuItem>
+                              
+                              {/* "My" tab actions (Edit / Cancel) */}
+                              {isPending && scope === 'my' && (
+                                <>
+                                  <DropdownMenuItem onSelect={() => setEditor(row)}>
+                                    <Pencil className="mr-2 h-4 w-4" />Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onSelect={() => { setCancel(row); setCancelReason(''); }}>
+                                    <X className="mr-2 h-4 w-4" />Cancel request
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+
+                              {/* "Team" tab actions (Approve / Reject) */}
+                              {isPending && scope === 'team' && (
+                                <>
+                                  <DropdownMenuItem onSelect={() => approveMutation.mutate(row.id)} disabled={approveMutation.isPending}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" />Approve
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onSelect={() => { setRejectRow(row); setRejectReason(''); }}>
+                                    <XCircle className="mr-2 h-4 w-4" />Reject
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <footer className="flex flex-col items-center justify-between gap-4 rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4 text-sm text-gray-600 md:flex-row">
+          <span>Page <strong className="text-gray-900">{page}</strong> of <strong className="text-gray-900">{pages}</strong></span>
+          <nav aria-label="Regularization pagination" className="flex flex-wrap items-center justify-center gap-2">
+            {[{ label: 'First page', target: 1, icon: ChevronsLeft }, { label: 'Previous page', target: page - 1, icon: ChevronLeft }].map(item => (
+              <Button key={item.label} variant="outline" size="sm" aria-label={item.label} disabled={!meta || list.isFetching || page <= 1} onClick={() => setPage(item.target)}>
+                <item.icon className="h-4 w-4" />
+              </Button>
+            ))}
+            {numbers.map(number => (
+              <Button key={number} size="sm" variant={number === page ? 'default' : 'outline'} className={`${number === page ? 'border-[#1E1B4B] bg-[#1E1B4B] text-white hover:bg-[#2A2675] hover:text-white' : ''}`} aria-current={number === page ? 'page' : undefined} disabled={!meta || list.isFetching} onClick={() => setPage(number)}>
+                {number}
+              </Button>
+            ))}
+            {[{ label: 'Next page', target: page + 1, icon: ChevronRight }, { label: 'Last page', target: pages, icon: ChevronsRight }].map(item => (
+              <Button key={item.label} variant="outline" size="sm" aria-label={item.label} disabled={!meta || list.isFetching || page >= pages} onClick={() => setPage(item.target)}>
+                <item.icon className="h-4 w-4" />
+              </Button>
+            ))}
+          </nav>
+          <span>{first} – {rows.length ? first + rows.length - 1 : 0} of {(meta?.total ?? 0).toLocaleString()} entries</span>
+        </footer>
+      </CardContent>
+    </Card>
+
+    {/* Editor Modal (My Tab) */}
+    {editor && (
+      <RequestEditor 
+        key={typeof editor === 'string' ? 'new' : editor.id} 
+        row={editor === 'new' ? null : editor} 
+        employeeId={profile.data?.data?.employee.uuid ?? ''} 
+        timeZone={timeZone} 
+        onClose={() => setEditor(null)} 
+        onSaved={() => { setEditor(null); void client.invalidateQueries({ queryKey: ['time-sync'] }); }} 
       />
+    )}
 
-      {/* Rejection Modal */}
-      <AnimatePresence>
-        {showRejectModal && selectedRequest && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
-            >
-              <h3 className="text-lg font-bold text-gray-800">Reject Request</h3>
-              <p className="mt-1 text-sm text-gray-500">Please provide a reason for rejection</p>
-              <textarea
-                className="mt-4 w-full rounded-xl border border-gray-200 p-3 text-sm"
-                rows={3}
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Reason..."
-              />
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={() => handleReject(selectedRequest.id, rejectionReason)}
-                  className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-700"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={() => setShowRejectModal(false)}
-                  className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-bold text-gray-600 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
+    {/* Detail Modal */}
+    <Dialog open={Boolean(detail)} onOpenChange={open => { if (!open) setDetail(null); }}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="text-brand-900">Request details</DialogTitle>
+          <DialogDescription>{detail ? attendanceDate(detail.attendance_date) : ''}</DialogDescription>
+        </DialogHeader>
+        {detail && (
+          <div className="space-y-4 text-sm">
+            {scope === 'team' && detail.employee && (
+              <div className="rounded-lg bg-blue-50 p-3">
+                <p className="text-xs text-blue-600 mb-1">Employee</p>
+                <p className="font-semibold text-blue-900">{detail.employee.name}</p>
+                <p className="text-xs text-blue-700">{detail.employee.employee_code}</p>
               </div>
-            </motion.div>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <span>{typeLabel(detail.correction_type)}</span>
+              <span className={`rounded-full px-2 py-1 text-xs capitalize ${statusTone(detail.status)}`}>{detail.status}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3">
+              <div><p className="text-xs text-gray-500">Requested in</p><p className="mt-1">{detail.requested_in || '—'}</p></div>
+              <div><p className="text-xs text-gray-500">Requested out</p><p className="mt-1">{detail.requested_out || '—'}</p></div>
+            </div>
+            <div><p className="mb-1 text-xs text-gray-500">Reason</p><p className="whitespace-pre-wrap break-words">{detail.reason}</p></div>
+            {detail.supporting_doc_path && <div><p className="text-xs text-gray-500">Supporting document path</p><p className="mt-1 break-all">{detail.supporting_doc_path}</p></div>}
+            {detail.decided_by_user && <p>Decision by {detail.decided_by_user.name}{detail.decided_at ? ` · ${detail.decided_at}` : ''}</p>}
+            {detail.rejection_reason && <p className="rounded-lg bg-rose-50 p-3 text-rose-800">{detail.rejection_reason}</p>}
           </div>
         )}
-      </AnimatePresence>
-    </>
+      </DialogContent>
+    </Dialog>
+
+    {/* Cancel Modal (My Tab) */}
+    <Dialog open={Boolean(cancel)} onOpenChange={open => { if (!open && !cancelMutation.isPending) setCancel(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Cancel request?</DialogTitle>
+          <DialogDescription>This will remove your pending correction request for {cancel?.attendance_date}.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="cancel-reason">Cancellation reason (optional)</Label>
+          <Textarea id="cancel-reason" maxLength={2000} value={cancelReason} onChange={event => setCancelReason(event.target.value)} disabled={cancelMutation.isPending} />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" disabled={cancelMutation.isPending} onClick={() => setCancel(null)}>Keep request</Button>
+          <Button className="bg-rose-600 text-white hover:bg-rose-700" disabled={cancelMutation.isPending} onClick={() => cancel && cancelMutation.mutate({ id: cancel.id, reason: cancelReason })}>
+            {cancelMutation.isPending ? <AppLoader variant="inline" label="Cancelling…" /> : 'Cancel request'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Reject Modal (Team Tab) */}
+    <Dialog open={Boolean(rejectRow)} onOpenChange={open => { if (!open && !rejectMutation.isPending) setRejectRow(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reject request?</DialogTitle>
+          <DialogDescription>This will reject the correction request for {rejectRow?.attendance_date}.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="reject-reason">Rejection reason <span className="text-red-500">*</span></Label>
+          <Textarea 
+            id="reject-reason" 
+            required 
+            maxLength={2000} 
+            value={rejectReason} 
+            onChange={event => setRejectReason(event.target.value)} 
+            disabled={rejectMutation.isPending} 
+            placeholder="Explain why this request is being rejected..."
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" disabled={rejectMutation.isPending} onClick={() => setRejectRow(null)}>Cancel</Button>
+          <Button 
+            className="bg-rose-600 text-white hover:bg-rose-700" 
+            disabled={rejectMutation.isPending || !rejectReason.trim()} 
+            onClick={() => rejectRow && rejectMutation.mutate({ id: rejectRow.id, reason: rejectReason })}
+          >
+            {rejectMutation.isPending ? <AppLoader variant="inline" label="Rejecting…" /> : 'Reject request'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>;
+}
+
+function RequestEditor({ row, employeeId, timeZone, onClose, onSaved }: { row: MyRegularization | null; employeeId: string; timeZone: string; onClose: () => void; onSaved: () => void }) {
+  const [date, setDate] = useState(row?.attendance_date.slice(0, 10) ?? companyDate(timeZone));
+  const [type, setType] = useState(row?.correction_type ?? 'add_in');
+  
+  const [requestedIn, setIn] = useState(extractTime(row?.requested_in));
+  const [requestedOut, setOut] = useState(extractTime(row?.requested_out));
+  
+  const [reason, setReason] = useState(row?.reason ?? '');
+  const [path, setPath] = useState(row?.supporting_doc_path ?? '');
+
+  const needsIn = ['add_in', 'modify_in', 'full_replacement'].includes(type);
+  const needsOut = ['add_out', 'modify_out', 'full_replacement'].includes(type);
+
+  // Fetch the day snapshot when the date changes
+  const { data: dayData, isLoading: isLoadingDay } = useQuery({
+    queryKey: ['time-sync', 'attendance-day', date],
+    queryFn: ({ signal }) => service.getAttendanceDay(date, signal),
+    enabled: !!date,
+  });
+
+  const snapshot = dayData?.data;
+  
+  const mutation = useMutation({ 
+    mutationFn: service.save, 
+    retry: false, 
+    onError: (error) => showApiError(error), 
+    onSuccess: response => { toast.success(response.message); onSaved(); } 
+  });
+  
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const id = row?.employee_id || employeeId;
+    if (!id) { toast.error('Your employee profile is unavailable. Refresh and try again.'); return; }
+    if (!reason.trim()) { toast.error('Please enter a reason.'); return; }
+    
+    // Validation: Compare HH:mm strings (e.g. "09:00" < "18:00")
+    if (needsIn && needsOut && requestedOut < requestedIn) { 
+      toast.error('Clock-out must be on or after clock-in.'); 
+      return; 
+    }
+    
+    // Helper to format time back to SQL datetime (YYYY-MM-DD HH:mm:ss)
+    const sql = (timeValue: string) => {
+      if (!timeValue) return null;
+      const timeStr = timeValue.length === 5 ? `${timeValue}:00` : timeValue;
+      return `${date} ${timeStr}`;
+    };
+
+    const payload: RegularizationPayload = { 
+      employee_id: id, 
+      attendance_date: date, 
+      correction_type: type, 
+      requested_in: needsIn ? sql(requestedIn) : null, 
+      requested_out: needsOut ? sql(requestedOut) : null, 
+      reason: reason.trim(), 
+      supporting_doc_path: path.trim() || null 
+    };
+    mutation.mutate({ id: row?.id, payload });
+  }
+  
+  return (
+    <Dialog open onOpenChange={open => { if (!open && !mutation.isPending) onClose(); }}>
+      <DialogContent className="max-h-[92vh] overflow-y-auto gap-0 p-0 sm:max-w-3xl">
+        <DialogHeader className="space-y-0 border-b bg-muted/30 px-6 py-5 pr-14 text-left">
+          <DialogTitle className="text-brand-900">{row ? 'Edit regularization' : 'New regularization'}</DialogTitle>
+          <DialogDescription>Request a correction to attendance.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit}>
+          <fieldset disabled={mutation.isPending} className="space-y-4 px-6 py-5">
+            
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="request-date">Attendance date</Label>
+                <Input id="request-date" type="date" required value={date} onChange={event => setDate(event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="request-type">Correction type</Label>
+                <select id="request-type" className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm" value={type} onChange={event => setType(event.target.value)}>
+                  {correctionOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* System Snapshot Info */}
+            <div className="rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
+              <p className="font-semibold mb-1">System Record for {date}</p>
+              {isLoadingDay ? (
+                <p className="text-blue-600">Loading system times…</p>
+              ) : snapshot?.found ? (
+                <div className="flex gap-4">
+                  <p><span className="text-blue-600">Clock In:</span> {extractTime(snapshot.first_in) || '—'}</p>
+                  <p><span className="text-blue-600">Clock Out:</span> {extractTime(snapshot.last_out) || '—'}</p>
+                </div>
+              ) : (
+                <p className="text-blue-600">No system record found for this date.</p>
+              )}
+            </div>
+            
+            <div className="grid gap-3 sm:grid-cols-2">
+              {needsIn && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="requested-in">Requested clock-in</Label>
+                  <Input id="requested-in" type="time" required value={requestedIn} onChange={event => setIn(event.target.value)} />
+                </div>
+              )}
+              {needsOut && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="requested-out">Requested clock-out</Label>
+                  <Input id="requested-out" type="time" required min={needsIn ? requestedIn : undefined} value={requestedOut} onChange={event => setOut(event.target.value)} />
+                </div>
+              )}
+            </div>
+            
+            <p className="text-[11px] text-gray-500">Times are entered in {timeZone}. The date from above will be applied automatically.</p>
+            
+            <div className="space-y-1.5">
+              <Label htmlFor="request-reason">Reason</Label>
+              <Textarea id="request-reason" required maxLength={2000} rows={3} value={reason} onChange={event => setReason(event.target.value)} placeholder="Explain the attendance correction…" />
+              <p className="text-right text-[10px] text-gray-400">{reason.length}/2000</p>
+            </div>
+            
+            <div className="space-y-1.5">
+              <Label htmlFor="request-document">Supporting document path (optional)</Label>
+              <Input id="request-document" maxLength={500} value={path} onChange={event => setPath(event.target.value)} placeholder="Path of an already uploaded document" />
+            </div>
+          </fieldset>
+          
+          <DialogFooter className="border-t bg-muted/30 px-6 py-4">
+            <Button type="button" variant="outline" disabled={mutation.isPending} onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={mutation.isPending} className="bg-[#1E1B4B] text-white hover:bg-[#2A2675]">
+              {mutation.isPending ? <AppLoader variant="inline" label="Saving…" /> : row ? 'Save changes' : 'Submit request'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

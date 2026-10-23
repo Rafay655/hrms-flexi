@@ -148,17 +148,17 @@ const SearchableSelect: React.FC<SearchableSelectProps> = (props) => {
           role="combobox"
           aria-expanded={open}
           disabled={disabled || isLoading}
-          className={cn(widthClass, "justify-between", className)}
+          className={cn(widthClass, "min-w-0 justify-between", className)}
         >
-          <span className="inline-flex items-center gap-2">
-            <Icon className="size-4 opacity-70" />
-            {displayLabel}
+          <span className="inline-flex min-w-0 flex-1 items-center gap-2 text-left">
+            <Icon className="size-4 shrink-0 opacity-70" />
+            <span className="truncate">{displayLabel}</span>
           </span>
-          <ChevronsUpDown className="ml-2 size-4 opacity-70" />
+          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-70" />
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className={cn(widthClass, "p-0 bg-white")} align="start" style={{ zIndex: 200000 }}>
+      <PopoverContent className={cn(widthClass, "p-0 bg-white")} align="start" style={{ zIndex: 200000, width: widthClass.split(" ").includes("w-full") ? "var(--radix-popover-trigger-width)" : undefined, maxWidth: "calc(100vw - 2rem)" }}>
         <Command shouldFilter>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>

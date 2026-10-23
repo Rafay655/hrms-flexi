@@ -482,17 +482,9 @@ export const modules: ModuleItem[] = [
       },
       {
         id: 50200,
-        icon: "ClipboardList",
-        title: "Policies",
-        subMenu: [
-          {
-            id: 50201,
-            icon: "FileCog",
-            title: "Attendance Policies",
-            pathname: "/time-sync/attendance-policies", 
-
-        }
-        ]
+        icon: "FileCog",
+        title: "Attendance Policy",
+        pathname: "/time-sync/attendance-policies",
       },
 
       // ═══════════════════════════════════════════════════════════════════
@@ -2404,12 +2396,6 @@ export const modules: ModuleItem[] = [
             icon: "Zap",
             title: "Grade Templates",
             pathname: "/flexi-meta/grade-templates",
-          },
-          {
-            id: 140604,
-            icon: "Zap",
-            title: "Shift Archetypes",
-            pathname: "/flexi-meta/shift-archetypes",
           },
         ],
       },
