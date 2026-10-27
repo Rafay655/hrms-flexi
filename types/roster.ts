@@ -1,4 +1,4 @@
-export type RosterStatus = 'draft' | 'published' | 'cancelled';
+export type RosterStatus = 'scheduled' | 'published' | 'confirmed';
 
 export interface RosterAssignment {
   id: string;              // UUID

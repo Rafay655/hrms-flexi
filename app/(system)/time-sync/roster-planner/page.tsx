@@ -3,6 +3,7 @@
 import { AppLoader } from "@/components/ui/app-loader";
 import { ApiErrorState } from "@/components/ui/api-error-state";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { RosterAssignmentModal } from './components/roster-assignment-modal';
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,9 +74,9 @@ import type { RosterAssignment, RosterFormData, RosterStatus } from "@/types/ros
 const DEFAULT_PER_PAGE = 10;
 
 const STATUS_OPTIONS: { value: RosterStatus; label: string }[] = [
-  { value: "draft", label: "Draft" },
+  { value: "scheduled", label: "Scheduled (draft)" },
   { value: "published", label: "Published" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: "confirmed", label: "Confirmed" },
 ];
 
 const RosterListingPage: React.FC = () => {
@@ -168,11 +169,12 @@ const RosterListingPage: React.FC = () => {
     roster_date: "",
     is_weekly_off: false,
     is_holiday: false,
-    status: "draft",
+    status: "scheduled",
     notes: "",
     template_id: "",
   });
 
+  const [createOpen, setCreateOpen] = useState(false);
   const [deleteUuid, setDeleteUuid] = useState<string | null>(null);
 
   // Reset page when filters change
@@ -216,22 +218,7 @@ const RosterListingPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleCreate = () => {
-    setSelectedItem(null);
-    setFormData({
-      employee_id: "",
-      shift_id: "",
-      roster_date: new Date().toLocaleDateString("en-CA"),
-      is_weekly_off: false,
-      is_holiday: false,
-      status: "draft",
-      notes: "",
-      template_id: "",
-    });
-    setModalMode("create");
-    setIsModalOpen(true);
-  };
-
+  const handleCreate = () => { setCreateOpen(true); };
   const handleDelete = (uuid: string) => setDeleteUuid(uuid);
 
   const confirmDelete = () => {
@@ -360,7 +347,7 @@ const RosterListingPage: React.FC = () => {
               className={
                 status === "published"
                   ? "bg-green-100 text-green-800"
-                  : status === "cancelled"
+                  : status === "confirmed"
                   ? "bg-red-100 text-red-800"
                   : "bg-gray-100 text-gray-800"
               }
@@ -582,6 +569,7 @@ const RosterListingPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      {createOpen && <RosterAssignmentModal onClose={() => setCreateOpen(false)} />}
       {/* Modal */}
       <Dialog open={isModalOpen} onOpenChange={open => { if (!isSaving) setIsModalOpen(open); }}>
         <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">

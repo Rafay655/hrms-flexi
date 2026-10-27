@@ -1,7 +1,8 @@
-export type TemplateType = 'weekly' | 'bi-weekly' | 'monthly' | 'custom';
+export type TemplateType = 'weekly' | 'fortnightly' | 'yearly';
 export type Weekday = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
 
 export interface PatternDay {
+  shift?: { id: string; name: string; code: string; start_time: string; end_time: string; is_active: boolean } | null;
   day: Weekday;
   shift_id: string | null;   // UUID or null
   is_off: boolean;

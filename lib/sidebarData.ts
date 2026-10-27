@@ -3,6 +3,7 @@ export type SubMenuItem = {
   icon: any;
   title: string;
   pathname?: string;
+  disabled?: boolean;
   subMenu?: SubMenuItem[];
 };
 
@@ -12,6 +13,7 @@ export type MenuItem = {
   title: string;
   subMenu?: SubMenuItem[];
   pathname?: string;
+  disabled?: boolean;
 };
 
 export type ModuleItem = {
@@ -508,12 +510,6 @@ export const modules: ModuleItem[] = [
             pathname: "/time-sync/punch-attendance",
           },
           {
-            id: 50303,
-            icon: "Timer",
-            title: "My Overtime",
-            pathname: "/time-sync/my-overtimes",
-          },
-          {
             id: 50304,
             icon: "FileEdit",
             title: "My Regularization",
@@ -526,16 +522,17 @@ export const modules: ModuleItem[] = [
             pathname: "/time-sync/my-shift-swap",
           },
           {
-            id: 50306,
-            icon: "ArrowLeftRight",
-            title: "Roaster Change",
-            pathname: "/time-sync/roaster-changes",
-          },
-          {
             id: 50308,
             icon: "CalendarDays",
             title: "My Schedule",
             pathname: "/time-sync/my-schedule",
+          },
+          {
+            id: 50303,
+            icon: "Timer",
+            title: "My Overtime",
+            pathname: "/time-sync/my-overtimes",
+            disabled: true,
           },
         ],
       },
@@ -606,18 +603,6 @@ export const modules: ModuleItem[] = [
         title: "SHIFT STUDIO",
         subMenu: [
           {
-            id: 50601,
-            icon: "LayoutGrid",
-            title: "Roster Planner",
-            pathname: "/time-sync/roster-planner",
-          },
-          {
-            id: 50602,
-            icon: "Copy",
-            title: "Roster Templates",
-            pathname: "/time-sync/roster-templates",
-          },
-          {
             id: 50603,
             icon: "Layers",
             title: "Shift Templates",
@@ -630,6 +615,18 @@ export const modules: ModuleItem[] = [
             pathname: "/time-sync/shift-assignment",
           },
           {
+            id: 50602,
+            icon: "Copy",
+            title: "Roster Templates",
+            pathname: "/time-sync/roster-templates",
+          },
+          {
+            id: 50601,
+            icon: "LayoutGrid",
+            title: "Roster Planner",
+            pathname: "/time-sync/roster-planner",
+          },
+          {
             id: 50605,
             icon: "CalendarCheck",
             title: "Calendar Assignment",
@@ -640,6 +637,7 @@ export const modules: ModuleItem[] = [
             icon: "DoorOpen",
             title: "Open Shifts",
             pathname: "/time-sync/open-shifts",
+            disabled: true,
           },
         ],
       },
@@ -661,18 +659,7 @@ export const modules: ModuleItem[] = [
             icon: "Bot",
             title: "AI Guard",
             pathname: "/time-sync/ai-anomaly",
-          },
-          {
-            id: 50803,
-            icon: "Search",
-            title: "Detailed Audit",
-            pathname: "/time-sync/anomalies-audit",
-          },
-          {
-            id: 50804,
-            icon: "ScrollText",
-            title: "System Audit Logs",
-            pathname: "/time-sync/audit-logs",
+            disabled: true,
           },
         ],
       },
@@ -698,16 +685,24 @@ export const modules: ModuleItem[] = [
             pathname: "/time-sync/employee-badges",
           },
           {
+            id: 50905,
+            icon: "RefreshCw",
+            title: "Attendance Reprocessing",
+            pathname: "/time-sync/attendance-reprocessing",
+          },
+          {
             id: 50902,
             icon: "HeartPulse",
             title: "Device Health",
             pathname: "/time-sync/device-health",
+            disabled: true,
           },
           {
             id: 50903,
             icon: "Download",
             title: "Ingestion Jobs",
             pathname: "/time-sync/ingestion-jobs",
+            disabled: true,
           },
         ],
       },
@@ -738,12 +733,6 @@ export const modules: ModuleItem[] = [
             pathname: "/leave-ease/my-balance",
           },
 
-          {
-            id: 70202,
-            icon: "Trophy",
-            title: "My Rewards",
-            pathname: "/leave-ease/my-earned-rewards",
-          },
           {
             id: 70203,
             icon: "Wallet",
@@ -793,25 +782,6 @@ export const modules: ModuleItem[] = [
             icon: "ClipboardCheck",
             title: "Pending Approvals",
             pathname: "/leave-ease/pending-approvals",
-          },
-        ],
-      },
-      {
-        id: 70400,
-        icon: "ListChecks",
-        title: "APPROVALS",
-        subMenu: [
-          {
-            id: 70401,
-            icon: "Inbox",
-            title: "Approvals Inbox",
-            pathname: "/leave-ease/approvals-inbox",
-          },
-          {
-            id: 70402,
-            icon: "UserPlus",
-            title: "Delegations",
-            pathname: "/leave-ease/delegations",
           },
         ],
       },
@@ -918,24 +888,6 @@ export const modules: ModuleItem[] = [
             title: "Leave Proration",
             pathname: "/leave-ease/leave-proration",
           },
-          {
-            id: 70517,
-            icon: "ScrollText",
-            title: "Audit Logs",
-            pathname: "/leave-ease/audit-logs",
-          },
-          {
-            id: 70518,
-            icon: "Gauge",
-            title: "SLA Monitor",
-            pathname: "/leave-ease/sla-monitor",
-          },
-          {
-            id: 70519,
-            icon: "FlaskConical",
-            title: "Simulator",
-            pathname: "/leave-ease/simulator",
-          },
         ],
       },
       {
@@ -985,84 +937,6 @@ export const modules: ModuleItem[] = [
             icon: "Map",
             title: "Travel Analytics",
             pathname: "/leave-ease/od-reports",
-          },
-        ],
-      },
-      {
-        id: 70800,
-        icon: "Bot",
-        title: "AI ASSISTANT",
-
-        subMenu: [
-          {
-            id: 70801,
-            icon: "BrainCircuit",
-            title: "Policy Copilot",
-            pathname: "/leave-ease/ai-copilot",
-          },
-          {
-            id: 70802,
-            icon: "AlertTriangle",
-            title: "Coverage Risk",
-            pathname: "/leave-ease/ai-risk",
-          },
-          {
-            id: 70803,
-            icon: "Radar",
-            title: "Anomaly Detection",
-            pathname: "/leave-ease/ai-anomalies",
-          },
-        ],
-      },
-      {
-        id: 70900,
-        icon: "BadgeDollarSign",
-        title: "PAYROLL LIQUIDATION",
-
-        subMenu: [
-          {
-            id: 70901,
-            icon: "HandCoins",
-            title: "Encashment Approvals",
-            pathname: "/leave-ease/encashment-approvals",
-          },
-          {
-            id: 70902,
-            icon: "CreditCard",
-            title: "Encashment Requests",
-            pathname: "/leave-ease/encashment-list",
-          },
-         
-        ],
-      },
-      {
-        id: 71000,
-        icon: "PieChart",
-        title: "REPORTS",
-        subMenu: [
-          {
-            id: 71001,
-            icon: "FileBarChart",
-            title: "Report Generator",
-            pathname: "/leave-ease/reports",
-          },
-          {
-            id: 71002,
-            icon: "CalendarClock",
-            title: "Scheduled Reports",
-            pathname: "/leave-ease/scheduled-reports",
-          },
-          {
-            id: 71003,
-            icon: "BarChart3",
-            title: "Analytics",
-            pathname: "/leave-ease/analytics",
-          },
-          {
-            id: 71004,
-            icon: "TrendingUp",
-            title: "Forecast",
-            pathname: "/leave-ease/forecast",
           },
         ],
       },
@@ -1118,6 +992,37 @@ export const modules: ModuleItem[] = [
             icon: "Gem",
             title: "Plan & Entitlements",
             pathname: "/leave-ease/entitlements",
+          },
+        ],
+      },
+      {
+        id: 70400,
+        icon: "Layers",
+        title: "EXTRA",
+        subMenu: [
+          {
+            id: 70517,
+            icon: "ScrollText",
+            title: "Audit Logs",
+            pathname: "/leave-ease/audit-logs",
+          },
+          {
+            id: 70518,
+            icon: "Gauge",
+            title: "SLA Monitor",
+            pathname: "/leave-ease/sla-monitor",
+          },
+          {
+            id: 70519,
+            icon: "FlaskConical",
+            title: "Simulator",
+            pathname: "/leave-ease/simulator",
+          },
+          {
+            id: 70202,
+            icon: "Trophy",
+            title: "My Rewards",
+            pathname: "/leave-ease/my-earned-rewards",
           },
         ],
       },

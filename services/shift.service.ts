@@ -24,6 +24,11 @@ function breakWindows(raw: unknown): ShiftBreakWindow[] {
 const normalize = (shift: Shift): Shift => ({ ...shift, working_days: workingDays(shift.working_days), break_windows: breakWindows(shift.break_windows) });
 const payload = (data: ShiftFormData): Record<string, unknown> => ({ ...data, name: data.name.trim(), code: data.code.trim(), attendance_policy_id: data.attendance_policy_id || null, start_time: data.start_time.slice(0, 5), end_time: data.end_time.slice(0, 5), max_ot_minutes_per_day: data.max_ot_minutes_per_day === '' ? null : Number(data.max_ot_minutes_per_day) });
 export const shiftService = {
+  async lookup(): Promise<Shift[]> {
+    const response = checked((await api.get<Envelope<Shift[]>>(`${ROOT}/lookup`)).data);
+    if (!Array.isArray(response.data)) throw new Error('Unexpected shift lookup response.');
+    return response.data;
+  },
   async getAll(params?: { page?: number; per_page?: number; search?: string; is_active?: number }): Promise<PaginatedShiftsResponse> {
     const response = checked((await api.get<Envelope<Shift[] | PaginatedShiftsResponse['data']> & { meta?: PaginatedShiftsResponse['data']['meta'] }>(ROOT, { params })).data);
     const rows = Array.isArray(response.data) ? response.data : response.data?.data;

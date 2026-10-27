@@ -87,7 +87,7 @@ it('opens a day in a modal with recorded endpoints and no invented break punches
   await render(); const button = document.querySelector('[aria-label^="View attendance for"]') as HTMLButtonElement;
   await act(async () => button.click());
   const modal = document.querySelector('[role="dialog"]')!; expect(modal.textContent).toContain('Attendance details'); expect(modal.textContent).toContain('9h 04m'); expect(modal.textContent).toContain('Location not checked'); expect(modal.textContent).not.toContain('Break Out');
-  expect(modal.querySelector('a')?.getAttribute('href')).toBe('/time-sync/regularizations');
+  expect(modal.querySelector('a')?.getAttribute('href')).toBe('/time-sync/my-regularizations');
 });
 it('retains today and history when only the monthly summary fails', async () => {
   const implementation = vi.mocked(api.get).getMockImplementation()!;

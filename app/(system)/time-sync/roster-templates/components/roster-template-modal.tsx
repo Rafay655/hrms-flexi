@@ -15,12 +15,9 @@ import { shiftService } from '@/services/shift.service';
 import type { RosterTemplate, RosterTemplateFormData, PatternDay, Weekday, TemplateType } from '@/types/roster-template';
 
 const weekdays: Weekday[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-const types: { value: TemplateType; label: string }[] = [{ value: 'weekly', label: 'Weekly' }, { value: 'bi-weekly', label: 'Bi-weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'custom', label: 'Custom' }];
+const types: { value: TemplateType; label: string }[] = [{ value: 'weekly', label: 'Weekly' }, { value: 'fortnightly', label: 'Fortnightly' }, { value: 'yearly', label: 'Yearly' }];
 async function allShifts() {
-  const first = await shiftService.getAll({ page: 1, per_page: 100 });
-  const rows = [...first.data.data];
-  for (let page = 2; page <= first.data.meta.last_page; page++) rows.push(...(await shiftService.getAll({ page, per_page: 100 })).data.data);
-  return rows;
+  return shiftService.lookup();
 }
 
 export function RosterTemplateModal({ mode, item, onClose }: { mode: 'create' | 'edit' | 'view'; item?: RosterTemplate; onClose: () => void }) {
@@ -40,7 +37,7 @@ export function RosterTemplateModal({ mode, item, onClose }: { mode: 'create' | 
   const saving = create.isPending || update.isPending;
   const options = (shifts.data ?? []).map(shift => ({ value: String(shift.uuid ?? shift.id), label: `${shift.name} (${shift.code})` }));
   // Preserve references to shifts that are no longer returned by the options endpoint.
-  const shiftOptions = [...options, ...[...new Set(draft.pattern_data.map(row => row.shift_id).filter(id => id != null && id !== '').map(String))].filter(id => !options.some(option => option.value === id)).map(id => ({ value: id, label: `Saved shift (${id.slice(0, 8)}…)` }))];
+  const shiftOptions = [...options, ...[...new Set(draft.pattern_data.map(row => row.shift_id).filter(id => id != null && id !== '').map(String))].filter(id => !options.some(option => option.value === id)).map(id => ({ value: id, label: (() => { const saved = draft.pattern_data.find(row => String(row.shift_id) === id)?.shift; return saved ? `${saved.name} (${saved.code})${saved.is_active ? '' : ' · Inactive — saved shift'}` : `Saved shift (${id.slice(0, 8)}…)`; })() }))];
   const set = <K extends keyof RosterTemplateFormData>(key: K, value: RosterTemplateFormData[K]) => { setDraft(previous => ({ ...previous, [key]: value })); setErrors(previous => ({ ...previous, [key]: '' })); };
   const updateRow = (index: number, value: Partial<PatternDay>) => set('pattern_data', draft.pattern_data.map((row, position) => position === index ? { ...row, ...value } : row));
   const validateDetails = () => {
@@ -60,7 +57,11 @@ export function RosterTemplateModal({ mode, item, onClose }: { mode: 'create' | 
       setErrors({ pattern_data: draft.pattern_data.length ? 'Choose a shift or mark each unassigned row as a day off.' : 'Add working days or add a day to start your pattern.' });
       setTab(1); return;
     }
-    const payload = { ...draft, name: draft.name.trim(), pattern_data: draft.pattern_data.map(row => ({ ...row, shift_id: row.is_off ? null : row.shift_id })) };
+    const limit = draft.template_type === 'weekly' ? 7 : 14;
+    if (draft.pattern_data.length > limit) { setTab(1); setErrors({ pattern_data: `This template supports at most ${limit} pattern rows.` }); return; }
+    const missing = draft.working_days.find(day => !draft.pattern_data.some(row => row.day === day));
+    if (missing) { setTab(1); setErrors({ pattern_data: `Add a pattern row for ${missing}.` }); return; }
+    const payload = { ...draft, name: draft.name.trim(), pattern_data: draft.pattern_data.map(row => ({ day: row.day, is_off: row.is_off, shift_id: row.is_off ? null : row.shift_id })) };
     if (mode === 'create') create.mutate(payload, { onSuccess: onClose });
     else if (item) update.mutate({ uuid: item.id, data: payload }, { onSuccess: onClose });
   }
@@ -93,7 +94,7 @@ export function RosterTemplateModal({ mode, item, onClose }: { mode: 'create' | 
             </div>
             <div role="tabpanel" id="roster-panel-1" aria-labelledby="roster-tab-1" hidden={tab !== 1} className="space-y-4">
               <div><h3 className="text-sm font-semibold">Build your shift sequence</h3><p className="mt-1 text-xs text-muted-foreground">Rows run in order. Add repeated weekdays when your pattern spans multiple weeks. Changing working days won’t overwrite this sequence.</p></div>
-              {!readOnly && <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4"><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => set('pattern_data', [...draft.pattern_data, ...draft.working_days.map(day => ({ day, shift_id: null, is_off: false }))])} disabled={!draft.working_days.length}>Add working days</Button><Button type="button" size="sm" variant="outline" onClick={() => set('pattern_data', [...draft.pattern_data, { day: weekdays[draft.pattern_data.length % 7], shift_id: null, is_off: false }])}><Plus className="mr-1 h-4 w-4" />Add day</Button></div><div className="grid min-w-0 grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><SearchableSelect aria-label="Shift to apply to working rows" allowAll={false} widthClass="w-full" options={shiftOptions} value={bulkShift} placeholder="Choose a shift for working rows" disabled={saving || shifts.isPending || shifts.isError} onChange={setBulkShift} /><Button type="button" variant="outline" size="sm" disabled={!bulkShift || !draft.pattern_data.some(row => !row.is_off)} onClick={() => set('pattern_data', draft.pattern_data.map(row => row.is_off ? row : { ...row, shift_id: bulkShift }))}>Apply to working rows</Button></div><p className="text-xs text-muted-foreground">Apply replaces shifts in working rows and keeps days off unchanged.</p></div>}
+              {!readOnly && <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4"><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => set('pattern_data', [...draft.pattern_data, ...draft.working_days.map(day => ({ day, shift_id: null, is_off: false }))])} disabled={!draft.working_days.length || draft.pattern_data.length + draft.working_days.length > (draft.template_type === 'weekly' ? 7 : 14)}>Add working days</Button><Button type="button" size="sm" variant="outline" disabled={draft.pattern_data.length >= (draft.template_type === 'weekly' ? 7 : 14)} onClick={() => set('pattern_data', [...draft.pattern_data, { day: weekdays[draft.pattern_data.length % 7], shift_id: null, is_off: false }])}><Plus className="mr-1 h-4 w-4" />Add day</Button></div><div className="grid min-w-0 grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><SearchableSelect aria-label="Shift to apply to working rows" allowAll={false} widthClass="w-full" options={shiftOptions} value={bulkShift} placeholder="Choose a shift for working rows" disabled={saving || shifts.isPending || shifts.isError} onChange={setBulkShift} /><Button type="button" variant="outline" size="sm" disabled={!bulkShift || !draft.pattern_data.some(row => !row.is_off)} onClick={() => set('pattern_data', draft.pattern_data.map(row => row.is_off ? row : { ...row, shift_id: bulkShift }))}>Apply to working rows</Button></div><p className="text-xs text-muted-foreground">Apply replaces shifts in working rows and keeps days off unchanged.</p></div>}
               {shifts.isPending && <AppLoader variant="inline" label="Loading shifts…" />}
               {shifts.isError && <ApiErrorState error={shifts.error} onRetry={() => void shifts.refetch()} />}
               {message('pattern_data')}

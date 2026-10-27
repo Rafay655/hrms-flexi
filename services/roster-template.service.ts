@@ -13,7 +13,7 @@ const toApiPayload = (data: RosterTemplateFormData): RosterTemplateApiPayload =>
   name: data.name.trim(),
   template_type: data.template_type as TemplateType,
   working_days: data.working_days,
-  pattern_data: data.pattern_data,
+  pattern_data: data.pattern_data.map(row => ({ day: row.day, is_off: row.is_off, shift_id: row.is_off ? null : row.shift_id })),
   auto_generate: data.auto_generate,
   is_active: data.is_active,
 });

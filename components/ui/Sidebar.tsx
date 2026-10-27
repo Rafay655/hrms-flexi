@@ -13,6 +13,7 @@ import { toggleDropdown } from "@/store/sidebarSlice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 type RawSubMenu = {
+  disabled?: boolean;
   id: number;
   icon: string;
   title: string;
@@ -21,6 +22,7 @@ type RawSubMenu = {
 };
 
 type RawMenuItem = {
+  disabled?: boolean;
   id: number;
   icon: string;
   title: string;
@@ -29,6 +31,7 @@ type RawMenuItem = {
 };
 
 type NavItem = {
+  disabled?: boolean;
   id: string;
   label: string;
   icon: string;     // ✅ icon name string now
@@ -37,18 +40,19 @@ type NavItem = {
 };
 
 const buildNavItemsFromModule = (moduleId: number) => {
-  const module = modules.find((m) => m.id === moduleId);
+  const selectedModule = modules.find((m) => m.id === moduleId);
 
-  if (!module) {
+  if (!selectedModule) {
     return { navItems: [] as NavItem[], moduleName: "Flexi HRMS", moduleTagline: undefined as string | undefined };
   }
 
-  const navItems: NavItem[] = (module.Menu || []).map((menuItem: RawMenuItem) => {
+  const navItems: NavItem[] = (selectedModule.Menu || []).map((menuItem: RawMenuItem) => {
     const subMenu: NavItem[] | undefined = menuItem.subMenu?.map((subItem: RawSubMenu) => ({
       id: subItem.id.toString(),
       label: subItem.title,
       path: subItem.pathname || "#",
       icon: subItem.icon || "Zap",
+      disabled: subItem.disabled,
     }));
 
     return {
@@ -56,14 +60,15 @@ const buildNavItemsFromModule = (moduleId: number) => {
       label: menuItem.title,
       icon: menuItem.icon || "Zap",
       path: menuItem.pathname || undefined,
+      disabled: menuItem.disabled,
       subMenu,
     };
   });
 
   return {
     navItems,
-    moduleName: module.name,
-    moduleTagline: module.Menu?.[0]?.title,
+    moduleName: selectedModule.name,
+    moduleTagline: selectedModule.Menu?.[0]?.title,
   };
 };
 const SidebarSkeleton: React.FC = () => {
@@ -110,6 +115,9 @@ const SidebarSkeleton: React.FC = () => {
     </aside>
   );
 };
+const subscribeToHydration = () => () => {};
+const clientHydrationSnapshot = () => true;
+const serverHydrationSnapshot = () => false;
 export const Sidebar: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }) => {
   const pathname = usePathname();
   const dispatch = useAppDispatch();
@@ -118,8 +126,7 @@ export const Sidebar: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }
   const activeModuleId = getModuleIdForPath(pathname) ?? savedModuleId;
   const openDropdowns = useAppSelector((s) => s.sidebar.openDropdowns);
 
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+  const mounted = React.useSyncExternalStore(subscribeToHydration, clientHydrationSnapshot, serverHydrationSnapshot);
 
   const { navItems, moduleName, moduleTagline } = buildNavItemsFromModule(activeModuleId);
 
@@ -176,7 +183,7 @@ export const Sidebar: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }
                 <DropdownMenuContent side="right" align="start" sideOffset={12} className="min-w-56 rounded-xl border-slate-200/80 p-2 shadow-xl">
                   <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
                   {item.path && <DropdownMenuItem asChild><Link href={item.path}>{item.label}</Link></DropdownMenuItem>}
-                  {item.subMenu.map((sub) => <DropdownMenuItem key={sub.id} asChild><Link href={sub.path || "#"} aria-current={isItemActive(sub.path) ? "page" : undefined} className={isItemActive(sub.path) ? "bg-accent font-semibold" : ""}>{sub.label}</Link></DropdownMenuItem>)}
+                  {item.subMenu.map((sub) => sub.disabled ? <DropdownMenuItem key={sub.id} disabled>{sub.label}</DropdownMenuItem> : <DropdownMenuItem key={sub.id} asChild><Link href={sub.path || "#"} aria-current={isItemActive(sub.path) ? "page" : undefined} className={isItemActive(sub.path) ? "bg-accent font-semibold" : ""}>{sub.label}</Link></DropdownMenuItem>)}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
@@ -255,6 +262,8 @@ export const Sidebar: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }
                     <div className="ml-7 mr-1 my-2 pl-3 border-l border-indigo-200/15 space-y-1">
                       {item.subMenu.map((sub) => {
                         const subActive = isItemActive(sub.path);
+
+                        if (sub.disabled) return <span key={sub.id} role="link" aria-disabled="true" title="Currently unavailable" className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2.5 text-[12px] font-medium text-indigo-200/30"><span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-200/15" /><span className="truncate">{sub.label}</span></span>;
 
                         return (
                           <Link

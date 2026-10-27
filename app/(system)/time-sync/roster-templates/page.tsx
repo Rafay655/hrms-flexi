@@ -56,9 +56,9 @@ const DEFAULT_PER_PAGE = 10;
 
 const TEMPLATE_TYPES: { value: TemplateType; label: string }[] = [
   { value: "weekly", label: "Weekly" },
-  { value: "bi-weekly", label: "Bi-Weekly" },
-  { value: "monthly", label: "Monthly" },
-  { value: "custom", label: "Custom" },
+  { value: "fortnightly", label: "Fortnightly" },
+  { value: "yearly", label: "Yearly" },
+
 ];
 
 function useDebounced<T>(value: T, delay = 400) {

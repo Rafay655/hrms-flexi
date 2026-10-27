@@ -1,462 +1,822 @@
-
 "use client";
-import React, { useState, useMemo } from 'react';
-import { 
-  AlertTriangle, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  Clock, 
-  MapPin, 
-  Smartphone, 
-  History, 
-  ShieldAlert, 
-  ChevronRight, 
-  MoreVertical, 
-  X, 
-  Bell, 
-  RefreshCcw,
-  Zap,
-  ArrowRight,
-  MessageSquare,
-  ShieldX,
-  FileText,
-  User,
-  Info
-} from 'lucide-react';
 
-type ExceptionSeverity = 'HIGH' | 'MEDIUM' | 'LOW';
-type ExceptionType = 
-  | 'MISSING_IN' 
-  | 'MISSING_OUT' 
-  | 'LATE_TOLERANCE' 
-  | 'EARLY_DEPARTURE' 
-  | 'GEO_VIOLATION' 
-  | 'UNSCHEDULED' 
-  | 'DEVICE_MISMATCH' 
-  | 'BUDDY_PUNCH' 
-  | 'REST_VIOLATION';
+import { ExceptionRegularizationModal } from "./components/exception-regularization-modal";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { format, subDays } from "date-fns";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  FileClock,
+  MoreVertical,
+  Filter,
+  Inbox,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import SearchableSelect from "@/components/ui/searchable-select";
+import { AppLoader } from "@/components/ui/app-loader";
+import { ApiErrorState } from "@/components/ui/api-error-state";
+import { useAppSelector } from "@/store/hooks";
+import { employeeService } from "@/services/employee.service";
+import { departmentService } from "@/services/department.service";
+import { attendanceExceptionService } from "@/services/attendance-exception.service";
+import {
+  regularizationTypeForException,
+  exceptionLabel,
+  exceptionSeverityTone,
+  exceptionStatusTone,
+  validateExceptionRange,
+} from "@/lib/attendance-exception";
+import type {
+  AttendanceException,
+  ExceptionCategory,
+  ExceptionFilters,
+  ExceptionSeverity,
+  ExceptionStatus,
+} from "@/types/attendance-exception";
 
-interface AttendanceException {
-  id: string;
-  employee: string;
-  avatar: string;
-  date: string;
-  type: ExceptionType;
-  severity: ExceptionSeverity;
-  detectedAt: string;
-  slaHours: number;
-  details: string;
-  status: 'PENDING' | 'RESOLVED';
-}
-
-const SEVERITY_CONFIG: Record<ExceptionSeverity, { label: string; color: string; icon: string }> = {
-  HIGH: { label: 'High', color: 'text-red-600 bg-red-50 border-red-100', icon: '🔴' },
-  MEDIUM: { label: 'Medium', color: 'text-orange-600 bg-orange-50 border-orange-100', icon: '🟡' },
-  LOW: { label: 'Low', color: 'text-green-600 bg-green-50 border-green-100', icon: '🟢' },
-};
-
-const TYPE_LABELS: Record<ExceptionType, string> = {
-  MISSING_IN: 'Missing In Punch',
-  MISSING_OUT: 'Missing Out Punch',
-  LATE_TOLERANCE: 'Late Beyond Tolerance',
-  EARLY_DEPARTURE: 'Early Departure',
-  GEO_VIOLATION: 'Geo Violation',
-  UNSCHEDULED: 'Unscheduled Work',
-  DEVICE_MISMATCH: 'Device Mismatch',
-  BUDDY_PUNCH: 'Buddy Punch Alert',
-  REST_VIOLATION: 'Rest Rule Violation',
-};
-
-const MOCK_EXCEPTIONS: AttendanceException[] = Array.from({ length: 45 }).map((_, i) => ({
-  id: `EXC-${5000 + i}`,
-  employee: ['Muqadas Mazhar', 'James Wilson', 'Ahmed Khan', 'Priya Das', 'Elena Frost', 'Marcus Low'][i % 6],
-  avatar: ['SC', 'JW', 'AK', 'PD', 'EF', 'ML'][i % 6],
-  date: `Jan ${15 - (i % 5)}, 2025`,
-  type: (['MISSING_IN', 'MISSING_OUT', 'LATE_TOLERANCE', 'GEO_VIOLATION', 'BUDDY_PUNCH', 'DEVICE_MISMATCH'] as ExceptionType[])[i % 6],
-  severity: i % 10 === 0 ? 'HIGH' : i % 3 === 0 ? 'MEDIUM' : 'LOW',
-  detectedAt: '10:15 AM',
-  slaHours: Math.floor(Math.random() * 24),
-  details: i % 6 === 4 ? 'Punch from unauthorized mobile device (Android v12)' : 'System detected mismatch between GPS and Office geofence.',
-  status: 'PENDING'
+const categories: { value: ExceptionCategory; label: string }[] = [
+  { value: "all", label: "All exceptions" },
+  { value: "missing_punch", label: "Missing punch" },
+  { value: "late_early", label: "Late / early" },
+  { value: "geo_violation", label: "Geo violations" },
+  { value: "fraud_alerts", label: "Fraud alerts" },
+];
+const severities = ["high", "medium", "low"].map((value) => ({
+  value,
+  label: exceptionLabel(value),
 }));
-
- const ExceptionsInbox: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ExceptionType | 'ALL'>('MISSING_OUT');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedException, setSelectedException] = useState<AttendanceException | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-
-  const filteredItems = useMemo(() => {
-    return MOCK_EXCEPTIONS.filter(item => {
-      const matchesTab = activeTab === 'ALL' || item.type === activeTab;
-      const matchesSearch = item.employee.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           item.id.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesTab && matchesSearch;
+const defaultRange = () => {
+  const day = format(subDays(new Date(), 1), "yyyy-MM-dd");
+  return { date_from: day, date_to: day };
+};
+async function allDepartments(signal?: AbortSignal) {
+  const first = await departmentService.getAll({ page: 1, per_page: 100 });
+  const rows = [...first.data];
+  for (let page = 2; page <= first.meta.last_page; page++) {
+    if (signal?.aborted) throw new Error("Request cancelled");
+    rows.push(
+      ...(await departmentService.getAll({ page, per_page: 100 })).data,
+    );
+  }
+  return rows;
+}
+function explanation(row: AttendanceException) {
+  for (const value of [row.message, row.description, row.details])
+    if (typeof value === "string" && value.trim()) return value;
+  return "";
+}
+export default function ExceptionsInboxPage() {
+  const company = useAppSelector((state) => state.auth.company?.id);
+  const timeZone =
+    useAppSelector((state) => state.auth.company?.timezone) || "Asia/Karachi";
+  return (
+    <ExceptionsInbox key={company} company={company} timeZone={timeZone} />
+  );
+}
+function ExceptionsInbox({
+  company,
+  timeZone,
+}: {
+  company?: string;
+  timeZone: string;
+}) {
+  const [filters, setFilters] = useState<ExceptionFilters>(() => ({
+    ...defaultRange(),
+    page: 1,
+    per_page: 25,
+    category: "all",
+    status: "all",
+  }));
+  const [dates, setDates] = useState(() => defaultRange());
+  const [rangeError, setRangeError] = useState("");
+  const [search, setSearch] = useState("");
+  const [regularization, setRegularization] =
+    useState<AttendanceException | null>(null);
+  const [advanced, setAdvanced] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(
+      () =>
+        setFilters((previous) =>
+          previous.search === (search.trim() || undefined)
+            ? previous
+            : { ...previous, search: search.trim() || undefined, page: 1 },
+        ),
+      350,
+    );
+    return () => clearTimeout(timer);
+  }, [search]);
+  const query = useQuery({
+    queryKey: ["attendance-exceptions", company, filters],
+    queryFn: ({ signal }) => attendanceExceptionService.list(filters, signal),
+    retry: false,
+  });
+  const employees = useQuery({
+    queryKey: ["exception-employees", company],
+    queryFn: ({ signal }) => employeeService.getAllForBatches(signal),
+    enabled: advanced,
+    retry: false,
+  });
+  const departments = useQuery({
+    queryKey: ["exception-departments", company],
+    queryFn: ({ signal }) => allDepartments(signal),
+    enabled: advanced,
+    retry: false,
+  });
+  const rows = query.data?.data ?? [],
+    meta = query.data?.meta,
+    summary = meta?.summary;
+  const total = meta?.total ?? 0,
+    pages = Math.max(1, meta?.last_page ?? 1);
+  const from = rows.length ? (filters.page - 1) * filters.per_page + 1 : 0;
+  const to = rows.length ? from + rows.length - 1 : 0;
+  const set = <K extends keyof ExceptionFilters>(
+    key: K,
+    value: ExceptionFilters[K],
+  ) => setFilters((previous) => ({ ...previous, [key]: value, page: 1 }));
+  const clear = () => {
+    const range = defaultRange();
+    setSearch("");
+    setDates(range);
+    setRangeError("");
+    setFilters({
+      ...range,
+      category: "all",
+      status: "all",
+      page: 1,
+      per_page: filters.per_page,
     });
-  }, [activeTab, searchQuery]);
-
-  const toggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
   };
+  const busy =
+    query.isFetching || (search.trim() || undefined) !== filters.search;
+  const advancedCount = [
+    filters.type,
+    filters.min_severity,
+    filters.employee_id,
+    filters.department_id,
+  ].filter(Boolean).length;
+  const numbers = Array.from(
+    { length: Math.min(5, pages) },
+    (_, index) => Math.max(1, Math.min(filters.page - 2, pages - 4)) + index,
+  );
+  const paginate = (page: number) =>
+    setFilters((previous) => ({ ...previous, page }));
+  const pageButton = (
+    label: string,
+    page: number,
+    Icon: typeof ChevronLeft,
+    disabled: boolean,
+  ) => (
+    <Button
+      variant="outline"
+      size="sm"
+      aria-label={label}
+      disabled={busy || disabled}
+      onClick={() => paginate(page)}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
+  );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-      {/* HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-3">
-            <ShieldAlert className="text-[#3E3B6F]" size={28} /> Exceptions Inbox
-          </h2>
-          <p className="text-sm text-gray-500 font-medium italic mt-1">Detect and resolve attendance anomalies and fraud alerts</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl shadow-sm">
-            <RefreshCcw size={14} className={`text-gray-400 ${autoRefresh ? 'animate-spin' : ''}`} />
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Auto-Refresh</span>
-            <div 
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`w-8 h-4 rounded-full relative p-0.5 cursor-pointer transition-all ${autoRefresh ? 'bg-green-500' : 'bg-gray-200'}`}
+    <div className="p-3">
+      <Card className="overflow-hidden border-gray-100 shadow-sm">
+        <CardHeader className="border-b">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <div className="mb-1 flex items-center gap-2 text-xs font-medium text-brand-700">
+                <ShieldAlert className="h-4 w-4" />
+                TimeSync
+              </div>
+              <CardTitle className="text-2xl font-semibold text-gray-900">
+                Exceptions Inbox
+              </CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                A clear view of attendance exceptions that need your attention.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={query.isFetching}
+              onClick={() => void query.refetch()}
             >
-              <div className={`w-3 h-3 bg-white rounded-full transition-all ${autoRefresh ? 'translate-x-4' : 'translate-x-0'}`} />
-            </div>
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
           </div>
-          <button className="flex items-center gap-2 px-6 py-2.5 bg-[#3E3B6F] text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-[#3E3B6F]/20 hover:scale-[1.02] active:scale-95 transition-all">
-            <Zap size={18} /> Bulk Resolve
-          </button>
-        </div>
-      </div>
-
-      {/* STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group">
-          <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Exceptions</p>
-            <p className="text-3xl font-black text-gray-800 tabular-nums">45</p>
-          </div>
-          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
-            <AlertTriangle size={28} />
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group">
-          <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Overdue SLA</p>
-            <p className="text-3xl font-black text-red-600 tabular-nums">8</p>
-          </div>
-          <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 group-hover:scale-110 transition-transform">
-            <Clock size={28} />
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group">
-          <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Resolved Today</p>
-            <p className="text-3xl font-black text-green-600 tabular-nums">23</p>
-          </div>
-          <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
-            <CheckCircle2 size={28} />
-          </div>
-        </div>
-      </div>
-
-      {/* FILTER TABS */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-1 flex items-center gap-1 overflow-x-auto no-scrollbar shadow-sm">
-        {[
-          { id: 'ALL', label: 'All' },
-          { id: 'MISSING_OUT', label: 'Missing Punch' },
-          { id: 'LATE_TOLERANCE', label: 'Late/Early' },
-          { id: 'GEO_VIOLATION', label: 'Geo Violation' },
-          { id: 'BUDDY_PUNCH', label: 'Fraud Alerts' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-6 py-2.5 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
-              activeTab === tab.id
-                ? 'bg-[#3E3B6F] text-white shadow-lg' 
-                : 'text-gray-500 hover:bg-gray-50'
-            }`}
+        </CardHeader>
+        <CardContent className="space-y-5 p-4 sm:p-6">
+          <form
+            className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(160px,200px)_minmax(160px,200px)_auto_1fr]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const error = validateExceptionRange(
+                dates.date_from,
+                dates.date_to,
+              );
+              setRangeError(error);
+              if (!error)
+                setFilters((previous) => ({ ...previous, ...dates, page: 1 }));
+            }}
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* DATA TABLE */}
-      <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-50 flex items-center gap-4">
-           <div className="relative flex-1 max-w-md">
-             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-             <input 
-              type="text" 
-              placeholder="Search employee or exception ID..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-[#3E3B6F]/10" 
-             />
-           </div>
-           {selectedIds.size > 0 && (
-             <div className="flex items-center gap-2 animate-in slide-in-from-right-4 duration-300">
-               <button className="px-4 py-2 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 transition-all flex items-center gap-2 shadow-lg shadow-green-900/10">
-                 <CheckCircle2 size={14} /> Resolve {selectedIds.size} Selected
-               </button>
-               <button className="px-4 py-2 bg-white border border-gray-200 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center gap-2">
-                 <Bell size={14} /> Notify Staff
-               </button>
-               <button onClick={() => setSelectedIds(new Set())} className="p-2 text-gray-400 hover:text-red-500"><X size={18}/></button>
-             </div>
-           )}
-        </div>
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50/80">
-              <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                <th className="px-6 py-4 w-12 text-center">
-                  <input 
-                    type="checkbox" 
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedIds(new Set(filteredItems.map(i => i.id)));
-                      else setSelectedIds(new Set());
-                    }}
-                    checked={selectedIds.size === filteredItems.length && filteredItems.length > 0}
-                    className="w-4 h-4 rounded border-gray-300 text-[#3E3B6F] focus:ring-[#3E3B6F]"
+            <div className="min-w-0 space-y-1.5">
+              <label
+                htmlFor="exceptions-from"
+                className="block text-xs font-medium text-gray-600"
+              >
+                From date
+              </label>
+              <Input
+                id="exceptions-from"
+                type="date"
+                value={dates.date_from}
+                aria-invalid={Boolean(rangeError)}
+                onChange={(event) => {
+                  setRangeError("");
+                  setDates((previous) => ({
+                    ...previous,
+                    date_from: event.target.value,
+                  }));
+                }}
+                className="h-9 w-full min-w-0"
+              />
+            </div>
+            <div className="min-w-0 space-y-1.5">
+              <label
+                htmlFor="exceptions-to"
+                className="block text-xs font-medium text-gray-600"
+              >
+                To date
+              </label>
+              <Input
+                id="exceptions-to"
+                type="date"
+                value={dates.date_to}
+                aria-invalid={Boolean(rangeError)}
+                onChange={(event) => {
+                  setRangeError("");
+                  setDates((previous) => ({
+                    ...previous,
+                    date_to: event.target.value,
+                  }));
+                }}
+                className="h-9 w-full min-w-0"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="h-9 w-full bg-brand-900 hover:bg-brand-800 sm:w-auto sm:justify-self-start"
+            >
+              Apply dates
+            </Button>
+            <div className="flex min-h-9 flex-wrap items-center gap-2 sm:justify-end xl:justify-start">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const day = format(subDays(new Date(), 1), "yyyy-MM-dd");
+                  setDates({ date_from: day, date_to: day });
+                  setRangeError("");
+                  setFilters((previous) => ({
+                    ...previous,
+                    date_from: day,
+                    date_to: day,
+                    page: 1,
+                  }));
+                }}
+              >
+                Yesterday
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const range = {
+                    date_from: format(subDays(new Date(), 6), "yyyy-MM-dd"),
+                    date_to: format(new Date(), "yyyy-MM-dd"),
+                  };
+                  setDates(range);
+                  setRangeError("");
+                  setFilters((previous) => ({
+                    ...previous,
+                    ...range,
+                    page: 1,
+                  }));
+                }}
+              >
+                Last 7 days
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground sm:col-span-2 xl:col-span-4">
+              Choose up to 62 days, then apply the date range.
+            </p>
+          </form>
+          {rangeError && (
+            <p role="alert" className="text-sm text-red-600">
+              {rangeError}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: "Total exceptions", value: meta?.total, icon: Inbox },
+              {
+                label: "High severity",
+                value: summary?.by_severity?.high,
+                icon: ShieldAlert,
+              },
+              {
+                label: "Medium severity",
+                value: summary?.by_severity?.medium,
+                icon: AlertTriangle,
+              },
+              {
+                label: "Affected employees",
+                value: summary?.affected_employees,
+                icon: Users,
+              },
+            ].map(({ label, value, icon: Icon }) => (
+              <div
+                key={label}
+                className="rounded-xl border border-brand-600/10 bg-brand-100/50 p-4"
+              >
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>{label}</span>
+                  <Icon
+                    className={`h-4 w-4 ${label === "High severity" ? "text-rose-600" : "text-brand-600"}`}
                   />
-                </th>
-                <th className="px-6 py-4">Employee</th>
-                <th className="px-6 py-4 text-center">Date</th>
-                <th className="px-6 py-4">Exception</th>
-                <th className="px-6 py-4 text-center">Severity</th>
-                <th className="px-6 py-4">SLA Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className={`group hover:bg-gray-50/80 transition-all ${selectedIds.has(item.id) ? 'bg-[#3E3B6F]/5' : ''}`}>
-                  <td className="px-6 py-4 text-center">
-                    <input 
-                      type="checkbox" 
-                      checked={selectedIds.has(item.id)}
-                      onChange={() => toggleSelect(item.id)}
-                      className="w-4 h-4 rounded border-gray-300 text-[#3E3B6F] focus:ring-[#3E3B6F]"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-primary-gradient flex items-center justify-center text-white text-[11px] font-black shadow-lg shadow-[#3E3B6F]/10">
-                        {item.avatar}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-800 truncate">{item.employee}</p>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">{item.id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center text-[11px] font-bold text-gray-500 tabular-nums">
-                    {item.date}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-gray-700">{TYPE_LABELS[item.type]}</span>
-                      <span className="text-[10px] text-gray-400 font-medium truncate max-w-[200px] italic">"{item.details}"</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${SEVERITY_CONFIG[item.severity].color}`}>
-                      <span>{SEVERITY_CONFIG[item.severity].icon}</span>
-                      <span>{SEVERITY_CONFIG[item.severity].label}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className={`inline-flex items-center gap-2 px-2 py-1 rounded-lg border text-[10px] font-black ${
-                      item.slaHours < 4 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-100 text-gray-400 border-gray-200'
-                    }`}>
-                      <Clock size={12} /> {item.slaHours}h left
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2  transition-all">
-                      <button className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-500 hover:text-white transition-all shadow-sm" title="Resolve">
-                        <CheckCircle2 size={16} />
-                      </button>
-                      <button className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Request Regularization">
-                        <History size={16} />
-                      </button>
-                      <button 
-                        onClick={() => setSelectedException(item)}
-                        className="p-2 bg-white border border-gray-200 text-gray-400 rounded-lg hover:text-[#3E3B6F] hover:border-[#3E3B6F] transition-all"
+                </div>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-brand-900">
+                  {query.isPending
+                    ? "…"
+                    : value == null
+                      ? meta?.total === 0
+                        ? "0"
+                        : "—"
+                      : value.toLocaleString()}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Across current filters
+                </p>
+              </div>
+            ))}
+          </div>
+          <div
+            className="flex flex-wrap gap-1 rounded-lg border bg-brand-100/60 p-1"
+            aria-label="Exception categories"
+          >
+            {categories.map((category) => (
+              <button
+                key={category.value}
+                type="button"
+                aria-pressed={filters.category === category.value}
+                onClick={() => set("category", category.value)}
+                className={`rounded-md px-4 py-2 text-sm font-medium transition ${filters.category === category.value ? "bg-brand-900 text-white shadow-sm" : "text-brand-700 hover:bg-white"}`}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Search exceptions"
+                placeholder="Search employee, code, or exception…"
+                maxLength={200}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <SearchableSelect
+              aria-label="Filter by status"
+              widthClass="w-full sm:w-40"
+              allLabel="All statuses"
+              value={filters.status === "all" ? "" : (filters.status ?? "")}
+              options={["pending", "escalated", "resolved"].map((value) => ({
+                value,
+                label: exceptionLabel(value),
+              }))}
+              onChange={(value) =>
+                set("status", (value || "all") as ExceptionStatus)
+              }
+            />
+            <SearchableSelect
+              aria-label="Filter by severity"
+              widthClass="w-full sm:w-40"
+              allLabel="All severities"
+              value={filters.severity ?? ""}
+              options={severities}
+              onChange={(value) =>
+                set(
+                  "severity",
+                  (value || undefined) as ExceptionSeverity | undefined,
+                )
+              }
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              aria-expanded={advanced}
+              aria-controls="exception-advanced"
+              onClick={() => setAdvanced(!advanced)}
+            >
+              <Filter className="mr-2 h-4 w-4" />
+              More filters{advancedCount ? ` (${advancedCount})` : ""}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clear}>
+              Reset
+            </Button>
+          </div>
+          {advanced && (
+            <div
+              id="exception-advanced"
+              className="grid gap-4 rounded-xl border bg-brand-100/40 p-4 sm:grid-cols-2 lg:grid-cols-4"
+            >
+              <div className="min-w-0 space-y-1.5">
+                <label
+                  htmlFor="exceptions-employee"
+                  className="text-xs font-medium"
+                >
+                  Employee
+                </label>
+                <SearchableSelect
+                  id="exceptions-employee"
+                  widthClass="w-full"
+                  allLabel="All employees"
+                  disabled={employees.isPending}
+                  options={(employees.data ?? []).map((item) => ({
+                    value: String(item.uuid),
+                    label: `${item.name} · ${item.employee_code}`,
+                  }))}
+                  value={filters.employee_id ?? ""}
+                  onChange={(value) => set("employee_id", value || undefined)}
+                />
+                {employees.isError && (
+                  <ApiErrorState
+                    error={employees.error}
+                    onRetry={() => void employees.refetch()}
+                  />
+                )}
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <label
+                  htmlFor="exceptions-department"
+                  className="text-xs font-medium"
+                >
+                  Department
+                </label>
+                <SearchableSelect
+                  id="exceptions-department"
+                  widthClass="w-full"
+                  allLabel="All departments"
+                  disabled={departments.isPending}
+                  options={(departments.data ?? []).map((item) => ({
+                    value: String(item.id),
+                    label: item.name,
+                  }))}
+                  value={
+                    filters.department_id == null
+                      ? ""
+                      : String(filters.department_id)
+                  }
+                  onChange={(value) =>
+                    set("department_id", value ? Number(value) : undefined)
+                  }
+                />
+                {departments.isError && (
+                  <ApiErrorState
+                    error={departments.error}
+                    onRetry={() => void departments.refetch()}
+                  />
+                )}
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <label
+                  htmlFor="exceptions-min-severity"
+                  className="text-xs font-medium"
+                >
+                  Minimum severity
+                </label>
+                <SearchableSelect
+                  id="exceptions-min-severity"
+                  widthClass="w-full"
+                  allLabel="Any severity"
+                  options={severities}
+                  value={filters.min_severity ?? ""}
+                  onChange={(value) =>
+                    set(
+                      "min_severity",
+                      (value || undefined) as ExceptionSeverity | undefined,
+                    )
+                  }
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Includes the chosen level and higher.
+                </p>
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <label
+                  htmlFor="exceptions-type"
+                  className="text-xs font-medium"
+                >
+                  Exception type
+                </label>
+                <SearchableSelect
+                  id="exceptions-type"
+                  widthClass="w-full"
+                  allLabel="All types"
+                  options={Object.keys(summary?.by_type ?? {}).map((value) => ({
+                    value,
+                    label: exceptionLabel(value),
+                  }))}
+                  value={filters.type ?? ""}
+                  onChange={(value) => set("type", value || undefined)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Types returned for the current filters.
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-600/10 bg-brand-100/50 p-3 text-sm text-muted-foreground">
+            <span>
+              Showing{" "}
+              <strong className="text-brand-900">
+                {from}–{to}
+              </strong>{" "}
+              of{" "}
+              <strong className="text-brand-900">
+                {total.toLocaleString()}
+              </strong>{" "}
+              exceptions
+              <span className="ml-2 text-xs">
+                · {filters.date_from} to {filters.date_to}
+              </span>
+            </span>
+            {query.isFetching && (
+              <AppLoader variant="inline" label="Loading exceptions…" />
+            )}
+          </div>
+          <div
+            className="overflow-hidden rounded-lg border border-gray-200"
+            aria-busy={query.isFetching}
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px]">
+                <caption className="sr-only">
+                  Attendance exceptions inbox
+                </caption>
+                <thead className="border-b bg-gray-50">
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
+                    {[
+                      "SR",
+                      "Employee",
+                      "Date",
+                      "Exception",
+                      "Severity",
+                      "Status",
+                      "Actions",
+                    ].map((label) => (
+                      <th key={label} scope="col" className="px-6 py-3">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {query.isPending ? (
+                    <tr>
+                      <td colSpan={7}>
+                        <AppLoader label="Loading exceptions inbox…" />
+                      </td>
+                    </tr>
+                  ) : query.isError ? (
+                    <tr>
+                      <td colSpan={7} className="p-6">
+                        <ApiErrorState
+                          error={query.error}
+                          onRetry={() => void query.refetch()}
+                        />
+                      </td>
+                    </tr>
+                  ) : !rows.length ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-14 text-center">
+                        <Inbox className="mx-auto h-9 w-9 text-brand-600" />
+                        <p className="mt-3 font-semibold text-brand-900">
+                          No exceptions found
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {query.data?.message &&
+                          query.data.message !==
+                            "Attendance anomalies retrieved successfully."
+                            ? query.data.message
+                            : "Try a different date range or adjust your filters."}
+                        </p>
+                        <Button
+                          className="mt-4"
+                          size="sm"
+                          variant="outline"
+                          onClick={clear}
+                        >
+                          Reset filters
+                        </Button>
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row, index) => (
+                      <tr
+                        key={row.id ?? index}
+                        className="text-sm transition hover:bg-brand-100/40"
                       >
-                        <ChevronRight size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* DETAIL DRAWER */}
-      {selectedException && (
-        <div className="fixed inset-0 z-[150] flex justify-end overflow-hidden">
-          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setSelectedException(null)}></div>
-          <div className="relative w-full max-w-xl bg-white h-full shadow-2xl animate-in slide-in-from-right duration-500 flex flex-col">
-            {/* DRAWER HEADER */}
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-               <div className="flex items-center gap-4">
-                 <div className={`p-2 rounded-xl border-2 ${SEVERITY_CONFIG[selectedException.severity].color}`}>
-                   <AlertTriangle size={20} />
-                 </div>
-                 <div>
-                    <h3 className="text-xl font-bold text-gray-800 tabular-nums">Exception Audit: {selectedException.id}</h3>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{selectedException.date} • {selectedException.detectedAt} Detection</p>
-                 </div>
-               </div>
-               <button onClick={() => setSelectedException(null)} className="p-2 hover:bg-gray-200 rounded-full transition-all text-gray-400"><X size={24}/></button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
-              {/* EMPLOYEE INFO */}
-              <div className="flex items-center gap-5 p-5 bg-gray-50 rounded-3xl border border-gray-100">
-                <div className="w-16 h-16 rounded-2xl bg-primary-gradient flex items-center justify-center text-white text-xl font-black shadow-lg">
-                  {selectedException.avatar}
-                </div>
-                <div>
-                  <h4 className="text-xl font-black text-gray-800 leading-tight">{selectedException.employee}</h4>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">FLX-2044 • Engineering Team</p>
-                  <div className="mt-2 flex gap-2">
-                    <span className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded uppercase border border-indigo-100">Morning Shift</span>
-                    <span className="text-[9px] font-black bg-white text-gray-400 px-2 py-0.5 rounded uppercase border border-gray-200 tracking-tighter">Office HQ Based</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* TRACE TIMELINE */}
-              <div className="space-y-4">
-                <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                  <Zap size={14} className="text-yellow-500" /> Calculation Trace
-                </h5>
-                <div className="bg-gray-50 rounded-3xl border border-gray-100 p-6 space-y-6">
-                   <div className="flex gap-4">
-                      <div className="w-1 bg-[#3E3B6F] rounded-full shrink-0"></div>
-                      <div className="flex-1">
-                         <div className="flex justify-between items-center mb-1">
-                            <p className="text-xs font-black text-gray-800 uppercase tracking-tight">Punch Event Recorded</p>
-                            <span className="text-[10px] font-black text-indigo-600 tabular-nums">09:02 AM</span>
-                         </div>
-                         <p className="text-[10px] text-gray-500 font-medium">Method: Mobile-Geo (Android App v4.2.1)</p>
-                      </div>
-                   </div>
-
-                   <div className="flex gap-4">
-                      <div className="w-1 bg-red-500 rounded-full shrink-0 shadow-[0_0_10px_rgba(239,68,68,0.3)]"></div>
-                      <div className="flex-1">
-                         <div className="flex justify-between items-center mb-1">
-                            <p className="text-xs font-black text-red-600 uppercase tracking-tight">Geofence Violation Detected</p>
-                            <span className="text-[10px] font-black text-red-500 tabular-nums">09:03 AM</span>
-                         </div>
-                         <div className="mt-2 flex items-center gap-3 p-3 bg-red-50/50 rounded-xl border border-red-100">
-                            <MapPin size={16} className="text-red-500" />
-                            <div className="flex-1 min-w-0">
-                               <p className="text-[10px] font-bold text-red-800">Distance: 420m from HQ</p>
-                               <p className="text-[9px] text-red-600 font-medium">Lat: 24.8607 • Long: 67.0011</p>
+                        <td className="px-6 py-4 text-muted-foreground">
+                          {from + index}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-900 text-xs font-semibold text-[#EEC293]">
+                              {row.employee.name
+                                .split(" ")
+                                .map((part) => part[0])
+                                .slice(0, 2)
+                                .join("")}
                             </div>
-                            <button className="text-[9px] font-black text-red-800 uppercase underline">View Map</button>
-                         </div>
-                      </div>
-                   </div>
-
-                   <div className="flex gap-4 opacity-40">
-                      <div className="w-1 bg-gray-300 rounded-full shrink-0"></div>
-                      <div className="flex-1">
-                         <div className="flex justify-between items-center mb-1">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-tight">Punch Out Event</p>
-                            <span className="text-[10px] font-black tabular-nums">PENDING</span>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-              </div>
-
-              {/* SECURITY & EVIDENCE */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <Smartphone size={14} className="text-blue-500" /> Device Evidence
-                  </h5>
-                  <div className="p-4 bg-blue-50/30 rounded-2xl border border-blue-100 space-y-2">
-                     <div className="flex justify-between text-[10px] font-bold"><span className="text-gray-400 uppercase">Device ID:</span> <span className="text-blue-700">#4A29-FF-12</span></div>
-                     <div className="flex justify-between text-[10px] font-bold"><span className="text-gray-400 uppercase">Registered:</span> <span className="text-green-600">MATCH ✓</span></div>
-                     <div className="flex justify-between text-[10px] font-bold"><span className="text-gray-400 uppercase">VPN/Proxy:</span> <span className="text-green-600">NONE ✓</span></div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <ShieldX size={14} className="text-red-500" /> Fraud Risk
-                  </h5>
-                  <div className="p-4 bg-red-50/30 rounded-2xl border border-red-100 space-y-2 text-center">
-                     <p className="text-lg font-black text-red-600 tabular-nums">12%</p>
-                     <p className="text-[9px] font-bold text-red-400 uppercase tracking-tighter leading-none">Buddy Punch Probability</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* SUGGESTED RESOLUTION */}
-              <div className="p-6 bg-[#E8D5A3]/10 border border-[#E8D5A3]/30 rounded-3xl">
-                 <div className="flex gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-[#3E3B6F]">
-                       <Info size={20} />
-                    </div>
-                    <div className="flex-1">
-                       <h5 className="text-xs font-black text-[#3E3B6F] uppercase tracking-widest mb-1">Recommended Action</h5>
-                       <p className="text-[10px] text-gray-600 leading-relaxed font-medium">
-                         Since the device is registered but geolocation is outside HQ, this may be a "Working from Client Site" scenario. <span className="font-bold">Request Regularization</span> from the employee to attach client visit proof.
-                       </p>
-                    </div>
-                 </div>
-              </div>
-
-              {/* ACTION HISTORY */}
-              <div className="space-y-4">
-                 <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                   <History size={14} /> Investigation Log
-                 </h5>
-                 <div className="space-y-3">
-                    <div className="flex gap-3">
-                       <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[9px] font-black text-gray-400 shrink-0">JD</div>
-                       <div className="flex-1 bg-white border border-gray-100 rounded-2xl p-3 shadow-sm relative">
-                          <p className="text-[10px] font-medium text-gray-700 leading-relaxed">"Checking if Alex was scheduled for a client visit today."</p>
-                          <span className="text-[8px] font-bold text-gray-400 uppercase mt-2 block">Jane Doe • Today, 11:20 AM</span>
-                          <div className="absolute right-3 top-3"><MoreVertical size={12} className="text-gray-300" /></div>
-                       </div>
-                    </div>
-                 </div>
-                 <div className="relative group">
-                    <input type="text" placeholder="Add note or update investigation..." className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-4 pr-12 py-3 text-xs font-medium outline-none focus:bg-white transition-all focus:ring-4 focus:ring-[#3E3B6F]/5" />
-                    <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-[#3E3B6F] hover:scale-110 transition-transform"><MessageSquare size={16}/></button>
-                 </div>
-              </div>
-            </div>
-
-            {/* DRAWER FOOTER */}
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex gap-4 shrink-0">
-               <button onClick={() => setSelectedException(null)} className="flex-1 py-4 bg-white border border-gray-200 text-red-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2">
-                 Escalate Alert
-               </button>
-               <button className="flex-[2] py-4 bg-[#3E3B6F] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#3E3B6F]/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2">
-                 Resolve & Close <CheckCircle2 size={16} />
-               </button>
+                            <div className="min-w-0">
+                              <p
+                                className="max-w-56 truncate font-semibold text-gray-900"
+                                title={row.employee.name}
+                              >
+                                {row.employee.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                {row.employee.employee_code}
+                              </p>
+                              {row.employee.department && (
+                                <p className="mt-0.5 max-w-56 truncate text-[11px] text-muted-foreground">
+                                  {typeof row.employee.department === "string"
+                                    ? row.employee.department
+                                    : row.employee.department.name}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
+                          {row.date?.slice(0, 10) || "—"}
+                        </td>
+                        <td className="max-w-80 px-6 py-4">
+                          <p className="font-medium text-gray-900">
+                            {row.label || exceptionLabel(row.type)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-brand-600">
+                            {row.exception_code || row.id}
+                          </p>
+                          {explanation(row) && (
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                              {explanation(row)}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${exceptionSeverityTone(row.severity)}`}
+                          >
+                            <AlertCircle className="h-3 w-3" />
+                            {exceptionLabel(row.severity)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${exceptionStatusTone(row.status)}`}
+                          >
+                            {exceptionLabel(row.status)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {regularizationTypeForException(row.type) &&
+                          row.status !== "resolved" ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label={`Actions for ${row.exception_code || row.id}`}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onSelect={() => setRegularization(row)}
+                                >
+                                  <FileClock className="mr-2 h-4 w-4" />
+                                  Request regularization
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (
+                            <span className="text-muted-foreground italic">
+                              No actions
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
+          <div className="flex flex-col items-center justify-between gap-4 rounded-lg border-t bg-gray-50 px-4 py-4 text-sm text-muted-foreground lg:flex-row">
+            <div className="flex items-center gap-2">
+              <span>Show</span>
+              <SearchableSelect
+                aria-label="Exceptions per page"
+                widthClass="w-24"
+                allowAll={false}
+                options={[10, 25, 50, 100, 200].map((value) => ({
+                  value: String(value),
+                  label: String(value),
+                }))}
+                value={String(filters.per_page)}
+                onChange={(value) => set("per_page", Number(value))}
+              />
+              <span>entries</span>
+            </div>
+            <nav
+              aria-label="Exceptions pagination"
+              className="flex flex-wrap justify-center gap-2"
+            >
+              {pageButton("First page", 1, ChevronsLeft, filters.page <= 1)}
+              {pageButton(
+                "Previous page",
+                filters.page - 1,
+                ChevronLeft,
+                filters.page <= 1,
+              )}
+              {numbers.map((number) => (
+                <Button
+                  key={number}
+                  variant={number === filters.page ? "default" : "outline"}
+                  size="sm"
+                  aria-label={`Page ${number}`}
+                  aria-current={number === filters.page ? "page" : undefined}
+                  disabled={busy}
+                  onClick={() => paginate(number)}
+                >
+                  {number}
+                </Button>
+              ))}
+              {pageButton(
+                "Next page",
+                filters.page + 1,
+                ChevronRight,
+                filters.page >= pages,
+              )}
+              {pageButton(
+                "Last page",
+                pages,
+                ChevronsRight,
+                filters.page >= pages,
+              )}
+            </nav>
+            <span>
+              Page {filters.page} of {pages}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+      {regularization && (
+        <ExceptionRegularizationModal
+          exception={regularization}
+          company={company}
+          timeZone={timeZone}
+          onClose={() => setRegularization(null)}
+        />
       )}
     </div>
   );
-};
-
-
-export default ExceptionsInbox;
+}

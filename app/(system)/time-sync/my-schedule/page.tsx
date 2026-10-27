@@ -1,501 +1,91 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import toast, { Toaster } from "react-hot-toast";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-  Clock,
-  Sun,
-  Moon,
-  Coffee,
-  Zap,
-  MapPin,
-  Users,
-  TrendingUp,
-  X,
-  Eye,
-} from "lucide-react";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { myScheduleService, type ScheduleDay } from '@/services/my-schedule.service';
+import { AppLoader } from '@/components/ui/app-loader';
+import { ApiErrorState } from '@/components/ui/api-error-state';
+import Link from 'next/link';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Coffee, MapPin, ArrowLeftRight, Sun, Moon, CalendarOff, ArrowUpRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { useAppSelector } from '@/store/hooks';
+import { companyDate } from '@/lib/web-punch';
+import { attendanceDate, monthLabel, shiftMonth } from '@/lib/attendance-timeline';
 
-// ------------------------------------------------------------------
-// Types
-// ------------------------------------------------------------------
-type ShiftType = "Morning" | "Evening" | "Night" | "General" | "Off";
-
-interface Shift {
-  id: string;
-  type: ShiftType;
-  startTime: string;
-  endTime: string;
-  location: string;
-  breakStart?: string;
-  breakEnd?: string;
-  overtimeHours?: number;
+type Schedule = { raw: ScheduleDay; location: string; date: string; kind: 'general' | 'evening' | 'off' | 'holiday' | 'unassigned'; leave?: { status: 'approved' | 'pending'; type: string; duration: string }; swapPending?: boolean; previousTime?: string; name: string; start?: string; end?: string; breakTime?: string; hours: number; note: string };
+const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const tones = { general: 'border-indigo-100 bg-indigo-50 text-[#1E1B4B]', evening: 'border-orange-100 bg-[#EEC293]/20 text-amber-900', off: 'border-gray-100 bg-gray-50 text-gray-400', holiday: 'border-emerald-100 bg-emerald-50 text-emerald-800', unassigned: 'border-dashed border-gray-200 bg-white text-gray-500' };
+function mapDay(raw: ScheduleDay): Schedule {
+  const leaves = (raw.leaves ?? []).filter(leave => ['approved', 'pending'].includes(leave.status));
+  const leave = leaves.find(item => item.status === 'approved') ?? leaves[0];
+  const portion: Record<string, string> = { full_day: 'Full day', first_half: 'Half day · morning', second_half: 'Half day · afternoon', hours: 'Hourly leave' };
+  const previous = raw.roster_change?.previous_shift;
+  return {
+    raw, date: raw.date,
+    kind: raw.day_type === 'weekly_off' ? 'off' : raw.day_type === 'holiday' ? 'holiday' : raw.day_type === 'unassigned' ? 'unassigned' : raw.shift?.is_night_shift ? 'evening' : 'general',
+    name: raw.day_type === 'holiday' ? raw.holiday?.name || 'Holiday' : raw.shift?.name || (raw.day_type === 'weekly_off' ? 'Weekly off' : raw.day_type === 'unassigned' ? 'No shift assigned' : 'Shift unavailable'),
+    start: raw.shift?.start_time?.slice(0, 5), end: raw.shift?.end_time?.slice(0, 5),
+    location: raw.location?.name || 'Not specified',
+    hours: raw.scheduled_minutes / 60,
+    leave: leave ? { status: leave.status as 'approved' | 'pending', type: leave.leave_type, duration: portion[leave.portion] || leave.portion } : undefined,
+    swapPending: Boolean(raw.pending_swaps?.length),
+    previousTime: previous ? `${previous.start_time.slice(0, 5)} – ${previous.end_time.slice(0, 5)}` : undefined,
+    note: [raw.notes, raw.roster_change?.reason].filter(Boolean).join(' · '),
+  };
 }
-
-interface ScheduleDay {
-  date: Date;
-  shift: Shift | null;
-  notes?: string;
-  isToday: boolean;
+function ScheduleNotices({ day }: { day: Schedule }) {
+  const portions: Record<string, string> = { full_day: 'Full day', first_half: 'Half day · morning', second_half: 'Half day · afternoon', hours: 'Hourly leave' };
+  return <div className="space-y-2">{(day.raw.leaves ?? []).filter(leave => ['approved', 'pending'].includes(leave.status)).map(leave => <div key={leave.id} className={`rounded-lg border p-3 text-xs ${leave.status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><p className="font-semibold">{leave.status === 'approved' ? 'Approved leave' : 'Leave awaiting approval'}</p><p className="mt-1">{leave.leave_type} · {portions[leave.portion] || leave.portion}</p>{leave.start_time && leave.end_time && <p className="mt-1">{leave.start_time.slice(0, 5)} – {leave.end_time.slice(0, 5)}</p>}{leave.status === 'pending' && <p className="mt-1">Your assigned shift remains in effect until approval.</p>}</div>)}{(day.raw.pending_swaps ?? []).map(swap => <div key={swap.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><p className="font-semibold">{swap.status === 'pending_target' ? 'Swap awaiting colleague' : 'Swap awaiting approval'}</p>{swap.colleague && <p className="mt-1">{swap.colleague.name}</p>}{swap.proposed_shift && <p className="mt-1">Proposed: {swap.proposed_shift.name} · {swap.proposed_shift.start_time.slice(0, 5)} – {swap.proposed_shift.end_time.slice(0, 5)}</p>}<p className="mt-1">Your current shift remains assigned until final approval.</p></div>)}{day.raw.roster_change && <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800"><p className="font-semibold">Roster updated</p>{day.previousTime && <p className="mt-1">Previous: {day.previousTime}</p>}<p className="mt-1">Current: {day.start || '—'} – {day.end || '—'}</p><p className="mt-1">{day.raw.roster_change.changed_at}{day.raw.roster_change.changed_by ? ' · ' + day.raw.roster_change.changed_by.name : ''}</p></div>}</div>;
 }
-
-// ------------------------------------------------------------------
-// Mock Data with Pakistani Names
-// ------------------------------------------------------------------
-const shifts: Record<ShiftType, Shift> = {
-  Morning: {
-    id: "morning",
-    type: "Morning",
-    startTime: "09:00",
-    endTime: "18:00",
-    location: "Head Office - IT Floor",
-    breakStart: "13:00",
-    breakEnd: "14:00",
-    overtimeHours: 0,
-  },
-  Evening: {
-    id: "evening",
-    type: "Evening",
-    startTime: "14:00",
-    endTime: "23:00",
-    location: "Head Office - IT Floor",
-    breakStart: "18:00",
-    breakEnd: "19:00",
-    overtimeHours: 0,
-  },
-  Night: {
-    id: "night",
-    type: "Night",
-    startTime: "23:00",
-    endTime: "08:00",
-    location: "Data Center",
-    breakStart: "03:00",
-    breakEnd: "04:00",
-    overtimeHours: 0,
-  },
-  General: {
-    id: "general",
-    type: "General",
-    startTime: "09:00",
-    endTime: "17:00",
-    location: "Head Office",
-    breakStart: "12:30",
-    breakEnd: "13:30",
-    overtimeHours: 0,
-  },
-  Off: {
-    id: "off",
-    type: "Off",
-    startTime: "--",
-    endTime: "--",
-    location: "",
-    overtimeHours: 0,
-  },
-};
-
-// Employee schedule for the next 14 days (current week + next week)
-const generateSchedule = (startDate: Date): ScheduleDay[] => {
-  const schedule: ScheduleDay[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + 13); // 14 days
-
-  const shiftPattern: ShiftType[] = [
-    "Morning",
-    "Morning",
-    "Evening",
-    "Evening",
-    "Night",
-    "Off",
-    "General",
-    "Morning",
-    "Evening",
-    "Night",
-    "Morning",
-    "General",
-    "Off",
-    "Evening",
-  ];
-
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    const date = new Date(d);
-    const dayOfWeek = date.getDay(); // 0 = Sunday
-    let shiftType: ShiftType = "Morning";
-
-    // Customize for specific dates with Pakistani holidays/events
-    const dateStr = date.toISOString().split("T")[0];
-    if (dateStr === "2025-03-23") shiftType = "Off"; // Pakistan Day
-    else if (dateStr === "2025-03-31" || dateStr === "2025-04-01") shiftType = "Off"; // Eid
-    else {
-      // Pattern based on index
-      const idx = (Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))) % shiftPattern.length;
-      shiftType = shiftPattern[idx];
-    }
-
-    schedule.push({
-      date,
-      shift: shifts[shiftType],
-      notes: shiftType === "Off" && dateStr === "2025-03-23" ? "Pakistan Day Holiday" : undefined,
-      isToday: date.toDateString() === today.toDateString(),
-    });
-  }
-  return schedule;
-};
-
-// Current user (Rafay Ahmed)
-const currentUser = {
-  name: "Rafay Ahmed",
-  role: "Senior Software Engineer",
-  department: "IT",
-  employeeId: "EMP101",
-};
-
-// Upcoming events (shift swaps, roster changes)
-const upcomingEvents = [
-  { date: "2025-03-28", title: "Shift Swap with Yousaf Khan", description: "Morning → Evening" },
-  { date: "2025-04-02", title: "Roster Change Request", description: "Evening → Night (Pending Approval)" },
-  { date: "2025-04-05", title: "Team Meeting", description: "09:30 - 10:30, Conference Room A" },
-];
-
-// ------------------------------------------------------------------
-// Helper Functions
-// ------------------------------------------------------------------
-const formatDate = (date: Date) => date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-const isSameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-
-const getShiftColor = (type: ShiftType) => {
-  switch (type) {
-    case "Morning": return "bg-amber-50 text-amber-800 border-amber-200";
-    case "Evening": return "bg-indigo-50 text-indigo-800 border-indigo-200";
-    case "Night": return "bg-purple-50 text-purple-800 border-purple-200";
-    case "General": return "bg-emerald-50 text-emerald-800 border-emerald-200";
-    case "Off": return "bg-gray-50 text-gray-500 border-gray-200";
-    default: return "bg-white text-gray-800 border-gray-200";
-  }
-};
-
-const getShiftIcon = (type: ShiftType) => {
-  switch (type) {
-    case "Morning": return <Sun size={14} className="text-amber-600" />;
-    case "Evening": return <Sun size={14} className="text-indigo-600" />;
-    case "Night": return <Moon size={14} className="text-purple-600" />;
-    case "General": return <Clock size={14} className="text-emerald-600" />;
-    default: return null;
-  }
-};
-
-// ------------------------------------------------------------------
-// Day Detail Modal
-// ------------------------------------------------------------------
-function DayDetailModal({ day, onClose }: { day: ScheduleDay; onClose: () => void }) {
-  const { date, shift, notes } = day;
-  const shiftName = shift?.type === "Off" ? "Day Off" : shift?.type;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="w-full max-w-md rounded-2xl bg-white shadow-xl"
-      >
-        <div className="border-b border-gray-100 p-5">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-800">
-              {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-            </h3>
-            <button onClick={onClose} className="rounded-full p-1 hover:bg-gray-100">
-              <X size={20} className="text-gray-400" />
-            </button>
-          </div>
-        </div>
-        <div className="p-5 space-y-4">
-          {shift?.type === "Off" ? (
-            <div className="rounded-xl bg-gray-50 p-4 text-center">
-              <Calendar size={32} className="mx-auto mb-2 text-gray-400" />
-              <p className="text-gray-600">Day Off</p>
-              {notes && <p className="text-sm text-gray-500 mt-1">{notes}</p>}
-            </div>
-          ) : (
-            <>
-              <div className={`rounded-xl border p-4 ${getShiftColor(shift?.type || "Morning")}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {getShiftIcon(shift?.type || "Morning")}
-                  <span className="font-semibold">{shiftName} Shift</span>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Clock size={12} className="text-gray-500" />
-                    <span>{shift?.startTime} – {shift?.endTime}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin size={12} className="text-gray-500" />
-                    <span>{shift?.location}</span>
-                  </div>
-                  {shift?.breakStart && shift?.breakEnd && (
-                    <div className="flex items-center gap-2">
-                      <Coffee size={12} className="text-gray-500" />
-                      <span>Break: {shift.breakStart} – {shift.breakEnd}</span>
-                    </div>
-                  )}
-                  {shift?.overtimeHours && shift.overtimeHours > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Zap size={12} className="text-yellow-600" />
-                      <span>Overtime: +{shift.overtimeHours}h</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {notes && <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">{notes}</div>}
-            </>
-          )}
-        </div>
-        <div className="border-t border-gray-100 p-4">
-          <button
-            onClick={onClose}
-            className="w-full rounded-xl bg-[#3E3B6F] py-2 text-sm font-bold text-white hover:bg-[#2C2A4A]"
-          >
-            Close
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
+const shiftIcons = { general: Sun, evening: Moon, off: CalendarOff, holiday: CalendarOff, unassigned: CalendarOff };
+function ShiftDetails({ day }: { day: Schedule }) {
+  const Icon = shiftIcons[day.kind];
+  return <div className="space-y-4"><ScheduleNotices day={day} /><div className={`flex items-center gap-3 rounded-xl border p-4 ${tones[day.kind]}`}><Icon className="h-5 w-5 shrink-0" /><div><p className="text-sm font-semibold">{day.name}</p><p className="mt-1 text-xs">{day.start ? `${day.start} – ${day.end}${day.raw.shift?.ends_next_day ? ' (next day)' : ''}` : 'No working hours'}</p></div></div>{day.start && <dl className="space-y-3 text-sm"><div className="flex items-center justify-between gap-3"><dt className="flex items-center gap-2 text-gray-500"><MapPin className="h-4 w-4" />Location</dt><dd className="font-medium text-gray-900">{day.location}</dd></div><div className="flex items-center justify-between gap-3"><dt className="flex items-center gap-2 text-gray-500"><Coffee className="h-4 w-4" />Break</dt><dd className="font-medium tabular-nums text-gray-900">{day.raw.breaks?.length ? day.raw.breaks.map((item, i) => <span key={i} className="block">{item.label || 'Break'}: {item.start_time.slice(0, 5)} – {item.end_time.slice(0, 5)} · {item.paid ? 'Paid' : 'Unpaid'}</span>) : 'No breaks'}</dd></div><div className="flex items-center justify-between gap-3"><dt className="flex items-center gap-2 text-gray-500"><Clock3 className="h-4 w-4" />Net scheduled time</dt><dd className="font-medium text-gray-900">{Math.floor(day.raw.scheduled_minutes / 60)}h {day.raw.scheduled_minutes % 60}m</dd></div></dl>}<p className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-500">{day.note}</p></div>;
 }
-
-// ------------------------------------------------------------------
-// Main Component
-// ------------------------------------------------------------------
 export default function MySchedulePage() {
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week
-  const [selectedDay, setSelectedDay] = useState<ScheduleDay | null>(null);
-
-  // Calculate start of week (Monday)
-  const getStartOfWeek = useCallback((offset: number) => {
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const startOfWeek = new Date(today);
-    // Adjust to Monday as start
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    startOfWeek.setDate(today.getDate() - daysToMonday + offset * 7);
-    startOfWeek.setHours(0, 0, 0, 0);
-    return startOfWeek;
-  }, []);
-
-  const startOfWeek = useMemo(() => getStartOfWeek(weekOffset), [weekOffset, getStartOfWeek]);
-  const endOfWeek = useMemo(() => {
-    const end = new Date(startOfWeek);
-    end.setDate(startOfWeek.getDate() + 6);
-    return end;
-  }, [startOfWeek]);
-
-  const schedule = useMemo(() => {
-    // Generate schedule for the next 14 days, but we'll only show the current week.
-    const fullSchedule = generateSchedule(startOfWeek);
-    return fullSchedule.slice(0, 7);
-  }, [startOfWeek]);
-
-  const weekLabel = useMemo(() => {
-    const start = startOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const end = endOfWeek.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return `${start} – ${end}`;
-  }, [startOfWeek, endOfWeek]);
-
-  const handlePrevWeek = () => setWeekOffset(offset => offset - 1);
-  const handleNextWeek = () => setWeekOffset(offset => offset + 1);
-  const handleThisWeek = () => setWeekOffset(0);
-
-  // Upcoming shifts (next 7 days from today)
-  const upcomingShifts = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const futureSchedule = generateSchedule(today);
-    return futureSchedule.filter(day => day.date >= today && day.shift?.type !== "Off").slice(0, 5);
-  }, []);
-
-  // Stats for current week
-  const weekStats = useMemo(() => {
-    const totalShifts = schedule.filter(day => day.shift?.type !== "Off").length;
-    const totalHours = schedule.reduce((sum, day) => {
-      if (day.shift?.type !== "Off") {
-        const start = day.shift!.startTime.split(":").map(Number);
-        const end = day.shift!.endTime.split(":").map(Number);
-        let hours = end[0] - start[0];
-        if (hours < 0) hours += 24;
-        return sum + hours;
-      }
-      return sum;
-    }, 0);
-    return { totalShifts, totalHours };
-  }, [schedule]);
-
-  return (
-    <>
-    
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 md:p-8">
-        <div className="mx-auto max-w-6xl space-y-8">
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-800">My Schedule</h1>
-              <p className="text-sm text-gray-500">
-                {currentUser.name} • {currentUser.role} • {currentUser.department}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleThisWeek}
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-              >
-                This Week
-              </button>
-              <div className="flex rounded-xl border border-gray-200 bg-white p-1">
-                <button onClick={handlePrevWeek} className="rounded-lg p-1 hover:bg-gray-100">
-                  <ChevronLeft size={18} />
-                </button>
-                <span className="px-2 text-sm font-medium text-gray-700 my-auto">{weekLabel}</span>
-                <button onClick={handleNextWeek} className="rounded-lg p-1 hover:bg-gray-100">
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard label="Shifts This Week" value={weekStats.totalShifts} icon={Calendar} color="blue" />
-            <StatCard label="Total Hours" value={`${weekStats.totalHours}h`} icon={Clock} color="green" />
-            <StatCard label="Upcoming Shifts" value={upcomingShifts.length} icon={TrendingUp} color="purple" />
-          </div>
-
-          {/* Weekly Schedule Grid */}
-          <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-gray-400">Weekly Schedule</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
-              {schedule.map(day => (
-                <ScheduleCard key={day.date.toISOString()} day={day} onClick={() => setSelectedDay(day)} />
-              ))}
-            </div>
-          </div>
-
-          {/* Upcoming Shifts List */}
-          <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-gray-400">Upcoming Shifts</h2>
-            {upcomingShifts.length === 0 ? (
-              <p className="text-center text-gray-400">No upcoming shifts</p>
-            ) : (
-              <div className="space-y-2">
-                {upcomingShifts.map(day => (
-                  <div
-                    key={day.date.toISOString()}
-                    onClick={() => setSelectedDay(day)}
-                    className="flex cursor-pointer items-center justify-between rounded-xl border border-gray-100 p-3 transition-all hover:bg-gray-50"
-                  >
-                    <div>
-                      <div className="font-medium text-gray-800">{formatDate(day.date)}</div>
-                      <div className="text-xs text-gray-500">
-                        {day.shift?.type} • {day.shift?.startTime} – {day.shift?.endTime}
-                      </div>
-                    </div>
-                    <div className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${getShiftColor(day.shift?.type || "Morning")}`}>
-                      {day.shift?.type}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Upcoming Events */}
-          <div className="rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-gray-400">Upcoming Events</h2>
-            {upcomingEvents.length === 0 ? (
-              <p className="text-center text-gray-400">No upcoming events</p>
-            ) : (
-              <div className="space-y-2">
-                {upcomingEvents.map(event => (
-                  <div key={event.date} className="flex items-start gap-3 rounded-xl border border-gray-100 p-3">
-                    <Calendar size={16} className="mt-0.5 text-purple-600" />
-                    <div>
-                      <div className="font-medium text-gray-800">{event.title}</div>
-                      <div className="text-xs text-gray-500">
-                        {new Date(event.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{event.description}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Day Detail Modal */}
-      <AnimatePresence>
-        {selectedDay && <DayDetailModal day={selectedDay} onClose={() => setSelectedDay(null)} />}
-      </AnimatePresence>
-    </>
-  );
+  const company = useAppSelector(state => state.auth.company);
+  const user = useAppSelector(state => state.auth.user?.id);
+  return <SchedulePage key={`${company?.id}-${user}`} company={company?.id} user={user} />;
 }
-
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: React.ElementType; color: string }) {
-  const colorClasses = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
-    purple: "bg-purple-50 text-purple-600",
-  }[color];
-
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">{label}</span>
-        <div className={`rounded-full p-1.5 ${colorClasses}`}>
-          <Icon size={14} />
-        </div>
-      </div>
-      <div className="mt-2 text-2xl font-bold text-gray-800">{value}</div>
+function SchedulePage({ company, user }: { company?: string; user?: string }) {
+  const timeZone = useAppSelector(state => state.auth.company?.timezone) || 'Asia/Karachi';
+  const localToday = companyDate(timeZone);
+  const [month, setMonth] = useState(localToday.slice(0, 7));
+  const [selected, setSelected] = useState(localToday);
+  const [detail, setDetail] = useState<Schedule | null>(null);
+  const reduced = useReducedMotion();
+  const [year, monthNumber] = month.split('-').map(Number);
+  const count = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
+  const query = useQuery({ queryKey: ['time-sync', 'my-schedule', company, user, month], queryFn: ({ signal }) => myScheduleService.get(month, signal), retry: false });
+  const current = useQuery({ queryKey: ['time-sync', 'my-schedule', company, user, localToday.slice(0, 7)], queryFn: ({ signal }) => myScheduleService.get(localToday.slice(0, 7), signal), enabled: month !== localToday.slice(0, 7), retry: false });
+  const today = query.data?.today || localToday;
+  const days = (query.data?.days ?? []).map(mapDay).sort((a, b) => a.date.localeCompare(b.date));
+  const summary = query.data?.summary;
+  const chosen = days.find(day => day.date === selected);
+  const todayShift = (month === localToday.slice(0, 7) ? days : (current.data?.days ?? []).map(mapDay)).find(day => day.date === today);
+  const upcoming = days.filter(day => day.date >= today && day.start && day.raw.scheduled_minutes > 0).slice(0, 4);
+  function changeMonth(value: string) { setDetail(null); setMonth(value); setSelected(value === today.slice(0, 7) ? today : `${value}-01`); }
+  if (query.isPending) return <AppLoader variant="page" label="Loading your schedule…" />;
+  if (query.isError) return <div className="p-3"><ApiErrorState error={query.error} onRetry={() => void query.refetch()} /></div>;
+  return <div className="space-y-4 p-3">
+    {month !== localToday.slice(0, 7) && current.isError && <ApiErrorState error={current.error} onRetry={() => void current.refetch()} />}
+    <Card className="border border-gray-100 shadow-sm"><CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><CardTitle className="text-2xl font-semibold text-gray-900">My Schedule</CardTitle><span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800">Live schedule</span></div><p className="mt-1 text-sm text-gray-500">Your shifts, breaks, and days off in one place.</p></div><Button variant="outline" size="sm" onClick={() => { changeMonth(today.slice(0, 7)); setSelected(today); }}>Today</Button></div></CardHeader><CardContent className="p-6"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{ label: 'Today’s shift', value: todayShift?.name || 'Unavailable', hint: todayShift?.start ? `${todayShift.start} – ${todayShift.end}` : current.isFetching ? 'Loading today’s schedule…' : 'No schedule returned for today', icon: Clock3 }, { label: 'Scheduled days', value: String(summary?.scheduled_days ?? 0), hint: monthLabel(month), icon: CalendarDays }, { label: 'Scheduled hours', value: `${Math.floor((summary?.scheduled_minutes ?? 0) / 60)}h ${(summary?.scheduled_minutes ?? 0) % 60}m`, hint: 'Excludes breaks and approved leave', icon: Sun }, { label: 'Days off & holidays', value: String((summary?.weekly_off_days ?? 0) + (summary?.holiday_days ?? 0)), hint: 'Weekly offs and company holidays', icon: CalendarOff }].map(item => <div key={item.label} className="rounded-xl border border-gray-200 bg-gray-50/50 p-4"><p className="flex items-center gap-2 text-xs text-gray-500"><item.icon className="h-4 w-4 text-brand-600" />{item.label}</p><p className="mt-2 text-lg font-semibold text-[#1E1B4B]">{item.value}</p><p className="mt-1 text-[11px] text-gray-400">{item.hint}</p></div>)}</div></CardContent></Card>
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <Card className="min-w-0 overflow-hidden border border-gray-100 shadow-sm"><CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-lg font-semibold text-gray-900">{monthLabel(month)}</CardTitle><div className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous month" onClick={() => changeMonth(shiftMonth(month, -1))}><ChevronLeft className="h-4 w-4" /></Button><label className="sr-only" htmlFor="schedule-month">Schedule month</label><input id="schedule-month" type="month" className="h-8 w-36 rounded-md border border-gray-200 bg-white px-2 text-xs" value={month} onChange={event => { if (/^\d{4}-\d{2}$/.test(event.target.value)) changeMonth(event.target.value); }} /><Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next month" onClick={() => changeMonth(shiftMonth(month, 1))}><ChevronRight className="h-4 w-4" /></Button></div></div><div className="mt-2 flex flex-wrap gap-3 text-[10px] text-gray-500">{[{ label: 'General', tone: 'bg-[#1E1B4B]' }, { label: 'Evening', tone: 'bg-[#EEC293]' }, { label: 'Weekly off', tone: 'bg-gray-300' }, { label: 'Holiday / approved leave', tone: 'bg-emerald-400' }, { label: 'Pending request', tone: 'bg-amber-400' }, { label: 'Roster changed', tone: 'bg-blue-400' }, { label: 'Unassigned', tone: 'bg-gray-100' }].map(item => <span key={item.label} className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${item.tone}`} />{item.label}</span>)}</div></CardHeader><CardContent className="p-3 sm:p-4"><div className="grid grid-cols-7 border-b border-gray-200 pb-2">{weekdays.map(day => <span key={day} className="text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400">{day}</span>)}</div><AnimatePresence initial={false} mode="wait"><motion.div key={month} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? { opacity: 1 } : { opacity: 0, y: -6 }} transition={{ duration: 0.15 }} className="mt-2 grid grid-cols-7 gap-1 sm:gap-2">{Array.from({ length: offset }, (_, index) => <div key={`empty-${index}`} aria-hidden="true" />)}{Array.from({ length: count }, (_, index) => { const date = `${month}-${String(index + 1).padStart(2, '0')}`; const day = days.find(item => item.date === date); if (!day) return <div key={date} className="min-h-20 rounded-lg border border-gray-100 p-2 text-xs text-gray-400 sm:min-h-28">{index + 1}<span className="mt-3 block text-[9px]">No data</span></div>; const isToday = day.date === today, active = day.date === selected, Icon = shiftIcons[day.kind]; return <button key={day.date} type="button" onClick={() => setSelected(day.date)} onDoubleClick={() => setDetail(day)} aria-pressed={active} aria-current={isToday ? 'date' : undefined} aria-label={`${attendanceDate(day.date)}, ${day.name}${day.start ? `, ${day.start} to ${day.end}` : ''}`} className={`flex min-h-20 min-w-0 flex-col rounded-lg border p-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:min-h-28 sm:p-2.5 ${isToday ? 'border-[#1E1B4B] bg-[#1E1B4B] text-white' : active ? 'border-[#1E1B4B] bg-indigo-50 ring-1 ring-[#1E1B4B]' : 'border-gray-100 bg-white hover:border-gray-300'} ${day.kind === 'off' && !isToday && !active ? 'bg-gray-50/80' : ''}`}><span className={`text-xs font-semibold ${isToday ? 'text-white' : 'text-gray-700'}`}>{Number(day.date.slice(-2))}{isToday && <span className="ml-1 hidden text-[9px] font-normal text-indigo-200 sm:inline">Today</span>}</span><div className={`mt-auto rounded-md px-1 py-1 text-[9px] leading-tight sm:text-[10px] ${isToday ? 'bg-white/10 text-white' : tones[day.kind]}`}><span className="flex items-center gap-1"><Icon className="hidden h-3 w-3 shrink-0 sm:block" /><span className="truncate">{day.kind === 'off' ? 'Off' : day.kind === 'holiday' ? 'Holiday' : day.kind === 'unassigned' ? 'Unassigned' : day.name}</span></span>{day.start && <span className={`mt-1 hidden whitespace-nowrap text-[9px] sm:block ${isToday ? 'text-indigo-100' : 'opacity-70'}`}>{day.start}–{day.end}{day.raw.shift?.ends_next_day ? ' +1d' : ''}</span>}</div><ScheduleCellBadge day={day} today={isToday} /></button>; })}</motion.div></AnimatePresence><p className="mt-3 text-[10px] text-gray-400">Select a date to view its schedule. Missing dates indicate no data was returned.</p></CardContent></Card>
+      <div className="space-y-4"><Card className="border border-gray-100 shadow-sm"><CardHeader className="border-b"><div className="flex items-center justify-between gap-2"><CardTitle className="text-sm font-semibold">{selected === today ? 'Today’s schedule' : 'Selected day'}</CardTitle><Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Open schedule details" disabled={!chosen} onClick={() => chosen && setDetail(chosen)}><ArrowUpRight className="h-4 w-4" /></Button></div><p className="text-xs text-gray-500">{attendanceDate(selected)}</p></CardHeader><CardContent className="p-4">{chosen ? <ShiftDetails day={chosen} /> : <p className="text-xs text-gray-500">No schedule returned for this date.</p>}</CardContent></Card><Card className="border border-gray-100 shadow-sm"><CardHeader className="border-b"><CardTitle className="text-sm font-semibold">Upcoming shifts</CardTitle></CardHeader><CardContent className="space-y-3 p-4">{upcoming.length ? upcoming.map(day => <button key={day.date} type="button" className="flex w-full items-center gap-3 rounded-lg text-left hover:bg-gray-50" onClick={() => setSelected(day.date)}><span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-gray-50 text-xs font-semibold text-brand-900">{Number(day.date.slice(-2))}<span className="text-[9px] font-normal text-gray-400">{attendanceDate(day.date, 'weekday')}</span></span><span><span className="block text-xs font-medium text-gray-800">{day.name}</span><span className="mt-1 block text-[10px] text-gray-500">{day.start} – {day.end}</span></span></button>) : <p className="text-xs text-gray-500">No upcoming shifts in this month.</p>}</CardContent></Card><div className="rounded-xl border border-[#EEC293]/40 bg-[#EEC293]/15 p-4"><ArrowLeftRight className="mb-2 h-4 w-4 text-brand-800" /><p className="text-sm font-semibold text-brand-900">Need a different shift?</p><p className="mt-1 text-xs leading-relaxed text-gray-600">You can request an exchange with an eligible colleague.</p><Link href="/time-sync/my-shift-swap" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-800 hover:underline">Open Shift Swap<ArrowUpRight className="h-3 w-3" /></Link></div></div>
     </div>
-  );
+    <Dialog open={Boolean(detail)} onOpenChange={open => { if (!open) setDetail(null); }}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Schedule details</DialogTitle><DialogDescription>{detail ? attendanceDate(detail.date) : ''}</DialogDescription></DialogHeader>{detail && <ShiftDetails day={detail} />}<DialogFooter><Button variant="outline" onClick={() => setDetail(null)}>Close</Button></DialogFooter></DialogContent></Dialog>
+  </div>;
 }
 
-function ScheduleCard({ day, onClick }: { day: ScheduleDay; onClick: () => void }) {
-  const { date, shift, isToday, notes } = day;
-  const shiftType = shift?.type;
-  const isOff = shiftType === "Off";
 
-  return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className={`cursor-pointer rounded-xl border p-3 transition-all ${getShiftColor(shiftType || "Morning")} ${
-        isToday ? "ring-2 ring-[#3E3B6F] ring-offset-2" : ""
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <span className={`text-sm font-semibold ${isToday ? "text-[#3E3B6F]" : "text-gray-700"}`}>
-          {date.toLocaleDateString("en-US", { weekday: "short", day: "numeric" })}
-        </span>
-        {getShiftIcon(shiftType || "Morning")}
-      </div>
-      <div className="mt-2">
-        {isOff ? (
-          <span className="text-xs text-gray-500">Day Off</span>
-        ) : (
-          <>
-            <div className="text-sm font-medium">{shiftType}</div>
-            <div className="text-xs text-gray-500 mt-0.5">
-              {shift?.startTime} – {shift?.endTime}
-            </div>
-          </>
-        )}
-        {notes && <div className="mt-1 text-[10px] text-gray-400 truncate">{notes}</div>}
-      </div>
-    </motion.div>
-  );
+function ScheduleCellBadge({ day, today }: { day: Schedule; today: boolean }) {
+  const label = day.leave ? day.leave.status === 'approved' ? day.leave.duration === 'Full day' ? 'On leave' : '½ day leave' : 'Leave pending' : day.swapPending ? 'Swap pending' : day.previousTime ? 'Updated' : null;
+  if (!label) return null;
+  const tone = today ? 'bg-white/20 text-white' : day.leave?.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : day.previousTime ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800';
+  return <span className={`mt-1 block w-full truncate rounded px-1 py-0.5 text-[8px] font-medium sm:text-[9px] ${tone}`} title={label}>{label}</span>;
 }

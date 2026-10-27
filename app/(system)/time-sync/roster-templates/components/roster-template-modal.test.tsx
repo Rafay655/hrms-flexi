@@ -11,7 +11,7 @@ vi.mock('@/services/roster-template.service', () => ({ rosterTemplateService: { 
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 // Keep interaction tests focused on the form rather than the shared popover implementation.
 vi.mock('@/components/ui/searchable-select', () => ({ default: (props: { id?: string; 'aria-label'?: string; value: string; options: { value: string; label: string }[]; disabled?: boolean; onChange: (value: string) => void }) => <select id={props.id} aria-label={props['aria-label']} value={props.value} disabled={props.disabled} onChange={event => props.onChange(event.target.value)}><option value="">Choose</option>{props.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select> }));
-const item: RosterTemplate = { id: 'template-1', name: 'Office', template_type: 'bi-weekly', working_days: ['monday'], pattern_data: [{ day: 'monday', shift_id: 'shift-1', is_off: false }, { day: 'monday', shift_id: null, is_off: true }], auto_generate: true, is_active: true };
+const item: RosterTemplate = { id: 'template-1', name: 'Office', template_type: 'fortnightly', working_days: ['monday'], pattern_data: [{ day: 'monday', shift_id: 'shift-1', is_off: false }, { day: 'monday', shift_id: null, is_off: true }], auto_generate: true, is_active: true };
 let client: QueryClient;
 function mount(mode: 'create' | 'edit' | 'view', value?: RosterTemplate) { client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } }); return render(<QueryClientProvider client={client}><RosterTemplateModal mode={mode} item={value} onClose={vi.fn()} /></QueryClientProvider>); }
 beforeEach(() => vi.clearAllMocks());
@@ -41,7 +41,7 @@ it('preserves repeated weekdays and days off when updating', async () => {
   fireEvent.change(screen.getByLabelText('Shift to apply to working rows'), { target: { value: 'shift-1' } });
   fireEvent.click(screen.getByRole('button', { name: 'Apply to working rows' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  await waitFor(() => expect(rosterTemplateService.update).toHaveBeenCalledWith(item.id, expect.objectContaining({ pattern_data: item.pattern_data, template_type: 'bi-weekly', auto_generate: true })));
+  await waitFor(() => expect(rosterTemplateService.update).toHaveBeenCalledWith(item.id, expect.objectContaining({ pattern_data: item.pattern_data, template_type: 'fortnightly', auto_generate: true })));
 });
 
 it('keeps view mode read only', () => {
