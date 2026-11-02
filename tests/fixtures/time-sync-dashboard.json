@@ -1,0 +1,396 @@
+{
+  "month": "2026-10",
+  "month_label": "October 2026",
+  "timezone": "Asia/Karachi",
+  "is_current_month": true,
+  "period": {
+    "from_date": "2026-10-01",
+    "to_date": "2026-10-27"
+  },
+  "scope": {
+    "type": "company",
+    "label": "Current company"
+  },
+  "generated_at": "2026-10-27 17:09:06",
+  "kpi": {
+    "attendance_records": 100,
+    "attendance_rate": 84,
+    "pending_regularizations": 3,
+    "open_shift_swaps": 0,
+    "published_roster_days": 112,
+    "active_devices": 1
+  },
+  "attendance": {
+    "present": 84,
+    "absent": 16,
+    "on_leave": 0,
+    "weekly_off": 4,
+    "holiday": 0,
+    "other": 0,
+    "late_records": 52,
+    "marked_working_records": 100,
+    "total_records": 104,
+    "attendance_rate": 84
+  },
+  "attendance_trend": [
+    {
+      "date": "2026-10-01",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-02",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 4
+    },
+    {
+      "date": "2026-10-03",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-04",
+      "present": 0,
+      "absent": 3,
+      "on_leave": 0,
+      "weekly_off": 1,
+      "holiday": 0,
+      "other": 0,
+      "late": 0
+    },
+    {
+      "date": "2026-10-05",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-06",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-07",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 1
+    },
+    {
+      "date": "2026-10-08",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-09",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-10",
+      "present": 3,
+      "absent": 1,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 2
+    },
+    {
+      "date": "2026-10-11",
+      "present": 0,
+      "absent": 3,
+      "on_leave": 0,
+      "weekly_off": 1,
+      "holiday": 0,
+      "other": 0,
+      "late": 0
+    },
+    {
+      "date": "2026-10-12",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-13",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-14",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 1
+    },
+    {
+      "date": "2026-10-15",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 1
+    },
+    {
+      "date": "2026-10-16",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 1
+    },
+    {
+      "date": "2026-10-17",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 4
+    },
+    {
+      "date": "2026-10-18",
+      "present": 0,
+      "absent": 3,
+      "on_leave": 0,
+      "weekly_off": 1,
+      "holiday": 0,
+      "other": 0,
+      "late": 0
+    },
+    {
+      "date": "2026-10-19",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-20",
+      "present": 3,
+      "absent": 1,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 1
+    },
+    {
+      "date": "2026-10-21",
+      "present": 3,
+      "absent": 1,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 0
+    },
+    {
+      "date": "2026-10-22",
+      "present": 3,
+      "absent": 1,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 2
+    },
+    {
+      "date": "2026-10-23",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-24",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 3
+    },
+    {
+      "date": "2026-10-25",
+      "present": 0,
+      "absent": 3,
+      "on_leave": 0,
+      "weekly_off": 1,
+      "holiday": 0,
+      "other": 0,
+      "late": 0
+    },
+    {
+      "date": "2026-10-26",
+      "present": 4,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 2
+    },
+    {
+      "date": "2026-10-27",
+      "present": 0,
+      "absent": 0,
+      "on_leave": 0,
+      "weekly_off": 0,
+      "holiday": 0,
+      "other": 0,
+      "late": 0
+    }
+  ],
+  "regularizations": {
+    "total": 13,
+    "pending": 3,
+    "approved": 10,
+    "rejected": 0,
+    "escalated": 0,
+    "other": 0
+  },
+  "shift_swaps": {
+    "total": 0,
+    "pending_target": 0,
+    "pending_manager": 0,
+    "approved": 0,
+    "rejected": 0,
+    "cancelled": 0,
+    "other": 0,
+    "open": 0
+  },
+  "needs_attention": {
+    "pending_regularizations": {
+      "count": 3,
+      "hint": "Attendance corrections awaiting a decision."
+    },
+    "swaps_awaiting_approval": {
+      "count": 0,
+      "hint": "Accepted exchanges awaiting an approval decision."
+    },
+    "unmapped_employee_badges": {
+      "count": 2,
+      "hint": "Active employees without a device badge."
+    },
+    "attendance_exceptions": {
+      "count": 143,
+      "hint": "Unresolved attendance exceptions in the selected period."
+    }
+  },
+  "roster_coverage": {
+    "total": 112,
+    "scheduled": 0,
+    "published": 112,
+    "confirmed": 0,
+    "published_percentage": 100,
+    "ready_percentage": 100
+  },
+  "configuration": {
+    "attendance_policies": {
+      "total": 1,
+      "active": 1
+    },
+    "shift_templates": {
+      "total": 2,
+      "active": 2
+    },
+    "roster_templates": {
+      "total": 2,
+      "active": 2
+    },
+    "calendar_assignments": {
+      "assigned_employees": 4
+    }
+  },
+  "devices": {
+    "total": 1,
+    "active": 1,
+    "inactive": 0
+  },
+  "employee_badges": {
+    "eligible_employees": 6,
+    "mapped": 4,
+    "unmapped": 2,
+    "mapped_percentage": 66.67
+  },
+  "recent_activity": [
+    {
+      "id": "activity-1",
+      "module": "roster",
+      "entity_id": "roster-1",
+      "employee": {
+        "id": "employee-1",
+        "employee_code": "EMP01",
+        "name": "Example Employee"
+      },
+      "scope_label": null,
+      "title": "Roster assignment published",
+      "status": "published",
+      "status_label": "Published",
+      "occurred_at": "2026-10-27 13:23:32"
+    }
+  ]
+}

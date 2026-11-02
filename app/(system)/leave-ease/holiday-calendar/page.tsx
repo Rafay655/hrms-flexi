@@ -1,467 +1,62 @@
-"use client";
-
-import { showApiError } from "@/lib/error-toast";
-import React, { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  SearchIcon,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Loader2,
-  PlusIcon,
-  Eye,
-  Pencil,
-  Trash2,
-} from "lucide-react";
-import {
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type ColumnDef,
-  type SortingState,
-} from "@tanstack/react-table";
-import toast from "react-hot-toast";
-
-import { useBranches } from "@/hooks/useBranches";
-import {
-  useHolidays,
-  useCreateHoliday,
-  useUpdateHoliday,
-  useDeleteHoliday,
-} from "@/hooks/useHolidays";
-import SearchableSelect from "@/components/ui/searchable-select";
-import type { Option } from "@/components/ui/searchable-select";
-import type { Holiday, HolidayFormData, HolidayType } from "@/types/holiday";
-
-const DEFAULT_PER_PAGE = 15;
-
-const HOLIDAY_TYPES: { value: HolidayType; label: string }[] = [
-  { value: "national", label: "National" },
-  { value: "religious", label: "Religious" },
-  { value: "regional", label: "Regional" },
-  { value: "company", label: "Company" },
-];
-
-function useDebounced<T>(value: T, delay = 400) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
-
-export default function HolidaysPage() {
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounced(search, 400);
-  const [sorting, setSorting] = useState<SortingState>([]);
-
-  // Branches for dropdown
-  const { data: branchesRaw, isLoading: isLoadingBranches } = useBranches({ per_page: 1000 });
-  const branches = useMemo(() => {
-    if (!branchesRaw) return [];
-    return branchesRaw?.data?.data ?? [];
-  }, [branchesRaw]);
-  const branchOptions: Option[] = useMemo(
-    () => branches.map((b: any) => ({ value: b.uuid ?? b.id, label: b.name })),
-    [branches]
-  );
-
-  // Holidays data
-  const { data, isLoading, isFetching, error } = useHolidays({
-    page,
-    per_page: perPage,
-    search: debouncedSearch || undefined,
-  });
-
-  const holidays = data?.data?.data ?? [];
-  const totalEntries = data?.data?.meta?.total ?? 0;
-  const totalPages = data?.data?.meta?.last_page ?? 1;
-
-  const createMutation = useCreateHoliday();
-  const updateMutation = useUpdateHoliday();
-  const deleteMutation = useDeleteHoliday();
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"view" | "edit" | "create">("create");
-  const [selectedItem, setSelectedItem] = useState<Holiday | null>(null);
-  const [formData, setFormData] = useState<HolidayFormData>({
-    name: "",
-    date: "",
-    is_optional: false,
-    applies_to_all_branches: true,
-    branch_id: "",
-    holiday_type: "",
-    year: new Date().getFullYear().toString(),
-  });
-
-  const [deleteUuid, setDeleteUuid] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPage(1);
-  }, [perPage, debouncedSearch]);
-
-  useEffect(() => {
-    if (error) showApiError(error, { fallbackMessage: "Failed to load holidays" });
-  }, [error]);
-
-  // Handlers
-  const populateForm = (item: Holiday) => {
-    setSelectedItem(item);
-    setFormData({
-      name: item.name,
-      date: item.date.split('T')[0] ?? item.date.split(' ')[0],
-      is_optional: item.is_optional,
-      applies_to_all_branches: item.applies_to_all_branches,
-      branch_id: item.branch_id ?? "",
-      holiday_type: item.holiday_type,
-      year: item.year?.toString() ?? "",
-    });
-  };
-
-  const handleView = (item: Holiday) => {
-    populateForm(item);
-    setModalMode("view");
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (item: Holiday) => {
-    populateForm(item);
-    setModalMode("edit");
-    setIsModalOpen(true);
-  };
-
-  const handleCreate = () => {
-    setSelectedItem(null);
-    setFormData({
-      name: "",
-      date: "",
-      is_optional: false,
-      applies_to_all_branches: true,
-      branch_id: "",
-      holiday_type: "",
-      year: new Date().getFullYear().toString(),
-    });
-    setModalMode("create");
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = (uuid: string) => setDeleteUuid(uuid);
-  const confirmDelete = () => {
-    if (deleteUuid) {
-      deleteMutation.mutate(deleteUuid, { onSuccess: () => setDeleteUuid(null) });
-    }
-  };
-
-  const handleSave = () => {
-    const trimmedName = formData.name.trim();
-    if (!trimmedName) { toast.error("Name required"); return; }
-    if (trimmedName.length > 100) { toast.error("Name ≤ 100 chars"); return; }
-    if (!formData.date) { toast.error("Date required"); return; }
-    if (!formData.holiday_type) { toast.error("Holiday type required"); return; }
-    if (!formData.applies_to_all_branches && !formData.branch_id) {
-      toast.error("Branch is required when not all branches"); return;
-    }
-
-    const payload = { ...formData, name: trimmedName };
-    if (modalMode === "create") {
-      createMutation.mutate(payload, { onSuccess: () => setIsModalOpen(false) });
-    } else if (selectedItem) {
-      updateMutation.mutate(
-        { uuid: selectedItem.uuid, data: payload },
-        { onSuccess: () => setIsModalOpen(false) }
-      );
-    }
-  };
-
-  const columns: ColumnDef<Holiday & { sr: number }>[] = useMemo(() => [
-    { accessorKey: "sr", header: "#", cell: ({ row }) => <div className="font-medium">{row.original.sr}</div> },
-    { accessorKey: "name", header: "Name", cell: ({ row }) => <div className="font-semibold">{row.original.name}</div> },
-    {
-      accessorKey: "date",
-      header: "Date",
-      cell: ({ row }) => row.original.date.split('T')[0] ?? row.original.date.split(' ')[0],
-    },
-    {
-      accessorKey: "holiday_type",
-      header: "Type",
-      cell: ({ row }) => {
-        const opt = HOLIDAY_TYPES.find(o => o.value === row.original.holiday_type);
-        return <Badge variant="outline" className="bg-blue-50 text-blue-800">{opt?.label ?? row.original.holiday_type}</Badge>;
-      },
-    },
-    {
-      id: "optional",
-      header: "Optional",
-      cell: ({ row }) => (row.original.is_optional ? <Badge className="bg-amber-100 text-amber-800">Optional</Badge> : "—"),
-    },
-    {
-      id: "branch",
-      header: "Branch",
-      cell: ({ row }) => (
-        <div className="text-sm">
-          {row.original.applies_to_all_branches ? "All Branches" : (row.original.branch?.name ?? "—")}
-        </div>
-      ),
-    },
-    {
-      id: "actions",
-      header: () => <div className="text-center">Actions</div>,
-      cell: ({ row }) => (
-        <div className="flex justify-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => handleView(row.original)}><Eye className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => handleDelete(row.original.uuid)}><Trash2 className="h-4 w-4" /></Button>
-        </div>
-      ),
-    },
-  ], []);
-
-  const rows = useMemo(() => {
-    const startSr = (page - 1) * perPage;
-    return holidays.map((h, idx) => ({ ...h, sr: startSr + idx + 1 }));
-  }, [holidays, page, perPage]);
-
-  const table = useReactTable({
-    data: rows,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    manualPagination: true,
-  });
-
-  const showingFrom = totalEntries > 0 ? (page - 1) * perPage + 1 : 0;
-  const showingTo = totalEntries > 0 ? Math.min(page * perPage, totalEntries) : 0;
-
-  return (
-    <div className="p-3">
-      <Card className="border border-gray-100 shadow-sm">
-        <CardHeader className="border-b">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-2xl font-bold text-gray-900">Holidays</CardTitle>
-              <p className="text-sm text-gray-500 mt-1">{totalEntries.toLocaleString()} holidays</p>
-            </div>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              <PlusIcon className="mr-2 h-4 w-4" /> Add Holiday
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Show</span>
-              <Select value={perPage.toString()} onValueChange={v => setPerPage(Number(v))}>
-                <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-white">{[10,15,25,50,100].map(s => <SelectItem key={s} value={String(s)}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-              <span className="text-sm text-gray-600">entries</span>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="bg-blue-50 p-4 rounded-lg mb-4 flex justify-between items-center">
-            <span className="text-sm">Showing {showingFrom} to {showingTo} of {totalEntries} entries</span>
-            {(isLoading || isFetching) && <Loader2 className="animate-spin h-5 w-5" />}
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id} className="py-3 px-4 text-left text-xs font-semibold uppercase cursor-pointer" onClick={h.column.getToggleSortingHandler()}>
-                        <div className="flex items-center gap-1">
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {h.column.getIsSorted() === 'asc' ? <ChevronRight className="h-4 w-4" /> : h.column.getIsSorted() === 'desc' ? <ChevronLeft className="h-4 w-4" /> : null}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody className="divide-y">
-                {isLoading ? (
-                  <tr><td colSpan={columns.length} className="py-12 text-center"><Loader2 className="animate-spin mx-auto" /></td></tr>
-                ) : rows.length === 0 ? (
-                  <tr><td colSpan={columns.length} className="py-12 text-center">No holidays found</td></tr>
-                ) : (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id} className="py-4 px-4 text-sm">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {!isLoading && rows.length > 0 && (
-            <div className="flex justify-between items-center mt-4">
-              <span>Page {page} of {totalPages}</span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1}><ChevronsLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><ChevronLeft className="h-4 w-4" /></Button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let num;
-                  if (totalPages <= 5) num = i + 1;
-                  else if (page <= 3) num = i + 1;
-                  else if (page >= totalPages - 2) num = totalPages - 4 + i;
-                  else num = page - 2 + i;
-                  return <Button key={num} variant={page === num ? "default" : "outline"} size="sm" onClick={() => setPage(num)}>{num}</Button>;
-                })}
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}><ChevronRight className="h-4 w-4" /></Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(totalPages)} disabled={page === totalPages}><ChevronsRight className="h-4 w-4" /></Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{modalMode === "create" ? "Add Holiday" : modalMode === "edit" ? "Edit Holiday" : "View Holiday"}</DialogTitle>
-            <DialogDescription>{modalMode === "view" ? "Read-only view." : "Fill in the details."}</DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Name *</label>
-              <Input value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} disabled={modalMode === "view"} maxLength={100} />
-            </div>
-            {/* Date */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Date *</label>
-              <Input type="date" value={formData.date} onChange={e => setFormData(p => ({...p, date: e.target.value}))} disabled={modalMode === "view"} />
-            </div>
-            {/* Holiday Type */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Type *</label>
-              <Select value={formData.holiday_type} onValueChange={v => setFormData(p => ({...p, holiday_type: v as HolidayType | ''}))} disabled={modalMode === "view"}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>{HOLIDAY_TYPES.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            {/* Year */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Year</label>
-              <Input type="number" min={2000} max={2100} value={formData.year} onChange={e => setFormData(p => ({...p, year: e.target.value}))} disabled={modalMode === "view"} />
-            </div>
-            {/* Applies to All Branches */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox
-                checked={formData.applies_to_all_branches}
-                onCheckedChange={(c) => {
-                  setFormData(p => ({
-                    ...p,
-                    applies_to_all_branches: !!c,
-                    branch_id: "", // clear branch when toggled on
-                  }));
-                }}
-                disabled={modalMode === "view"}
-              />
-              <label className="text-sm">Applies to All Branches</label>
-            </div>
-            {/* Branch (visible only when NOT all branches) */}
-            {!formData.applies_to_all_branches && (
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Branch *</label>
-                <SearchableSelect
-                  options={branchOptions}
-                  value={formData.branch_id || ""}
-                  onChange={v => setFormData(p => ({...p, branch_id: v as string}))}
-                  placeholder="Select branch"
-                  groupLabel="Branches"
-                  allowAll={false}
-                  widthClass="w-full"
-                  disabled={modalMode === "view" || isLoadingBranches}
-                  multiple={false}
-                />
-              </div>
-            )}
-            {/* Is Optional */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.is_optional} onCheckedChange={c => setFormData(p => ({...p, is_optional: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Optional</label>
-            </div>
-          </div>
-          <DialogFooter>
-            {modalMode !== "view" ? (
-              <>
-                <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
-                  {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>Close</Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteUuid} onOpenChange={() => setDeleteUuid(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete Holiday?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700" disabled={deleteMutation.isPending}>
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
+'use client';
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import { CalendarDays, RefreshCw, Plus, Search, MoreVertical, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import SearchableSelect from '@/components/ui/searchable-select';
+import { AppLoader } from '@/components/ui/app-loader';
+import { ApiErrorState } from '@/components/ui/api-error-state';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { useHolidays, useCreateHoliday, useUpdateHoliday, useDeleteHoliday } from '@/hooks/useHolidays';
+import { useBranches } from '@/hooks/useBranches';
+import type { Holiday, HolidayFormData, HolidayType } from '@/types/holiday';
+import { HolidayYearModal } from './components/year-calendar-modal';
+const holidayTypes=[{value:'national',label:'National'},{value:'religious',label:'Religious'},{value:'regional',label:'Regional'},{value:'company',label:'Company'}];
+function emptyForm():HolidayFormData{return {name:'',date:'',is_optional:false,applies_to_all_branches:true,branch_id:'',holiday_type:'',year:''};}
+export default function HolidaysPage(){
+ const [search,setSearch]=useState('');const [filters,setFilters]=useState({page:1,per_page:10,search:''});
+ useEffect(()=>{const timer=setTimeout(()=>{setFilters(p=>p.search===search.trim()?p:{...p,search:search.trim(),page:1});},350);return()=>clearTimeout(timer);},[search]);
+ const query=useHolidays({page:filters.page,per_page:filters.per_page,search:filters.search||undefined});
+ const holidays=query.data?.data.data||[];const meta=query.data?.data.meta;
+ const page=meta?.current_page||filters.page;const totalPages=Math.max(1,meta?.last_page||1);
+ if(meta&&!query.isFetching&&filters.page>totalPages)setFilters(p=>({...p,page:totalPages}));
+ const first=Math.max(1,Math.min(page-2,totalPages-4));const numbers=Array.from({length:Math.min(5,totalPages)},(_,i)=>first+i);
+ const create=useCreateHoliday();const update=useUpdateHoliday();const remove=useDeleteHoliday();const saving=create.isPending||update.isPending;
+ const [yearOpen,setYearOpen]=useState(false);const [mode,setMode]=useState<'create'|'edit'|'view'>('create');const [modalOpen,setModalOpen]=useState(false);
+ const [selected,setSelected]=useState<Holiday|null>(null);const [form,setForm]=useState<HolidayFormData>(emptyForm);
+ const [deleteHoliday,setDeleteHoliday]=useState<Holiday|null>(null);
+ const branchesQuery=useBranches({per_page:1000});
+ const branchOptions=useMemo(()=>{const options=(branchesQuery.data?.data.data||[]).map(b=>({value:b.id,label:b.name}));if(selected?.branch&&!options.some(o=>o.value===form.branch_id)&&form.branch_id)options.push({value:form.branch_id,label:selected.branch.name});return options;},[branchesQuery.data,selected,form.branch_id]);
+ function openHoliday(item:Holiday,nextMode:'view'|'edit'){
+  setSelected(item);setMode(nextMode);setForm({name:item.name,date:item.date.slice(0,10),is_optional:item.is_optional,applies_to_all_branches:item.applies_to_all_branches,branch_id:item.branch_id||item.branch?.uuid||item.branch?.id||'',holiday_type:item.holiday_type||'',year:String(item.year||Number(item.date.slice(0,4)))});setModalOpen(true);
+ }
+ function save(){
+  if(saving||mode==='view')return;
+  const name=form.name.trim();if(!name||name.length>100){toast.error('Enter a holiday name of up to 100 characters');return;}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(form.date)){toast.error('Select a valid holiday date');return;}
+  const parsed=new Date(`${form.date}T12:00:00`);if(Number.isNaN(parsed.getTime())||parsed.getFullYear()!==Number(form.date.slice(0,4))||parsed.getMonth()+1!==Number(form.date.slice(5,7))||parsed.getDate()!==Number(form.date.slice(8))){toast.error('Select a valid holiday date');return;}
+  if(mode==='create'&&(parsed.getFullYear()<2000||parsed.getFullYear()>2100)){toast.error('Holiday year must be between 2000 and 2100');return;}
+  if(!form.applies_to_all_branches&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(form.branch_id)){toast.error('Select a branch when the holiday does not apply to all branches');return;}
+  const payload={...form,name,year:form.date.slice(0,4)};
+  if(mode==='create')create.mutate(payload,{onSuccess:()=>setModalOpen(false)});
+  else if(selected)update.mutate({uuid:selected.uuid||selected.id,data:payload},{onSuccess:()=>setModalOpen(false)});
+ }
+ function setPage(value:number){setFilters(p=>({...p,page:value}));}
+ return <div className="p-3"><Card className="border-gray-100 shadow-sm"><CardHeader className="border-b"><div className="flex flex-wrap items-center justify-between gap-4"><div><CardTitle className="text-2xl font-semibold text-gray-900">Holiday Calendar</CardTitle><p className="mt-1 text-sm text-gray-500">{meta?.total||0} holidays · Manage dates and branch coverage.</p></div><div className="flex flex-wrap items-center gap-2"><Button variant="outline" size="sm" onClick={()=>void query.refetch()} disabled={query.isFetching}><RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching?'animate-spin':''}`} />Refresh</Button><Button variant="outline" size="sm" onClick={()=>setYearOpen(true)}><CalendarDays className="mr-2 h-4 w-4" />Year calendar</Button><Button size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={()=>{setSelected(null);setMode('create');setForm(emptyForm());setModalOpen(true);}}><Plus className="mr-2 h-4 w-4" />Create holiday</Button></div></div></CardHeader><CardContent className="space-y-4 p-6">
+ <div className="flex flex-wrap items-center gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input aria-label="Search holidays" className="pl-10" placeholder="Search holidays…" value={search} onChange={e=>setSearch(e.target.value)} /></div><div className="flex items-center gap-2 text-sm text-gray-600"><span>Show</span><SearchableSelect aria-label="Holidays per page" allowAll={false} widthClass="w-28" value={String(filters.per_page)} options={[10,25,50,100].map(n=>({value:String(n),label:String(n)}))} onChange={v=>setFilters(p=>({...p,per_page:Number(v),page:1}))} /><span>entries</span></div></div>
+ <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-gray-600"><span>Showing <strong className="text-gray-900">{meta?.from||0}</strong> to <strong className="text-gray-900">{meta?.to||0}</strong> of <strong className="text-gray-900">{meta?.total||0}</strong> entries</span>{query.isFetching&&<AppLoader variant="inline" label="Loading…" />}</div>
+ <div className="overflow-hidden rounded-lg border border-gray-200"><div className="overflow-x-auto"><table className="w-full min-w-[1000px]"><caption className="sr-only">Holiday directory</caption><thead className="border-b border-gray-200 bg-gray-50"><tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-700">{['SR. NO.','Holiday','Date','Type','Observance','Branch','Actions'].map(t=><th key={t} scope="col" className={`px-6 py-3 ${t==='Actions'?'text-right':''}`}>{t}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 bg-white">{query.isPending?<tr><td colSpan={7}><AppLoader label="Loading holidays…" /></td></tr>:query.isError?<tr><td colSpan={7} className="p-6"><ApiErrorState error={query.error} onRetry={()=>void query.refetch()} /></td></tr>:!holidays.length?<tr><td colSpan={7} className="p-12 text-center text-sm text-gray-500">No holidays found.</td></tr>:holidays.map((h,i)=><tr key={h.uuid||h.id} className="text-sm hover:bg-gray-50"><td className="px-6 py-4 text-gray-500">{(page-1)*filters.per_page+i+1}</td><td className="px-6 py-4 font-medium text-gray-900">{h.name}</td><td className="whitespace-nowrap px-6 py-4 text-gray-600">{new Date(`${h.date.slice(0,10)}T12:00:00`).toLocaleDateString('en-US',{day:'numeric',month:'short',year:'numeric'})}</td><td className="px-6 py-4"><Badge variant="outline" className="capitalize">{h.holiday_type||'Not specified'}</Badge></td><td className="px-6 py-4"><Badge variant="outline" className={h.is_optional?'border-amber-200 bg-amber-50 text-amber-800':'border-gray-200 bg-gray-50 text-[#1E1B4B]'}>{h.is_optional?'Optional':'Non-optional'}</Badge></td><td className="px-6 py-4 text-gray-600">{h.applies_to_all_branches?'All branches':h.branch?.name||'—'}</td><td className="px-6 py-4 text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${h.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={()=>openHoliday(h,'view')}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem onClick={()=>openHoliday(h,'edit')}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem className="text-red-600" onClick={()=>setDeleteHoliday(h)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></td></tr>)}</tbody></table></div>
+ <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-gray-50 px-6 py-4 text-sm text-gray-600"><span>Page {page} of {totalPages}</span><div className="flex gap-2"><Button variant="outline" size="sm" aria-label="First page" disabled={!meta||page===1||query.isFetching} onClick={()=>setPage(1)}><ChevronsLeft className="h-4 w-4" /></Button><Button variant="outline" size="sm" aria-label="Previous page" disabled={!meta||page===1||query.isFetching} onClick={()=>setPage(page-1)}><ChevronLeft className="h-4 w-4" /></Button>{numbers.map(n=><Button key={n} variant={n===page?'default':'outline'} size="sm" className={n===page?'bg-[#1E1B4B] hover:bg-[#2A2675]':''} aria-current={n===page?'page':undefined} disabled={!meta||query.isFetching} onClick={()=>setPage(n)}>{n}</Button>)}<Button variant="outline" size="sm" aria-label="Next page" disabled={!meta||page===totalPages||query.isFetching} onClick={()=>setPage(page+1)}><ChevronRight className="h-4 w-4" /></Button><Button variant="outline" size="sm" aria-label="Last page" disabled={!meta||page===totalPages||query.isFetching} onClick={()=>setPage(totalPages)}><ChevronsRight className="h-4 w-4" /></Button></div></div></div>
+ </CardContent></Card>
+ <Dialog open={modalOpen} onOpenChange={value=>{if(!saving)setModalOpen(value);}}><DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]"><DialogHeader className="shrink-0 border-b bg-gray-50/70 px-6 py-4"><DialogTitle>{mode==='create'?'Create holiday':mode==='edit'?'Edit holiday':'Holiday details'}</DialogTitle><DialogDescription>Define the date, observance and branches for this holiday.</DialogDescription></DialogHeader><form onSubmit={e=>{e.preventDefault();save();}} className="flex min-h-0 flex-col"><fieldset disabled={saving||mode==='view'} className="min-h-0 space-y-5 overflow-y-auto p-6"><section className="space-y-4"><h3 className="text-sm font-semibold text-[#1E1B4B]">Holiday details</h3><div className="space-y-1.5"><Label htmlFor="holiday-name">Holiday name *</Label><Input id="holiday-name" required maxLength={100} placeholder="e.g. Independence Day" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="holiday-date">Date *</Label><Input id="holiday-date" required type="date" min={mode==='create'?'2000-01-01':undefined} max={mode==='create'?'2100-12-31':undefined} value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value,year:e.target.value.slice(0,4)}))} /></div><div className="space-y-1.5"><Label htmlFor="holiday-type">Holiday type</Label><SearchableSelect id="holiday-type" allowAll={mode==='create'} allLabel="Not specified" widthClass="w-full" value={form.holiday_type} options={holidayTypes} disabled={saving||mode==='view'} onChange={v=>setForm(p=>({...p,holiday_type:v as HolidayType|''}))} /></div></div><label htmlFor="holiday-optional" className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5"><span><span className="block text-sm font-medium text-gray-800">Optional holiday</span><span className="text-xs text-gray-500">Mark this date as an optional observance.</span></span><Checkbox id="holiday-optional" checked={form.is_optional} onCheckedChange={v=>setForm(p=>({...p,is_optional:v===true}))} /></label></section><section className="space-y-4 border-t border-gray-100 pt-5"><h3 className="text-sm font-semibold text-[#1E1B4B]">Branch coverage</h3><label htmlFor="holiday-all-branches" className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5"><span><span className="block text-sm font-medium text-gray-800">All branches</span><span className="text-xs text-gray-500">Apply this holiday across the company.</span></span><Checkbox id="holiday-all-branches" checked={form.applies_to_all_branches} onCheckedChange={v=>setForm(p=>({...p,applies_to_all_branches:v===true}))} /></label>{!form.applies_to_all_branches&&<div className="space-y-1.5"><Label htmlFor="holiday-branch">Branch *</Label><SearchableSelect id="holiday-branch" allowAll={false} widthClass="w-full" value={form.branch_id} options={branchOptions} disabled={saving||mode==='view'||branchesQuery.isLoading} isLoading={branchesQuery.isLoading} placeholder="Select branch" onChange={v=>setForm(p=>({...p,branch_id:v}))} />{branchesQuery.error&&<ApiErrorState error={branchesQuery.error} onRetry={()=>void branchesQuery.refetch()} />}</div>}</section></fieldset><DialogFooter className="shrink-0 border-t bg-gray-50/70 px-6 py-4"><Button type="button" variant="outline" disabled={saving} onClick={()=>setModalOpen(false)}>{mode==='view'?'Close':'Cancel'}</Button>{mode!=='view'&&<Button type="submit" className="bg-[#1E1B4B] hover:bg-[#2A2675]" disabled={saving}>{saving?<AppLoader variant="inline" label="Saving…" className="text-white" />:mode==='create'?'Create holiday':'Save changes'}</Button>}</DialogFooter></form></DialogContent></Dialog>
+ <AlertDialog open={!!deleteHoliday} onOpenChange={value=>{if(!value&&!remove.isPending)setDeleteHoliday(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete holiday?</AlertDialogTitle><AlertDialogDescription>Delete “{deleteHoliday?.name}” from your holiday calendar? This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700" disabled={remove.isPending} onClick={e=>{e.preventDefault();if(deleteHoliday)remove.mutate(deleteHoliday.uuid||deleteHoliday.id,{onSuccess:()=>{setDeleteHoliday(null);if(holidays.length===1&&page>1)setPage(page-1);}});}}>{remove.isPending?'Deleting…':'Delete holiday'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+ <HolidayYearModal open={yearOpen} onClose={()=>setYearOpen(false)} />
+ </div>;
 }

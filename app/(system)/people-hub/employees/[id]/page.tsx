@@ -422,7 +422,7 @@ function generateAnalytics(id: number): AnalyticsBundle {
     },
     {
       title: "LeaveEase",
-      route: `/leaveease/my-balance`,
+      route: `/leave-ease/my-balance`,
       subtitle: "Leave balance & approvals",
       value: `${14 - shift} days`,
       helper: "Current annual leave balance",
@@ -770,7 +770,7 @@ export default function EmployeeViewPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => router.push("/leaveease/my-balance")}
+            onClick={() => router.push("/leave-ease/my-balance")}
             className="gap-2 border-border text-brand-800 hover:bg-brand-100"
           >
             <Calendar className="h-4 w-4" /> Leave Balance

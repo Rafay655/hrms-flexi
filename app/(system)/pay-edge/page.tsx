@@ -372,7 +372,7 @@ export default function PayrollDashboard() {
 
       {/* ── Cross-module alert: pending Leave Encashments ─────────────── */}
       <Link
-        href="/leaveease/encashment-approvals"
+        href="/leave-ease/leave-encashments"
         className="group mb-6 flex items-center justify-between gap-4 rounded-xl border border-brand-300/60 bg-gradient-to-r from-brand-100/60 to-white px-5 py-3.5 shadow-sm transition-all hover:shadow-md hover:border-brand-400"
       >
         <div className="flex items-center gap-3">

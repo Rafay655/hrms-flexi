@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,9 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import toast from "react-hot-toast";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { AppLoader } from "@/components/ui/app-loader";
 
 import { useEmployees } from "@/hooks/useEmployees";
 import { useCompOffs, useMyCompOffs, useCreateCompOff } from "@/hooks/useCompOffs";
@@ -85,17 +88,17 @@ const TableSection = ({
   setPage,
 }: any) => (
   <>
-    <div className="bg-blue-50 p-4 rounded-lg mb-4 flex justify-between items-center">
+    <div className="border border-blue-100 bg-blue-50 p-4 rounded-lg mb-4 flex justify-between items-center">
       <span className="text-sm">Showing {showingFrom} to {showingTo} of {totalEntries} entries</span>
       {isLoading && <Loader2 className="animate-spin h-5 w-5" />}
     </div>
     <div className="overflow-x-auto border rounded-lg">
       <table className="w-full">
-        <thead className="bg-gray-50">
+        <thead className="border-b border-gray-200 bg-gray-50">
           {table.getHeaderGroups().map((hg: any) => (
             <tr key={hg.id}>
               {hg.headers.map((h: any) => (
-                <th key={h.id} className="py-3 px-4 text-left text-xs font-semibold uppercase cursor-pointer" onClick={h.column.getToggleSortingHandler()}>
+                <th key={h.id} className="py-3 px-6 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 cursor-pointer" onClick={h.column.getToggleSortingHandler()}>
                   <div className="flex items-center gap-1">
                     {flexRender(h.column.columnDef.header, h.getContext())}
                     {h.column.getIsSorted() === 'asc' ? <ChevronRight className="h-4 w-4" /> : h.column.getIsSorted() === 'desc' ? <ChevronLeft className="h-4 w-4" /> : null}
@@ -105,7 +108,7 @@ const TableSection = ({
             </tr>
           ))}
         </thead>
-        <tbody className="divide-y">
+        <tbody className="divide-y divide-gray-100">
           {isLoading ? (
             <tr><td colSpan={columns.length} className="py-12 text-center"><Loader2 className="animate-spin mx-auto" /></td></tr>
           ) : rows.length === 0 ? (
@@ -114,7 +117,7 @@ const TableSection = ({
             table.getRowModel().rows.map((row: any) => (
               <tr key={row.id} className="hover:bg-gray-50">
                 {row.getVisibleCells().map((cell: any) => (
-                  <td key={cell.id} className="py-4 px-4 text-sm">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                  <td key={cell.id} className="py-4 px-6 text-sm">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                 ))}
               </tr>
             ))
@@ -145,7 +148,15 @@ const TableSection = ({
 );
 
 export default function CompOffPage() {
-  const [activeTab, setActiveTab] = useState<"my" | "all">("my");
+  return <Suspense fallback={<AppLoader label="Loading comp-off…" />}><CompOffRoute /></Suspense>;
+}
+function CompOffRoute() {
+  const params = useSearchParams();
+  const initialView = params.get('view') === 'all' ? 'all' : 'my';
+  return <CompOffContent key={initialView} initialView={initialView} />;
+}
+function CompOffContent({initialView}:{initialView:'my'|'all'}) {
+  const [activeTab, setActiveTab] = useState<"my" | "all">(initialView);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [search, setSearch] = useState("");
@@ -342,7 +353,7 @@ export default function CompOffPage() {
         <CardHeader className="border-b">
           <div className="flex flex-col md:flex-row justify-between items-start gap-4">
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-900">Comp‑Off Records</CardTitle>
+              <CardTitle className="text-2xl font-semibold text-gray-900">Comp‑Off Records</CardTitle>
               <p className="text-sm text-gray-500 mt-1">{totalEntries.toLocaleString()} records</p>
             </div>
             <Button onClick={handleCreate} disabled={createMutation.isPending}>
@@ -352,10 +363,10 @@ export default function CompOffPage() {
         </CardHeader>
         <CardContent className="p-6">
           <Tabs value={activeTab} onValueChange={v => setActiveTab(v as "my" | "all")} className="w-full">
-            <TabsList className="mb-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><TabsList>
               <TabsTrigger value="my">My Comp‑Off</TabsTrigger>
               <TabsTrigger value="all">All Comp‑Off</TabsTrigger>
-            </TabsList>
+            </TabsList><Button asChild variant="outline" size="sm"><Link href="/leave-ease/approvals-inbox">Approvals inbox · demo</Link></Button></div>
             <TabsContent value="my" className="mt-0">
               <FilterBar />
               <TableSection {...tableProps} />

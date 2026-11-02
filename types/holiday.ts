@@ -10,8 +10,8 @@ export interface Holiday {
   is_optional: boolean;
   holiday_type: HolidayType;
   applies_to_all_branches: boolean;
-  branch_id: string | null;   // UUID or null
-  branch?: { id: string; name: string } | null;
+  branch_id?: string | null;   // UUID or null
+  branch?: { id: string; uuid?: string; name: string } | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -41,7 +41,7 @@ export interface PaginatedHolidaysResponse {
   message: string;
   data: {
     data: Holiday[];
-    links: any;
+    links: { first: string | null; last: string | null; prev: string | null; next: string | null };
     meta: {
       current_page: number;
       from: number;
@@ -51,4 +51,15 @@ export interface PaginatedHolidaysResponse {
       total: number;
     };
   };
+}
+export interface YearHoliday {
+  date: string;
+  name: string;
+  is_optional: boolean;
+  holiday_type: HolidayType;
+}
+export interface HolidayYearResponse {
+  success: boolean;
+  message: string;
+  data: { year: number; count: number; holidays: YearHoliday[] };
 }

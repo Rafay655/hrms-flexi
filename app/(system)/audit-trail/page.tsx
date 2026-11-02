@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   Download,
@@ -337,12 +338,16 @@ async function fetchTimeline(
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
-export default function AuditTrailDashboard() {
+export default function AuditTrailPage() {
+  return <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading audit trail…</div>}><AuditTrailDashboard /></Suspense>;
+}
+function AuditTrailDashboard() {
+  const searchParams = useSearchParams();
   const [stream, setStream] = useState<Stream>("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [userIdInput, setUserIdInput] = useState("");
-  const [selectedModule, setSelectedModule] = useState("");
+  const [selectedModule, setSelectedModule] = useState(() => searchParams.get("module") || "");
   const [page, setPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
 

@@ -3,8 +3,10 @@ import type { LeavePolicy, LeavePolicyFormData, LeavePolicyApiPayload } from '@/
 
 const BASE_PATH = '/leave-ease/policies';
 
-// Helper to convert form data to API payload.
-// For edit, scope fields are sent unchanged (they will be ignored by backend).
+function checked<T extends { success?: boolean; message?: string }>(data: T): T {
+  if (data.success === false) throw new Error(data.message || 'Leave policy request failed');
+  return data;
+}
 const toApiPayload = (data: LeavePolicyFormData): LeavePolicyApiPayload => ({
   leave_type_id: data.leave_type_id || null,
   grade_band_id: data.grade_band_id === '' ? null : Number(data.grade_band_id),
@@ -13,7 +15,7 @@ const toApiPayload = (data: LeavePolicyFormData): LeavePolicyApiPayload => ({
   carry_forward_limit: data.carry_forward_limit === '' ? null : parseFloat(data.carry_forward_limit),
   encashment_limit: data.encashment_limit === '' ? null : parseFloat(data.encashment_limit),
   accrual_rate: data.accrual_rate === '' ? null : parseFloat(data.accrual_rate),
-  accrual_period: data.accrual_period || null,
+  accrual_period: data.accrual_rate === '' ? null : data.accrual_period || null,
   probation_eligible: data.probation_eligible,
   min_service_months: data.min_service_months,
   max_consecutive_days: data.max_consecutive_days === '' ? null : parseInt(data.max_consecutive_days),
@@ -24,26 +26,30 @@ const toApiPayload = (data: LeavePolicyFormData): LeavePolicyApiPayload => ({
 
 export const leavePolicyService = {
   getAll: async (params?: { page?: number; per_page?: number; search?: string }) => {
-    const { data } = await api.get(BASE_PATH, { params });
-    return data;
+    const { data } = await api.get<{ success: boolean; message: string; data: { data: LeavePolicy[]; meta: { current_page: number; last_page: number; total: number; from: number | null; to: number | null; per_page: number } } }>(BASE_PATH, { params });
+    return checked(data);
   },
 
   getById: async (uuid: string) => {
     const { data } = await api.get(`${BASE_PATH}/${uuid}`);
-    return data.data as LeavePolicy;
+    return checked(data).data as LeavePolicy;
   },
 
   create: async (payload: LeavePolicyFormData) => {
     const { data } = await api.post(BASE_PATH, toApiPayload(payload));
-    return data.data;
+    return checked(data).data;
   },
 
   update: async (uuid: string, payload: LeavePolicyFormData) => {
-    const { data } = await api.put(`${BASE_PATH}/${uuid}`, toApiPayload(payload));
-    return data.data;
+    const values = toApiPayload(payload);
+    const { leave_type_id, grade_band_id, department_id, ...editable } = values;
+    void leave_type_id; void grade_band_id; void department_id;
+    const { data } = await api.patch(`${BASE_PATH}/${uuid}`, editable);
+    return checked(data).data;
   },
 
   delete: async (uuid: string) => {
-    await api.delete(`${BASE_PATH}/${uuid}`);
+    const { data } = await api.delete(`${BASE_PATH}/${uuid}`);
+    if (data) checked(data);
   },
 };

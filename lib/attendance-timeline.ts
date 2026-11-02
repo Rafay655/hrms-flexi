@@ -5,8 +5,9 @@ export const ATTENDANCE_STATUSES = [
   { value: 'out_missing', label: 'Clock-out missing' }, { value: 'weekend', label: 'Weekly off' }, { value: 'holiday', label: 'Holiday' },
   { value: 'present_holiday', label: 'Worked on holiday' }, { value: 'present_off_day', label: 'Worked on weekly off' },
 ];
-export function attendanceLabel(status: string) { return ATTENDANCE_STATUSES.find(item => item.value === status)?.label ?? status.replaceAll('_', ' '); }
-export function attendanceTone(status: string) {
+export function attendanceLabel(status?: string | null) { if (!status?.trim()) return 'Not marked'; return ATTENDANCE_STATUSES.find(item => item.value === status)?.label ?? status.replaceAll('_', ' '); }
+export function attendanceTone(status?: string | null) {
+  status = status ?? "";
   if (['present', 'present_holiday', 'present_off_day'].includes(status)) return { badge: 'border-emerald-200 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' };
   if (['late_in', 'out_missing', 'half_day', 'early_out'].includes(status)) return { badge: 'border-amber-200 bg-amber-50 text-amber-800', dot: 'bg-[#EEC293]' };
   if (status === 'absent') return { badge: 'border-rose-200 bg-rose-50 text-rose-700', dot: 'bg-rose-500' };

@@ -715,315 +715,67 @@ export const modules: ModuleItem[] = [
     icon: "Palmtree",
     admin: false, // Default, can be overridden based on user
     Menu: [
+      {id: 70100, icon: "LayoutDashboard", title: "Dashboard (home page)", pathname: "/leave-ease"},
       {
-        id: 70100,
-        icon: "LayoutDashboard",
-        title: "Dashboard",
-        pathname: "/leave-ease",
-      },
-      {
-        id: 70200,
-        icon: "Calendar",
-        title: "MY LEAVE",
+        id: 70200, icon: "Calendar", title: "My Leave",
         subMenu: [
-          {
-            id: 70201,
-            icon: "WalletCards",
-            title: "My Balances",
-            pathname: "/leave-ease/my-balance",
-          },
-
-          {
-            id: 70203,
-            icon: "Wallet",
-            title: "Encashment",
-            pathname: "/leave-ease/encashment",
-          },
-          {
-            id: 70204,
-            icon: "List",
-            title: "My Requests",
-            pathname: "/leave-ease/my-requests",
-          },
-          {
-            id: 70205,
-            icon: "CalendarDays",
-            title: "My Calendar",
-            pathname: "/leave-ease/my-calendar",
-          },
-          {
-            id: 70206,
-            icon: "BookText",
-            title: "Balance Ledger",
-            pathname: "/leave-ease/balance-ledger",
-          },
+          {id: 70201, icon: "WalletCards", title: "My Balance", pathname: "/leave-ease/my-balance"},
+          {id: 70202, icon: "List", title: "My Requests", pathname: "/leave-ease/my-requests"},
+          {id: 70203, icon: "CalendarDays", title: "My Calendar", pathname: "/leave-ease/my-calendar"},
+          {id: 70204, icon: "BookText", title: "Balance Ledger", pathname: "/leave-ease/balance-ledger"},
+          {id: 70205, icon: "Wallet", title: "Encashment (apply)", pathname: "/leave-ease/encashment"},
+          {id: 70206, icon: "CalendarPlus", title: "Comp Off", pathname: "/leave-ease/comp-off"},
         ],
       },
       {
-        id: 70300,
-        icon: "Users",
-        title: "TEAM",
-
+        id: 70300, icon: "ClipboardCheck", title: "Approvals",
         subMenu: [
-          {
-            id: 70301,
-            icon: "CalendarRange",
-            title: "Team Calendar",
-            pathname: "/leave-ease/team-calendar",
-          },
-          {
-            id: 70302,
-            icon: "Scale",
-            title: "Team Balances",
-            pathname: "/leave-ease/team-balances",
-          },
-          {
-            id: 70303,
-            icon: "ClipboardCheck",
-            title: "Pending Approvals",
-            pathname: "/leave-ease/pending-approvals",
-          },
+          {id: 70301, icon: "ClipboardCheck", title: "Approvals Inbox", pathname: "/leave-ease/approvals-inbox"},
+          {id: 70302, icon: "CheckSquare", title: "Comp-Off Approvals", pathname: "/leave-ease/co-approvals"},
+          {id: 70303, icon: "Coins", title: "Encashment Approvals", pathname: "/leave-ease/encashment-approvals"},
+          {id: 70304, icon: "ShieldCheck", title: "Adjustment Approvals", pathname: "/leave-ease/adjustment-approvals"},
+          {id: 70305, icon: "UserCheck", title: "Delegations", pathname: "/leave-ease/delegations"},
         ],
       },
       {
-        id: 70500,
-        icon: "SlidersHorizontal",
-        title: "POLICY STUDIO",
-
+        id: 70400, icon: "Users", title: "Team",
         subMenu: [
-          {
-            id: 70501,
-            icon: "PartyPopper",
-            title: "Holiday Calendar",
-            pathname: "/leave-ease/holiday-calendar",
-          },
-          {
-            id: 70502,
-            icon: "Tags",
-            title: "Leave Types",
-            pathname: "/leave-ease/leave-types",
-          },
-          {
-            id: 70503,
-            icon: "UserCheck",
-            title: "Eligibility Groups",
-            pathname: "/leave-ease/eligibility",
-          },
-          {
-            id: 70504,
-            icon: "UserCog",
-            title: "Leave Assignments",
-            pathname: "/leave-ease/employee-assignments",
-          },
-          {
-            id: 70505,
-            icon: "Hourglass",
-            title: "Accrual Rules",
-            pathname: "/leave-ease/accrual",
-          },
-          {
-            id: 70506,
-            icon: "Cog",
-            title: "Accrual Jobs",
-            pathname: "/leave-ease/accrual-jobs",
-          },
-          {
-            id: 70507,
-            icon: "FastForward",
-            title: "Carry Forward",
-            pathname: "/leave-ease/carry-forward",
-          },
-          {
-            id: 70508,
-            icon: "RefreshCw",
-            title: "Year-End Process",
-            pathname: "/leave-ease/year-end",
-          },
-       
-          {
-            id: 70509,
-            icon: "CalendarX",
-            title: "Blackout Periods",
-            pathname: "/leave-ease/blackout",
-          },
-          {
-            id: 70510,
-            icon: "Gift",
-            title: "Incentive Rules",
-            pathname: "/leave-ease/incentive-rules",
-          },
-          {
-            id: 70511,
-            icon: "Play",
-            title: "Incentive Runs",
-            pathname: "/leave-ease/incentive-runs",
-          },
-          {
-            id: 70512,
-            icon: "Sliders",
-            title: "Balance Adjustments",
-            pathname: "/leave-ease/balance-adjustments",
-          },
-          {
-            id: 70513,
-            icon: "ShieldCheck",
-            title: "Adjustment Approvals",
-            pathname: "/leave-ease/adjustment-approvals",
-          },
-          {
-            id: 70514,
-            icon: "ClipboardList",
-            title: "Opening Balances",
-            pathname: "/leave-ease/opening-balances",
-          },
-          {
-            id: 70515,
-            icon: "XCircle",
-            title: "Rejection Reasons",
-            pathname: "/leave-ease/rejection-reasons",
-          },
-          {
-            id: 70516,
-            icon: "Percent",
-            title: "Leave Proration",
-            pathname: "/leave-ease/leave-proration",
-          },
+          {id: 70401, icon: "CalendarRange", title: "Team Calendar", pathname: "/leave-ease/team-calendar"},
+          {id: 70402, icon: "Scale", title: "Team Balances", pathname: "/leave-ease/team-balances"},
         ],
       },
       {
-        id: 70600,
-        icon: "CalendarPlus",
-        title: "COMP-OFF",
+        id: 70500, icon: "SlidersHorizontal", title: "Leave Setup (HR)",
         subMenu: [
-          {
-            id: 70601,
-            icon: "HandCoins",
-            title: "My Credits",
-            pathname: "/leave-ease/co-credits",
-          },
-          {
-            id: 70602,
-            icon: "ClipboardCheck",
-            title: "Credit Approvals",
-            pathname: "/leave-ease/co-approvals",
-          },
-          {
-            id: 70603,
-            icon: "Coins",
-            title: "All Credits",
-            pathname: "/leave-ease/co-all",
-          },
+          {id: 70501, icon: "Tags", title: "Leave Types", pathname: "/leave-ease/leave-types"},
+          {id: 70502, icon: "ShieldCheck", title: "Leave Policies", pathname: "/leave-ease/leave-policies"},
+          {id: 70503, icon: "PartyPopper", title: "Holiday Calendar", pathname: "/leave-ease/holiday-calendar"},
+          {id: 70504, icon: "Hourglass", title: "Accrual Rules", pathname: "/leave-ease/accrual-rules"},
+          {id: 70505, icon: "FastForward", title: "Carry-Forward", pathname: "/leave-ease/carry-forward"},
+          {id: 70506, icon: "CalendarX", title: "Blackout Dates", pathname: "/leave-ease/blackout"},
+          {id: 70507, icon: "XCircle", title: "Rejection Reasons", pathname: "/leave-ease/rejection-reasons"},
         ],
       },
       {
-        id: 70700,
-        icon: "Briefcase",
-        title: "OFFICIAL DUTY",
+        id: 70600, icon: "Wallet", title: "Balance Operations (HR)",
         subMenu: [
-          {
-            id: 70701,
-            icon: "Plane",
-            title: "My OD/Travel",
-            pathname: "/leave-ease/od-travel",
-          },
-          {
-            id: 70702,
-            icon: "ClipboardCheck",
-            title: "OD Approvals",
-            pathname: "/leave-ease/od-approvals",
-          },
-          {
-            id: 70703,
-            icon: "Map",
-            title: "Travel Analytics",
-            pathname: "/leave-ease/od-reports",
-          },
+          {id: 70601, icon: "Sliders", title: "Balance Adjustments", pathname: "/leave-ease/balance-adjustments"},
+          {id: 70602, icon: "ClipboardList", title: "Opening Balances", pathname: "/leave-ease/opening-balances"},
+          {id: 70603, icon: "CalendarMinus", title: "Unpaid Leave (LWP)", pathname: "/leave-ease/lwp"},
+          {id: 70604, icon: "Coins", title: "Encashments (HR list)", pathname: "/leave-ease/leave-encashments"},
+          {id: 70605, icon: "CalendarPlus", title: "Comp-Off Credits", pathname: "/leave-ease/co-credits"},
+          {id: 70606, icon: "Users", title: "Comp-Off All", pathname: "/leave-ease/co-all"},
+          {id: 70607, icon: "Cog", title: "Accrual Jobs", pathname: "/leave-ease/accrual-jobs"},
+          {id: 70608, icon: "RefreshCw", title: "Year-End Close", pathname: "/leave-ease/year-end"},
+          {id: 70609, icon: "Calendar", title: "Payroll Periods", pathname: "/leave-ease/payroll-periods"},
         ],
       },
       {
-        id: 71100,
-        icon: "Settings",
-        title: "SETTINGS",
+        id: 70700, icon: "BarChart3", title: "Insights",
         subMenu: [
-          {
-            id: 71101,
-            icon: "Bell",
-            title: "Notification Settings",
-            pathname: "/leave-ease/notifications",
-          },
-          {
-            id: 71102,
-            icon: "LayoutTemplate",
-            title: "Notification Templates",
-            pathname: "/leave-ease/notification-templates",
-          },
-          {
-            id: 71103,
-            icon: "Send",
-            title: "Delivery Logs",
-            pathname: "/leave-ease/notification-logs",
-          },
-          {
-            id: 71104,
-            icon: "GitMerge",
-            title: "Workflows",
-            pathname: "/leave-ease/workflows",
-          },
-          {
-            id: 71105,
-            icon: "Workflow",
-            title: "Workflow Builder",
-            pathname: "/leave-ease/workflow-builder",
-          },
-          {
-            id: 71106,
-            icon: "ListTree",
-            title: "Workflow Instances",
-            pathname: "/leave-ease/workflow-instances",
-          },
-          {
-            id: 71107,
-            icon: "Link2",
-            title: "Integrations",
-            pathname: "/leave-ease/integrations",
-          },
-          {
-            id: 71108,
-            icon: "Gem",
-            title: "Plan & Entitlements",
-            pathname: "/leave-ease/entitlements",
-          },
-        ],
-      },
-      {
-        id: 70400,
-        icon: "Layers",
-        title: "EXTRA",
-        subMenu: [
-          {
-            id: 70517,
-            icon: "ScrollText",
-            title: "Audit Logs",
-            pathname: "/leave-ease/audit-logs",
-          },
-          {
-            id: 70518,
-            icon: "Gauge",
-            title: "SLA Monitor",
-            pathname: "/leave-ease/sla-monitor",
-          },
-          {
-            id: 70519,
-            icon: "FlaskConical",
-            title: "Simulator",
-            pathname: "/leave-ease/simulator",
-          },
-          {
-            id: 70202,
-            icon: "Trophy",
-            title: "My Rewards",
-            pathname: "/leave-ease/my-earned-rewards",
-          },
+          {id: 70701, icon: "FileText", title: "Reports", pathname: "/leave-ease/reports"},
+          {id: 70702, icon: "BarChart3", title: "Analytics", pathname: "/leave-ease/analytics"},
+          {id: 70703, icon: "ScrollText", title: "Audit Logs", pathname: "/leave-ease/audit-logs"},
         ],
       },
     ],
@@ -2539,7 +2291,7 @@ export const modules: ModuleItem[] = [
  * no extra wiring.
  */
 const MODULE_LANDING_OVERRIDES: Record<number, string> = {
-  7: "/leaveease",        // legacy slug kept for the tile (registry Menu uses /leave-ease)
+  7: "/leave-ease",
   9: "/connect-central",  // Menu[0] is /connect-central/security; tile lands on the module root
   12: "/system-flex",     // Menu[0] is a sub-route; tile lands on the module root
   14: "/flexi-meta",      // Menu[0] is a sub-route; tile lands on the module root

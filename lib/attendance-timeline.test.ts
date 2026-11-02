@@ -16,3 +16,10 @@ describe('attendance timeline display rules', () => {
   it('keeps an unknown location result separate from a failed check', () => { expect(geofenceLabel(null)).toBe('Location not checked'); expect(geofenceLabel(false)).toBe('Outside permitted area'); expect(geofenceLabel(true)).toBe('Location verified'); });
   it('labels known statuses while preserving unknown server statuses', () => { expect(attendanceLabel('out_missing')).toBe('Clock-out missing'); expect(attendanceLabel('custom_status')).toBe('custom status'); });
 });
+
+it('shows unmarked attendance for null, undefined and blank statuses', () => {
+  expect(attendanceLabel(null)).toBe('Not marked');
+  expect(attendanceLabel(undefined)).toBe('Not marked');
+  expect(attendanceLabel('')).toBe('Not marked');
+  expect(attendanceLabel('  ')).toBe('Not marked');
+});

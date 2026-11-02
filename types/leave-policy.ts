@@ -1,4 +1,4 @@
-export type AccrualPeriod = 'monthly' | 'quarterly' | 'annual' | 'none';
+export type AccrualPeriod = 'monthly' | 'quarterly' | 'annual';
 
 export interface LeavePolicy {
   id: string;
@@ -38,7 +38,7 @@ export interface LeavePolicy {
 
 export interface LeavePolicyFormData {
   leave_type_id: string;       // UUID (disabled on edit)
-  grade_band_id: number | '';       // UUID (disabled on edit)
+  grade_band_id: number | '';       // Integer ID (disabled on edit)
   department_id: number | '';  // (disabled on edit)
   annual_entitlement: number;
   carry_forward_limit: string;

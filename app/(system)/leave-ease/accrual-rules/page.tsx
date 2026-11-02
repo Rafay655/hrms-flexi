@@ -1,464 +1,109 @@
-"use client";
-
-import { showApiError } from "@/lib/error-toast";
-import React, { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  SearchIcon,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Loader2,
-  PlusIcon,
-  Eye,
-  Pencil,
-  Trash2,
-} from "lucide-react";
-import {
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type ColumnDef,
-  type SortingState,
-} from "@tanstack/react-table";
-import toast from "react-hot-toast";
-
-import { useLeaveTypes } from "@/hooks/useLeaveTypes";
-import {
-  useAccrualRules,
-  useCreateAccrualRule,
-  useUpdateAccrualRule,
-  useDeleteAccrualRule,
-} from "@/hooks/useAccrualRules";
-import SearchableSelect from "@/components/ui/searchable-select";
-import type { Option } from "@/components/ui/searchable-select";
-import type { AccrualRule, AccrualRuleFormData, AccrualFrequency } from "@/types/accrual-rule";
-
-const DEFAULT_PER_PAGE = 15;
-
-const ACCRUAL_FREQUENCIES: { value: AccrualFrequency; label: string }[] = [
-  { value: "monthly", label: "Monthly" },
-  { value: "quarterly", label: "Quarterly" },
-  { value: "half_yearly", label: "Half Yearly" },
-  { value: "yearly", label: "Yearly" },
-  { value: "pro_rata", label: "Pro Rata" },
-];
-
-export default function AccrualRulesPage() {
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
-  const [sorting, setSorting] = useState<SortingState>([]);
-
-  // Leave types dropdown
-  const { data: leaveTypesRaw, isLoading: isLoadingLeaveTypes } = useLeaveTypes({ per_page: 1000 });
-  const leaveTypes = useMemo(() => leaveTypesRaw?.data?.data ?? [], [leaveTypesRaw]);
-  const leaveTypeOptions: Option[] = useMemo(
-    () => leaveTypes.map((lt: any) => ({ value: String(lt.uuid ?? lt.id), label: `${lt.name} (${lt.code})` })),
-    [leaveTypes]
-  );
-
-  // Data
-  const { data, isLoading, isFetching, error } = useAccrualRules({ page, per_page: perPage });
-
-  const rules = data?.data ?? [];
-  const totalEntries = data?.meta?.total ?? 0;
-  const totalPages = data?.meta?.last_page ?? 1;
-
-  const createMutation = useCreateAccrualRule();
-  const updateMutation = useUpdateAccrualRule();
-  const deleteMutation = useDeleteAccrualRule();
-
-  // Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"view" | "edit" | "create">("create");
-  const [selectedRule, setSelectedRule] = useState<AccrualRule | null>(null);
-  const [formData, setFormData] = useState<AccrualRuleFormData>({
-    leave_type_uuid: "",
-    name: "",
-    accrual_frequency: "",
-    days_per_accrual: 0,
-    max_carry_forward: "",
-    carry_forward_expiry_months: "",
-    is_prorated_for_new_joiners: false,
-    min_service_months_for_accrual: 0,
-    is_active: true,
-    effective_from: "",
-    effective_to: null,
-  });
-
-  const [deleteUuid, setDeleteUuid] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPage(1);
-  }, [perPage]);
-
-  useEffect(() => {
-    if (error) showApiError(error, { fallbackMessage: "Failed to load accrual rules" });
-  }, [error]);
-
-  const handleView = (rule: AccrualRule) => {
-    setSelectedRule(rule);
-    setFormData({
-      leave_type_uuid: rule.leave_type_uuid,
-      name: rule.name,
-      accrual_frequency: rule.accrual_frequency,
-      days_per_accrual: rule.days_per_accrual,
-      max_carry_forward: rule.max_carry_forward?.toString() ?? "",
-      carry_forward_expiry_months: rule.carry_forward_expiry_months?.toString() ?? "",
-      is_prorated_for_new_joiners: rule.is_prorated_for_new_joiners,
-      min_service_months_for_accrual: rule.min_service_months_for_accrual,
-      is_active: rule.is_active,
-      effective_from: rule.effective_from.split('T')[0] ?? rule.effective_from.split(' ')[0],
-      effective_to: rule.effective_to ? (rule.effective_to.split('T')[0] ?? rule.effective_to.split(' ')[0]) : null,
-    });
-    setModalMode("view");
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (rule: AccrualRule) => {
-    handleView(rule);
-    setModalMode("edit");
-  };
-
-  const handleCreate = () => {
-    setSelectedRule(null);
-    setFormData({
-      leave_type_uuid: "",
-      name: "",
-      accrual_frequency: "",
-      days_per_accrual: 0,
-      max_carry_forward: "",
-      carry_forward_expiry_months: "",
-      is_prorated_for_new_joiners: false,
-      min_service_months_for_accrual: 0,
-      is_active: true,
-      effective_from: "",
-      effective_to: null,
-    });
-    setModalMode("create");
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = (uuid: string) => setDeleteUuid(uuid);
-  const confirmDelete = () => {
-    if (deleteUuid) {
-      deleteMutation.mutate(deleteUuid, { onSuccess: () => setDeleteUuid(null) });
-    }
-  };
-
-  const handleSave = () => {
-    const trimmedName = formData.name.trim();
-    if (!formData.leave_type_uuid) { toast.error("Leave type required"); return; }
-    if (!trimmedName) { toast.error("Name required"); return; }
-    if (trimmedName.length > 255) { toast.error("Name max 255 chars"); return; }
-    if (!formData.accrual_frequency) { toast.error("Accrual frequency required"); return; }
-    if (formData.days_per_accrual < 0.25 || formData.days_per_accrual > 999.99) { toast.error("Days per accrual 0.25–999.99"); return; }
-    if (!formData.effective_from) { toast.error("Effective from required"); return; }
-
-    const payload = { ...formData, name: trimmedName };
-    if (modalMode === "create") {
-      createMutation.mutate(payload, { onSuccess: () => setIsModalOpen(false) });
-    } else if (selectedRule) {
-      updateMutation.mutate(
-        { uuid: selectedRule.uuid, data: payload },
-        { onSuccess: () => setIsModalOpen(false) }
-      );
-    }
-  };
-
-  const columns: ColumnDef<AccrualRule & { sr: number }>[] = useMemo(() => [
-    { accessorKey: "sr", header: "#", cell: ({ row }) => <div className="font-medium">{row.original.sr}</div> },
-    { accessorKey: "name", header: "Name", cell: ({ row }) => <div className="font-semibold">{row.original.name}</div> },
-    {
-      id: "leave_type",
-      header: "Leave Type",
-      cell: ({ row }) => <span>{row.original.leave_type_name ?? "—"}</span>,
-    },
-    {
-      accessorKey: "accrual_frequency",
-      header: "Frequency",
-      cell: ({ row }) => {
-        const opt = ACCRUAL_FREQUENCIES.find(o => o.value === row.original.accrual_frequency);
-        return <Badge variant="outline">{opt?.label ?? row.original.accrual_frequency}</Badge>;
-      },
-    },
-    { accessorKey: "days_per_accrual", header: "Days/Accrual", cell: ({ row }) => row.original.days_per_accrual },
-    {
-      accessorKey: "effective_from",
-      header: "Effective",
-      cell: ({ row }) => row.original.effective_from?.split('T')[0] ?? "—",
-    },
-    {
-      accessorKey: "is_active",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge className={row.original.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-          {row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
-      ),
-    },
-    {
-      id: "actions",
-      header: () => <div className="text-center">Actions</div>,
-      cell: ({ row }) => (
-        <div className="flex justify-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => handleView(row.original)}><Eye className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => handleDelete(row.original.uuid)}><Trash2 className="h-4 w-4" /></Button>
-        </div>
-      ),
-    },
-  ], []);
-
-  const rows = useMemo(() => {
-    const startSr = (page - 1) * perPage;
-    return rules.map((r, idx) => ({ ...r, sr: startSr + idx + 1 }));
-  }, [rules, page, perPage]);
-
-  const table = useReactTable({
-    data: rows,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    manualPagination: true,
-  });
-
-  const showingFrom = totalEntries > 0 ? (page - 1) * perPage + 1 : 0;
-  const showingTo = totalEntries > 0 ? Math.min(page * perPage, totalEntries) : 0;
-
-  return (
-    <div className="p-3">
-      <Card className="border border-gray-100 shadow-sm">
-        <CardHeader className="border-b">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-2xl font-bold text-gray-900">Accrual Rules</CardTitle>
-              <p className="text-sm text-gray-500 mt-1">{totalEntries.toLocaleString()} rules</p>
-            </div>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              <PlusIcon className="mr-2 h-4 w-4" /> Add Rule
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* Filters */}
-          <div className="flex items-center gap-2 mb-6">
-            <span className="text-sm text-gray-600">Show</span>
-            <Select value={perPage.toString()} onValueChange={v => setPerPage(Number(v))}>
-              <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-white">{[10,15,25,50,100].map(s => <SelectItem key={s} value={String(s)}>{s}</SelectItem>)}</SelectContent>
-            </Select>
-            <span className="text-sm text-gray-600">entries</span>
-          </div>
-
-          {/* Stats */}
-          <div className="bg-blue-50 p-4 rounded-lg mb-4 flex justify-between items-center">
-            <span className="text-sm">Showing {showingFrom} to {showingTo} of {totalEntries} entries</span>
-            {(isLoading || isFetching) && <Loader2 className="animate-spin h-5 w-5" />}
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id}>
-                    {hg.headers.map(h => (
-                      <th key={h.id} className="py-3 px-4 text-left text-xs font-semibold uppercase cursor-pointer" onClick={h.column.getToggleSortingHandler()}>
-                        <div className="flex items-center gap-1">
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          {h.column.getIsSorted() === 'asc' ? <ChevronRight className="h-4 w-4" /> : h.column.getIsSorted() === 'desc' ? <ChevronLeft className="h-4 w-4" /> : null}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody className="divide-y">
-                {isLoading ? (
-                  <tr><td colSpan={columns.length} className="py-12 text-center"><Loader2 className="animate-spin mx-auto" /></td></tr>
-                ) : rows.length === 0 ? (
-                  <tr><td colSpan={columns.length} className="py-12 text-center">No rules found</td></tr>
-                ) : (
-                  table.getRowModel().rows.map(row => (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      {row.getVisibleCells().map(cell => (
-                        <td key={cell.id} className="py-4 px-4 text-sm">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {!isLoading && rows.length > 0 && (
-            <div className="flex justify-between items-center mt-4">
-              <span>Page {page} of {totalPages}</span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1}><ChevronsLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><ChevronLeft className="h-4 w-4" /></Button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let num;
-                  if (totalPages <= 5) num = i + 1;
-                  else if (page <= 3) num = i + 1;
-                  else if (page >= totalPages - 2) num = totalPages - 4 + i;
-                  else num = page - 2 + i;
-                  return <Button key={num} variant={page === num ? "default" : "outline"} size="sm" onClick={() => setPage(num)}>{num}</Button>;
-                })}
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}><ChevronRight className="h-4 w-4" /></Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(totalPages)} disabled={page === totalPages}><ChevronsRight className="h-4 w-4" /></Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {modalMode === "create" ? "Add Accrual Rule" : modalMode === "edit" ? "Edit Accrual Rule" : "View Accrual Rule"}
-            </DialogTitle>
-            <DialogDescription>
-              {modalMode === "view" ? "Read-only view." : "Fill in the details."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-            {/* Leave Type */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Leave Type *</label>
-              <SearchableSelect
-                options={leaveTypeOptions}
-                value={formData.leave_type_uuid || ""}
-                onChange={v => setFormData(p => ({ ...p, leave_type_uuid: v as string }))}
-                placeholder="Select leave type"
-                groupLabel="Leave Types"
-                allowAll={false}
-                widthClass="w-full"
-                disabled={modalMode === "view" || isLoadingLeaveTypes}
-                multiple={false}
-              />
-            </div>
-            {/* Name */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Name *</label>
-              <Input value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} disabled={modalMode === "view"} maxLength={255} />
-            </div>
-            {/* Accrual Frequency */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Accrual Frequency *</label>
-              <Select value={formData.accrual_frequency} onValueChange={v => setFormData(p => ({ ...p, accrual_frequency: v as AccrualFrequency | '' }))} disabled={modalMode === "view"}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>{ACCRUAL_FREQUENCIES.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            {/* Days Per Accrual */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Days Per Accrual *</label>
-              <Input type="number" step="0.01" min={0.25} max={999.99} value={formData.days_per_accrual} onChange={e => setFormData(p => ({ ...p, days_per_accrual: Number(e.target.value) }))} disabled={modalMode === "view"} />
-            </div>
-            {/* Max Carry Forward */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Max Carry Forward</label>
-              <Input type="number" step="0.01" min={0} value={formData.max_carry_forward} onChange={e => setFormData(p => ({ ...p, max_carry_forward: e.target.value }))} disabled={modalMode === "view"} placeholder="Optional" />
-            </div>
-            {/* Carry Forward Expiry Months */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Carry Fwd Expiry (months)</label>
-              <Input type="number" min={0} max={24} value={formData.carry_forward_expiry_months} onChange={e => setFormData(p => ({ ...p, carry_forward_expiry_months: e.target.value }))} disabled={modalMode === "view"} placeholder="Optional" />
-            </div>
-            {/* Min Service Months */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Min Service (months)</label>
-              <Input type="number" min={0} max={120} value={formData.min_service_months_for_accrual} onChange={e => setFormData(p => ({ ...p, min_service_months_for_accrual: Number(e.target.value) }))} disabled={modalMode === "view"} />
-            </div>
-            {/* Effective From */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Effective From *</label>
-              <Input type="date" value={formData.effective_from} onChange={e => setFormData(p => ({ ...p, effective_from: e.target.value }))} disabled={modalMode === "view"} />
-            </div>
-            {/* Effective To */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Effective To</label>
-              <Input type="date" value={formData.effective_to ?? ""} onChange={e => setFormData(p => ({ ...p, effective_to: e.target.value || null }))} disabled={modalMode === "view"} min={formData.effective_from} />
-            </div>
-          </div>
-          {/* Checkboxes */}
-          <div className="flex flex-wrap gap-4 mt-2">
-            <div className="flex items-center gap-2">
-              <Checkbox checked={formData.is_prorated_for_new_joiners} onCheckedChange={c => setFormData(p => ({ ...p, is_prorated_for_new_joiners: !!c }))} disabled={modalMode === "view"} />
-              <label className="text-sm">Prorated for New Joiners</label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={formData.is_active} onCheckedChange={c => setFormData(p => ({ ...p, is_active: !!c }))} disabled={modalMode === "view"} />
-              <label className="text-sm">Active</label>
-            </div>
-          </div>
-          <DialogFooter className="mt-4">
-            {modalMode !== "view" ? (
-              <>
-                <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
-                  {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>Close</Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteUuid} onOpenChange={() => setDeleteUuid(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete Accrual Rule?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700" disabled={deleteMutation.isPending}>
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
+'use client';
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
+import { useAppSelector } from '@/store/hooks';
+import { accrualRuleService } from '@/services/accrual-rule.service';
+import { Search, SlidersHorizontal, Plus, RefreshCw, MoreVertical, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import SearchableSelect from '@/components/ui/searchable-select';
+import { AppLoader } from '@/components/ui/app-loader';
+import { ApiErrorState } from '@/components/ui/api-error-state';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { useLeaveTypes } from '@/hooks/useLeaveTypes';
+import { useAccrualRules, useCreateAccrualRule, useUpdateAccrualRule, useDeleteAccrualRule } from '@/hooks/useAccrualRules';
+import type { AccrualRule, AccrualRuleFilters, AccrualRuleFormData, AccrualFrequency } from '@/types/accrual-rule';
+const frequencies: {value:AccrualFrequency;label:string}[]=[{value:'monthly',label:'Monthly'},{value:'quarterly',label:'Quarterly'},{value:'half_yearly',label:'Half yearly'},{value:'yearly',label:'Yearly'},{value:'pro_rata',label:'Pro rata'}];
+const defaults:AccrualRuleFilters={page:1,per_page:10,sort_by:'created_at',sort_dir:'desc'};
+function emptyForm():AccrualRuleFormData {return {leave_type_uuid:'',name:'',accrual_frequency:'',days_per_accrual:'',max_carry_forward:'',carry_forward_expiry_months:'',is_prorated_for_new_joiners:false,min_service_months_for_accrual:0,is_active:true,effective_from:'',effective_to:null};}
+function validDate(value:string){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const date=new Date(`${value}T12:00:00`);return !Number.isNaN(date.getTime())&&date.getFullYear()===Number(value.slice(0,4))&&date.getMonth()+1===Number(value.slice(5,7))&&date.getDate()===Number(value.slice(8));}
+export default function AccrualRulesPage(){
+ const [filters,setFilters]=useState<AccrualRuleFilters>(defaults);
+ const [search,setSearch]=useState('');
+ const [debouncedSearch,setDebouncedSearch]=useState('');
+ const [advanced,setAdvanced]=useState(false);
+ const company=useAppSelector(state=>state.auth.company?.id);
+ const user=useAppSelector(state=>state.auth.user?.id);
+ useEffect(()=>{const timer=setTimeout(()=>{setDebouncedSearch(search.trim());setFilters(p=>({...p,page:1}));},350);return()=>clearTimeout(timer);},[search]);
+ const searching=!!debouncedSearch;
+ const searchFilters={leave_type_uuid:filters.leave_type_uuid,accrual_frequency:filters.accrual_frequency,is_active:filters.is_active,effective_from:filters.effective_from,effective_to:filters.effective_to,sort_by:filters.sort_by,sort_dir:filters.sort_dir};
+ const listQuery=useAccrualRules(filters,!searching);
+ const pool=useQuery({queryKey:['accrual-rules','list','search-pool',company,user,searchFilters],queryFn:({signal})=>accrualRuleService.getSearchPool(searchFilters,signal),enabled:searching});
+ const matching=useMemo(()=>pool.data?.filter(rule=>`${rule.name} ${rule.leave_type_name} ${rule.leave_type_code}`.toLowerCase().includes(debouncedSearch.toLowerCase()))||[],[pool.data,debouncedSearch]);
+ const searchPage=filters.page||1;const searchSize=filters.per_page||10;
+ const response=searching?(pool.data?{data:matching.slice((searchPage-1)*searchSize,searchPage*searchSize),meta:{current_page:searchPage,last_page:Math.max(1,Math.ceil(matching.length/searchSize)),per_page:searchSize,total:matching.length}}:undefined):listQuery.data;
+ const query=searching?pool:listQuery;
+ const rules=response?.data||[];const meta=response?.meta;
+ const page=meta?.current_page||filters.page||1;const pages=Math.max(1,meta?.last_page||1);const total=meta?.total||0;
+ if(meta&&!query.isFetching&&(filters.page||1)>pages)setFilters(p=>({...p,page:pages}));
+ const perPage=meta?.per_page||filters.per_page||10;const from=total?(page-1)*perPage+1:0;const to=total?Math.min(from+rules.length-1,total):0;
+ const first=Math.max(1,Math.min(page-2,pages-4));const numbers=Array.from({length:Math.min(5,pages)},(_,i)=>first+i);
+ const create=useCreateAccrualRule();const update=useUpdateAccrualRule();const remove=useDeleteAccrualRule();const saving=create.isPending||update.isPending;
+ const [open,setOpen]=useState(false);const [mode,setMode]=useState<'create'|'edit'|'view'>('create');const [selected,setSelected]=useState<AccrualRule|null>(null);const [form,setForm]=useState<AccrualRuleFormData>(emptyForm);
+ const [deleteRule,setDeleteRule]=useState<AccrualRule|null>(null);
+ const types=useLeaveTypes({per_page:1000});
+ const typeOptions=useMemo(()=>{const options=(types.data?.data.data||[]).map(t=>({value:t.uuid||t.id,label:`${t.name} (${t.code})`}));if(selected&&!options.some(t=>t.value===selected.leave_type_uuid))options.push({value:selected.leave_type_uuid,label:`${selected.leave_type_name} (${selected.leave_type_code})`});return options;},[types.data,selected]);
+ function changeFilter<K extends keyof AccrualRuleFilters>(key:K,value:AccrualRuleFilters[K]){setFilters(p=>({...p,[key]:value,page:1}));}
+ function view(rule:AccrualRule,nextMode:'edit'|'view'){
+  setSelected(rule);setMode(nextMode);setForm({leave_type_uuid:rule.leave_type_uuid,name:rule.name,accrual_frequency:rule.accrual_frequency,days_per_accrual:rule.days_per_accrual,max_carry_forward:rule.max_carry_forward?.toString()??'',carry_forward_expiry_months:rule.carry_forward_expiry_months?.toString()??'',is_prorated_for_new_joiners:rule.is_prorated_for_new_joiners,min_service_months_for_accrual:rule.min_service_months_for_accrual??0,is_active:rule.is_active,effective_from:rule.effective_from?.slice(0,10)||'',effective_to:rule.effective_to?.slice(0,10)||null});setOpen(true);
+ }
+ function save(){
+  if(saving||mode==='view')return;
+  if(!form.leave_type_uuid){toast.error('Select a leave type');return;}
+  if(!form.name.trim()||form.name.trim().length>255){toast.error('Enter a rule name of up to 255 characters');return;}
+  if(!frequencies.some(f=>f.value===form.accrual_frequency)){toast.error('Select an accrual frequency');return;}
+  if(form.days_per_accrual===''){toast.error('Days per accrual is required');return;}
+  const limits:[string,number|string,number,number,boolean][]=[['Days per accrual',form.days_per_accrual,0.25,999.99,false],['Maximum carry forward',form.max_carry_forward,0,999.99,false],['Carry-forward expiry',form.carry_forward_expiry_months,0,24,true],['Minimum service months',form.min_service_months_for_accrual,0,120,true]];
+  for(const [label,value,min,max,integer] of limits){if(value!==''&&(!Number.isFinite(Number(value))||Number(value)<min||Number(value)>max||(integer&&!Number.isInteger(Number(value))))){toast.error(`${label} must be ${integer?'a whole number ':''}between ${min} and ${max}`);return;}}
+  if(!validDate(form.effective_from)){toast.error('Select a valid effective from date');return;}
+  if(form.effective_to&&(!validDate(form.effective_to)||form.effective_to<form.effective_from)){toast.error('Effective to must be on or after effective from');return;}
+  const data={...form,name:form.name.trim()};
+  if(mode==='create')create.mutate(data,{onSuccess:()=>setOpen(false)});
+  else if(selected)update.mutate({uuid:selected.uuid,data},{onSuccess:()=>setOpen(false)});
+ }
+ const filtered=Boolean(search||filters.leave_type_uuid||filters.accrual_frequency||filters.is_active!==undefined||filters.effective_from||filters.effective_to||filters.sort_by!==defaults.sort_by||filters.sort_dir!==defaults.sort_dir);
+ const numericFields=[{key:'days_per_accrual',label:'Days per accrual *',min:0.25,max:999.99,step:0.01,required:true},{key:'max_carry_forward',label:'Maximum carry-forward days',min:0,max:999.99,step:0.01},{key:'carry_forward_expiry_months',label:'Carry-forward expiry (months)',min:0,max:24,step:1},{key:'min_service_months_for_accrual',label:'Minimum service (months)',min:0,max:120,step:1}] as const;
+ return <div className="p-3"><Card className="border-gray-100 shadow-sm"><CardHeader className="border-b"><div className="flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><CardTitle className="text-2xl font-semibold text-gray-900">Accrual Rules Directory</CardTitle><p className="mt-1 text-sm text-gray-500">{total.toLocaleString()} rules • Real-time data</p></div><div className="flex items-center gap-2"><Button size="sm" variant="outline" disabled={query.isFetching} onClick={()=>void query.refetch()}><RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching?'animate-spin':''}`} />Refresh</Button><Button size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={()=>{setSelected(null);setMode('create');setForm(emptyForm());setOpen(true);}}><Plus className="mr-2 h-4 w-4" />Create rule</Button></div></div></CardHeader><CardContent className="space-y-4 p-6">
+ <div className="flex flex-wrap items-center gap-3">
+   <div className="relative min-w-[240px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Search accrual rules" placeholder="Search rules, leave types or codes…" value={search} onChange={e=>setSearch(e.target.value)} className="pl-10" /></div>
+   <div className="flex items-center gap-2 text-sm text-gray-600"><span>Show</span><SearchableSelect aria-label="Rules per page" allowAll={false} widthClass="w-28" value={String(filters.per_page||10)} options={[10,25,50,100].map(n=>({value:String(n),label:String(n)}))} onChange={v=>changeFilter('per_page',Number(v))} /><span>entries</span></div>
+   <div className="basis-full" />
+   <SearchableSelect aria-label="Filter by leave type" allLabel="All leave types" value={filters.leave_type_uuid||''} options={typeOptions} widthClass="w-full sm:w-56" isLoading={types.isLoading} onChange={v=>changeFilter('leave_type_uuid',v||undefined)} />
+   <SearchableSelect aria-label="Filter by frequency" allLabel="All frequencies" value={filters.accrual_frequency||''} options={frequencies} widthClass="w-full sm:w-56" onChange={v=>changeFilter('accrual_frequency',(v||undefined) as AccrualFrequency|undefined)} />
+   <SearchableSelect aria-label="Filter by status" allLabel="All statuses" value={filters.is_active===undefined?'':String(filters.is_active)} options={[{value:'1',label:'Active'},{value:'0',label:'Inactive'}]} widthClass="w-full sm:w-56" onChange={v=>changeFilter('is_active',v===''?undefined:Number(v) as 0|1)} />
+   <Button variant="outline" size="sm" aria-expanded={advanced} aria-controls="accrual-advanced-filters" onClick={()=>setAdvanced(p=>!p)}><SlidersHorizontal className="mr-2 h-4 w-4" />{advanced?'Fewer filters':'More filters'}</Button>
+   {filtered&&<Button size="sm" variant="ghost" onClick={()=>{setSearch('');setDebouncedSearch('');setFilters({...defaults,per_page:filters.per_page});}}>Clear filters</Button>}
+ </div>
+ {advanced&&<div id="accrual-advanced-filters" className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-100 bg-gray-50/60 p-4">
+   <div className="w-full space-y-1.5 sm:w-48"><Label htmlFor="rule-filter-from" className="text-xs text-gray-500">Effective from</Label><Input id="rule-filter-from" type="date" value={filters.effective_from||''} onChange={e=>changeFilter('effective_from',e.target.value||undefined)} /></div>
+   <div className="w-full space-y-1.5 sm:w-48"><Label htmlFor="rule-filter-to" className="text-xs text-gray-500">Effective to</Label><Input id="rule-filter-to" type="date" value={filters.effective_to||''} onChange={e=>changeFilter('effective_to',e.target.value||undefined)} /></div>
+   <SearchableSelect aria-label="Sort accrual rules" allowAll={false} value={filters.sort_by||'created_at'} widthClass="w-full sm:w-48" options={[{value:'created_at',label:'Created date'},{value:'name',label:'Rule name'},{value:'effective_from',label:'Effective date'},{value:'days_per_accrual',label:'Days per accrual'},{value:'accrual_frequency',label:'Frequency'}]} onChange={v=>changeFilter('sort_by',v as AccrualRuleFilters['sort_by'])} />
+   <SearchableSelect aria-label="Sort direction" allowAll={false} value={filters.sort_dir||'desc'} widthClass="w-full sm:w-48" options={[{value:'asc',label:'Ascending'},{value:'desc',label:'Descending'}]} onChange={v=>changeFilter('sort_dir',v as 'asc'|'desc')} />
+ </div>}
+ {types.error&&<ApiErrorState error={types.error} onRetry={()=>void types.refetch()} />}
+ <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-gray-600"><span>Showing <strong className="text-gray-900">{from}</strong> to <strong className="text-gray-900">{to}</strong> of <strong className="text-gray-900">{total.toLocaleString()}</strong> entries</span>{query.isFetching&&<AppLoader variant="inline" label="Loading…" />}</div>
+ <div className="overflow-hidden rounded-lg border border-gray-200" aria-busy={query.isFetching}><div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-left"><caption className="sr-only">Leave accrual rules</caption><thead className="border-b border-gray-200 bg-gray-50"><tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-700">{['SR. NO.','Rule','Leave type','Frequency','Days / accrual','Effective dates','Status','Actions'].map(t=><th key={t} scope="col" className={`px-6 py-3 ${t==='Actions'?'text-right':''}`}>{t}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 bg-white">{query.isPending?<tr><td colSpan={8}><AppLoader label="Loading accrual rules…" /></td></tr>:query.isError?<tr><td colSpan={8} className="p-6"><ApiErrorState error={query.error} onRetry={()=>void query.refetch()} /></td></tr>:!rules.length?<tr><td colSpan={8} className="p-12 text-center text-sm text-gray-500">No accrual rules found.</td></tr>:rules.map((rule,i)=><tr key={rule.uuid} className="text-sm hover:bg-gray-50"><td className="px-6 py-4 text-gray-500">{from+i}</td><td className="px-6 py-4 font-medium text-gray-900">{rule.name}</td><td className="px-6 py-4"><p>{rule.leave_type_name}</p><p className="mt-1 text-xs text-gray-400">{rule.leave_type_code}</p></td><td className="px-6 py-4"><Badge variant="outline">{frequencies.find(f=>f.value===rule.accrual_frequency)?.label||rule.accrual_frequency}</Badge></td><td className="px-6 py-4">{rule.days_per_accrual}</td><td className="whitespace-nowrap px-6 py-4 text-xs text-gray-600"><p>{rule.effective_from?.slice(0,10)||'—'}</p><p className="mt-1 text-gray-400">to {rule.effective_to?.slice(0,10)||'No end date'}</p></td><td className="px-6 py-4"><Badge variant="outline" className={rule.is_active?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-gray-200 bg-gray-100 text-gray-500'}>{rule.is_active?'Active':'Inactive'}</Badge></td><td className="px-6 py-4 text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${rule.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={()=>view(rule,'view')}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem onClick={()=>view(rule,'edit')}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem className="text-red-600" onClick={()=>setDeleteRule(rule)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></td></tr>)}</tbody></table></div>
+ </div>
+ <footer className="flex flex-col items-center justify-between gap-4 rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4 text-sm text-gray-600 md:flex-row">
+   <span>Page <strong className="text-gray-900">{page}</strong> of <strong className="text-gray-900">{pages}</strong></span>
+   <nav aria-label="Accrual rule pagination" className="flex flex-wrap items-center justify-center gap-2">
+     {[{label:'First page',target:1,icon:ChevronsLeft},{label:'Previous page',target:page-1,icon:ChevronLeft}].map(item=><Button key={item.label} variant="outline" size="sm" aria-label={item.label} disabled={!meta||query.isFetching||page<=1} onClick={()=>setFilters(p=>({...p,page:item.target}))}><item.icon className="h-4 w-4" /></Button>)}
+     {numbers.map(n=><Button key={n} size="sm" variant={n===page?'default':'outline'} className={n===page?'border-[#1E1B4B] bg-[#1E1B4B] text-white hover:bg-[#2A2675] hover:text-white':''} aria-current={n===page?'page':undefined} disabled={!meta||query.isFetching} onClick={()=>setFilters(p=>({...p,page:n}))}>{n}</Button>)}
+     {[{label:'Next page',target:page+1,icon:ChevronRight},{label:'Last page',target:pages,icon:ChevronsRight}].map(item=><Button key={item.label} variant="outline" size="sm" aria-label={item.label} disabled={!meta||query.isFetching||page>=pages} onClick={()=>setFilters(p=>({...p,page:item.target}))}><item.icon className="h-4 w-4" /></Button>)}
+   </nav>
+   <span>{from} – {to} of {total.toLocaleString()} entries</span>
+ </footer>
+ </CardContent></Card>
+ <Dialog open={open} onOpenChange={value=>{if(!saving)setOpen(value);}}><DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[740px]"><DialogHeader className="shrink-0 border-b bg-gray-50/70 px-6 py-4"><DialogTitle>{mode==='create'?'Create accrual rule':mode==='edit'?'Edit accrual rule':'Accrual rule details'}</DialogTitle><DialogDescription>Configure the earning schedule, carry forward and eligibility.</DialogDescription></DialogHeader><form className="flex min-h-0 flex-col" onSubmit={e=>{e.preventDefault();save();}}><fieldset disabled={mode==='view'||saving} className="min-h-0 space-y-5 overflow-y-auto p-6"><section className="space-y-4"><h3 className="text-sm font-semibold text-[#1E1B4B]">Rule & schedule</h3><div className="space-y-1.5"><Label htmlFor="rule-name">Rule name *</Label><Input id="rule-name" required maxLength={255} placeholder="e.g. Monthly annual leave credit" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="rule-type">Leave type *</Label><SearchableSelect id="rule-type" allowAll={false} widthClass="w-full" value={form.leave_type_uuid} options={typeOptions} isLoading={types.isLoading} disabled={mode==='view'||saving||types.isLoading} onChange={v=>setForm(p=>({...p,leave_type_uuid:v}))} /></div><div className="space-y-1.5"><Label htmlFor="rule-frequency">Frequency *</Label><SearchableSelect id="rule-frequency" allowAll={false} widthClass="w-full" value={form.accrual_frequency} options={frequencies} disabled={mode==='view'||saving} onChange={v=>setForm(p=>({...p,accrual_frequency:v as AccrualFrequency}))} /></div></div></section>
+ <section className="space-y-4 border-t border-gray-100 pt-5"><h3 className="text-sm font-semibold text-[#1E1B4B]">Accrual & carry forward</h3><div className="grid gap-4 sm:grid-cols-2">{numericFields.map(field=><div key={field.key} className="space-y-1.5"><Label htmlFor={`rule-${field.key}`}>{field.label}</Label><Input id={`rule-${field.key}`} type="number" min={field.min} max={field.max} step={field.step} required={field.key==='days_per_accrual'} value={form[field.key]} onChange={e=>setForm(p=>({...p,[field.key]:field.key==='days_per_accrual'?(e.target.value===''?'':Number(e.target.value)):field.key==='min_service_months_for_accrual'?Number(e.target.value):e.target.value}))} /></div>)}</div></section>
+ <section className="space-y-4 border-t border-gray-100 pt-5"><h3 className="text-sm font-semibold text-[#1E1B4B]">Effective dates & eligibility</h3><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-1.5"><Label htmlFor="rule-from">Effective from *</Label><Input id="rule-from" required type="date" value={form.effective_from} onChange={e=>setForm(p=>({...p,effective_from:e.target.value}))} /></div><div className="space-y-1.5"><Label htmlFor="rule-to">Effective to</Label><Input id="rule-to" type="date" min={form.effective_from||undefined} value={form.effective_to||''} onChange={e=>setForm(p=>({...p,effective_to:e.target.value||null}))} /></div>{([{key:'is_prorated_for_new_joiners',label:'Prorate for new joiners',hint:'Enable prorated credits for new employees.'},{key:'is_active',label:'Active rule',hint:'Keep this rule enabled for accrual processing.'}] as const).map(item=><label key={item.key} htmlFor={`rule-${item.key}`} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5"><span><span className="block text-sm font-medium text-gray-800">{item.label}</span><span className="text-xs text-gray-500">{item.hint}</span></span><Checkbox id={`rule-${item.key}`} checked={form[item.key]} onCheckedChange={v=>setForm(p=>({...p,[item.key]:v===true}))} /></label>)}</div></section></fieldset><DialogFooter className="shrink-0 border-t bg-gray-50/70 px-6 py-4"><Button type="button" variant="outline" disabled={saving} onClick={()=>setOpen(false)}>{mode==='view'?'Close':'Cancel'}</Button>{mode!=='view'&&<Button type="submit" className="bg-[#1E1B4B] hover:bg-[#2A2675]" disabled={saving}>{saving?<AppLoader variant="inline" label="Saving…" className="text-white" />:mode==='create'?'Create rule':'Save changes'}</Button>}</DialogFooter></form></DialogContent></Dialog>
+ <AlertDialog open={!!deleteRule} onOpenChange={value=>{if(!value&&!remove.isPending)setDeleteRule(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete accrual rule?</AlertDialogTitle><AlertDialogDescription>Delete “{deleteRule?.name}”? This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700" disabled={remove.isPending} onClick={e=>{e.preventDefault();if(deleteRule)remove.mutate(deleteRule.uuid,{onSuccess:()=>{setDeleteRule(null);if(rules.length===1&&page>1)setFilters(p=>({...p,page:page-1}));}});}}>{remove.isPending?'Deleting…':'Delete rule'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+ </div>;
 }

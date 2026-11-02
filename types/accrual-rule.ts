@@ -16,8 +16,8 @@ export interface AccrualRule {
   is_active: boolean;
   effective_from: string;       // YYYY-MM-DD (possibly with time, we'll strip)
   effective_to: string | null;
-  created_by: string;
-  updated_by: string;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,7 +26,7 @@ export interface AccrualRuleFormData {
   leave_type_uuid: string;
   name: string;
   accrual_frequency: AccrualFrequency | '';
-  days_per_accrual: number;
+  days_per_accrual: number | '';
   max_carry_forward: string;           // empty for null
   carry_forward_expiry_months: string; // empty for null
   is_prorated_for_new_joiners: boolean;
@@ -60,4 +60,15 @@ export interface PaginatedAccrualRulesResponse {
     per_page: number;
     total: number;
   };
+}
+export interface AccrualRuleFilters {
+  page?: number;
+  per_page?: number;
+  leave_type_uuid?: string;
+  accrual_frequency?: AccrualFrequency;
+  is_active?: 0 | 1;
+  effective_from?: string;
+  effective_to?: string;
+  sort_by?: 'created_at' | 'name' | 'effective_from' | 'days_per_accrual' | 'accrual_frequency';
+  sort_dir?: 'asc' | 'desc';
 }

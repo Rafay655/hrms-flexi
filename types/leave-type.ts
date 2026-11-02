@@ -9,15 +9,18 @@ export interface LeaveType {
   name: string;
   code: string;
   is_paid: boolean;
+  /** Legacy response field; entitlement is configured on Leave Policy. */
   default_days_per_year: number | null;
   is_encashable: boolean;
   carry_forward_allowed: boolean;
+  /** Legacy response field; limits are configured on Leave Policy. */
   carry_forward_max_days: number | null;
   requires_attachment: boolean;
   min_days_notice: number;
   allow_half_day: boolean;
   is_gender_specific: boolean;
   gender_restriction: GenderRestriction | null;
+  /** Legacy response field; accrual is configured on Leave Policy. */
   accrual_type: AccrualType | null;
   is_system_default: boolean;
   is_active: boolean;
@@ -29,16 +32,13 @@ export interface LeaveTypeFormData {
   name: string;
   code: string;
   is_paid: boolean;
-  default_days_per_year: string;        // number or empty
   is_encashable: boolean;
   carry_forward_allowed: boolean;
-  carry_forward_max_days: string;       // number or empty
   requires_attachment: boolean;
   min_days_notice: number;
   allow_half_day: boolean;
   is_gender_specific: boolean;
   gender_restriction: GenderRestriction | '';
-  accrual_type: AccrualType | '';
   is_active: boolean;
 }
 
@@ -46,16 +46,13 @@ export interface LeaveTypeApiPayload {
   name: string;
   code: string;
   is_paid: boolean;
-  default_days_per_year: number | null;
   is_encashable: boolean;
   carry_forward_allowed: boolean;
-  carry_forward_max_days: number | null;
   requires_attachment: boolean;
   min_days_notice: number;
   allow_half_day: boolean;
   is_gender_specific: boolean;
   gender_restriction: GenderRestriction | null;
-  accrual_type: AccrualType | null;
   is_active: boolean;
 }
 
@@ -64,7 +61,7 @@ export interface PaginatedLeaveTypesResponse {
   message: string;
   data: {
     data: LeaveType[];
-    links: any;
+    links: { first: string | null; last: string | null; prev: string | null; next: string | null };
     meta: {
       current_page: number;
       from: number;

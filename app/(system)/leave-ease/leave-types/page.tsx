@@ -7,13 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import {
   Dialog,
   DialogContent,
@@ -33,7 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  DownloadIcon,
+  MoreVertical, RefreshCw,
   SearchIcon,
   ChevronLeft,
   ChevronRight,
@@ -55,7 +49,10 @@ import {
 } from "@tanstack/react-table";
 import toast from "react-hot-toast";
 
-import { useGenders } from "@/hooks/useGenders";
+import { AppLoader } from "@/components/ui/app-loader";
+import { ApiErrorState } from "@/components/ui/api-error-state";
+import { leaveTypeService } from "@/services/leave-type.service";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   useLeaveTypes,
   useCreateLeaveType,
@@ -64,16 +61,9 @@ import {
 } from "@/hooks/useLeaveTypes";
 import SearchableSelect from "@/components/ui/searchable-select";
 import type { Option } from "@/components/ui/searchable-select";
-import type { LeaveType, LeaveTypeFormData, GenderRestriction, AccrualType } from "@/types/leave-type";
+import type { LeaveType, LeaveTypeFormData, GenderRestriction } from "@/types/leave-type";
 
-const DEFAULT_PER_PAGE = 15;
-
-const ACCRUAL_TYPES: { value: AccrualType; label: string }[] = [
-  { value: "monthly", label: "Monthly" },
-  { value: "quarterly", label: "Quarterly" },
-  { value: "annual", label: "Annual" },
-  { value: "none", label: "None" },
-];
+const DEFAULT_PER_PAGE = 10;
 
 function useDebounced<T>(value: T, delay = 400) {
   const [debounced, setDebounced] = useState(value);
@@ -94,30 +84,20 @@ export default function LeaveTypesPage() {
 
   const isActiveParam = activeFilter === "all" ? undefined : activeFilter === "active" ? 1 : 0;
 
-  // Fetch genders for dynamic gender restriction dropdown
-  const { data: gendersData, isLoading: isLoadingGenders } = useGenders({ per_page: 1000 });
-  const genders = useMemo(() => {
-    if (!gendersData) return [];
-    return gendersData?.data ?? [];
-  }, [gendersData]);
-
-  const genderOptions: Option[] = useMemo(() => {
-    return genders
-      .filter((g: any) => ['male', 'female'].includes(g.name.toLowerCase()))
-      .map((g: any) => ({ value: g.name.toLowerCase(), label: g.name }));
-  }, [genders]);
-
+  const genderOptions: Option[] = [{value:"male",label:"Male"},{value:"female",label:"Female"}];
+  const [detailBusy, setDetailBusy] = useState(false);
   // Leave types data
-  const { data, isLoading, isFetching, error } = useLeaveTypes({
+  const { data, isLoading, isFetching, error, refetch } = useLeaveTypes({
     page,
     per_page: perPage,
     search: debouncedSearch || undefined,
     is_active: isActiveParam,
   });
 
-  const leaveTypes = data?.data?.data ?? [];
+  const leaveTypes = useMemo(() => data?.data?.data ?? [], [data]);
   const totalEntries = data?.data?.meta?.total ?? 0;
-  const totalPages = data?.data?.meta?.last_page ?? 1;
+  const totalPages = Math.max(1, data?.data?.meta?.last_page ?? 1);
+  if (data && !isFetching && page > totalPages) setPage(totalPages);
 
   const createMutation = useCreateLeaveType();
   const updateMutation = useUpdateLeaveType();
@@ -130,89 +110,56 @@ export default function LeaveTypesPage() {
     name: "",
     code: "",
     is_paid: false,
-    default_days_per_year: "",
     is_encashable: false,
     carry_forward_allowed: false,
-    carry_forward_max_days: "",
     requires_attachment: false,
     min_days_notice: 0,
     allow_half_day: false,
     is_gender_specific: false,
     gender_restriction: "",
-    accrual_type: "",
     is_active: true,
   });
 
   const [deleteUuid, setDeleteUuid] = useState<string | null>(null);
 
-  useEffect(() => {
-    setPage(1);
-  }, [perPage, debouncedSearch, activeFilter]);
-
-  useEffect(() => {
-    if (error) showApiError(error, { fallbackMessage: "Failed to load leave types" });
-  }, [error]);
-
-  const handleView = (item: LeaveType) => {
+  const handleView = async (row: LeaveType, mode: "view" | "edit" = "view") => {
+    if (detailBusy) return;
+    setDetailBusy(true);
+    try {
+    const item = await leaveTypeService.getById(row.uuid || row.id);
     setSelectedItem(item);
     setFormData({
       name: item.name,
       code: item.code,
       is_paid: item.is_paid,
-      default_days_per_year: item.default_days_per_year?.toString() ?? "",
       is_encashable: item.is_encashable,
       carry_forward_allowed: item.carry_forward_allowed,
-      carry_forward_max_days: item.carry_forward_max_days?.toString() ?? "",
       requires_attachment: item.requires_attachment,
       min_days_notice: item.min_days_notice,
       allow_half_day: item.allow_half_day,
       is_gender_specific: item.is_gender_specific,
       gender_restriction: item.gender_restriction ?? "",
-      accrual_type: item.accrual_type ?? "",
       is_active: item.is_active,
     });
-    setModalMode("view");
+    setModalMode(mode);
     setIsModalOpen(true);
+    } catch (error) { showApiError(error); } finally { setDetailBusy(false); }
   };
 
-  const handleEdit = (item: LeaveType) => {
-    setSelectedItem(item);
-    setFormData({
-      name: item.name,
-      code: item.code,
-      is_paid: item.is_paid,
-      default_days_per_year: item.default_days_per_year?.toString() ?? "",
-      is_encashable: item.is_encashable,
-      carry_forward_allowed: item.carry_forward_allowed,
-      carry_forward_max_days: item.carry_forward_max_days?.toString() ?? "",
-      requires_attachment: item.requires_attachment,
-      min_days_notice: item.min_days_notice,
-      allow_half_day: item.allow_half_day,
-      is_gender_specific: item.is_gender_specific,
-      gender_restriction: item.gender_restriction ?? "",
-      accrual_type: item.accrual_type ?? "",
-      is_active: item.is_active,
-    });
-    setModalMode("edit");
-    setIsModalOpen(true);
-  };
-
+  const handleEdit = (item: LeaveType) => void handleView(item, "edit");
   const handleCreate = () => {
     setSelectedItem(null);
     setFormData({
       name: "",
       code: "",
       is_paid: false,
-      default_days_per_year: "",
       is_encashable: false,
       carry_forward_allowed: false,
-      carry_forward_max_days: "",
       requires_attachment: false,
       min_days_notice: 0,
       allow_half_day: false,
       is_gender_specific: false,
       gender_restriction: "",
-      accrual_type: "",
       is_active: true,
     });
     setModalMode("create");
@@ -222,11 +169,12 @@ export default function LeaveTypesPage() {
   const handleDelete = (uuid: string) => setDeleteUuid(uuid);
   const confirmDelete = () => {
     if (deleteUuid) {
-      deleteMutation.mutate(deleteUuid, { onSuccess: () => setDeleteUuid(null) });
+      deleteMutation.mutate(deleteUuid, { onSuccess: () => { setDeleteUuid(null); if (leaveTypes.length === 1 && page > 1) setPage(page - 1); } });
     }
   };
 
   const handleSave = () => {
+    if (createMutation.isPending || updateMutation.isPending) return;
     const trimmedName = formData.name.trim();
     const trimmedCode = formData.code.trim();
     if (!trimmedName) { toast.error("Name required"); return; }
@@ -238,26 +186,22 @@ export default function LeaveTypesPage() {
       return;
     }
 
+    if (!Number.isInteger(formData.min_days_notice) || formData.min_days_notice < 0 || formData.min_days_notice > 255) { toast.error("Minimum notice must be a whole number between 0 and 255"); return; }
     const payload = { ...formData, name: trimmedName, code: trimmedCode };
     if (modalMode === "create") {
       createMutation.mutate(payload, { onSuccess: () => setIsModalOpen(false) });
     } else if (selectedItem) {
       updateMutation.mutate(
-        { uuid: selectedItem.uuid, data: payload },
+        { uuid: selectedItem.uuid || selectedItem.id, data: payload },
         { onSuccess: () => setIsModalOpen(false) }
       );
     }
   };
 
-  const columns: ColumnDef<LeaveType & { sr: number }>[] = useMemo(() => [
+  const columns: ColumnDef<LeaveType & { sr: number }>[] = [
     { accessorKey: "sr", header: "#", cell: ({ row }) => <div className="font-medium">{row.original.sr}</div> },
     { accessorKey: "code", header: "Code", cell: ({ row }) => <div className="font-mono font-semibold">{row.original.code}</div> },
     { accessorKey: "name", header: "Name", cell: ({ row }) => <div className="font-semibold">{row.original.name}</div> },
-    {
-      id: "days",
-      header: "Days/Year",
-      cell: ({ row }) => <span>{row.original.default_days_per_year ?? "—"}</span>,
-    },
     {
       id: "flags",
       header: "Flags",
@@ -272,11 +216,6 @@ export default function LeaveTypesPage() {
       ),
     },
     {
-      accessorKey: "accrual_type",
-      header: "Accrual",
-      cell: ({ row }) => <Badge variant="outline">{row.original.accrual_type ?? "—"}</Badge>,
-    },
-    {
       accessorKey: "is_active",
       header: "Status",
       cell: ({ row }) => (
@@ -287,16 +226,16 @@ export default function LeaveTypesPage() {
     },
     {
       id: "actions",
-      header: () => <div className="text-center">Actions</div>,
+      header: () => <div className="text-right">Actions</div>,
       cell: ({ row }) => (
-        <div className="flex justify-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => handleView(row.original)}><Eye className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="sm" onClick={() => handleDelete(row.original.uuid)}><Trash2 className="h-4 w-4" /></Button>
-        </div>
+        <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${row.original.name}`} disabled={detailBusy}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => void handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+          <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(row.original.uuid || row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+        </DropdownMenuContent></DropdownMenu></div>
       ),
     },
-  ], []);
+  ];
 
   const rows = useMemo(() => {
     const startSr = (page - 1) * perPage;
@@ -322,52 +261,34 @@ export default function LeaveTypesPage() {
         <CardHeader className="border-b">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-900">Leave Types</CardTitle>
+              <CardTitle className="text-2xl font-semibold text-gray-900">Leave Types</CardTitle>
               <p className="text-sm text-gray-500 mt-1">{totalEntries.toLocaleString()} leave types</p>
             </div>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              <PlusIcon className="mr-2 h-4 w-4" /> Add Leave Type
-            </Button>
+            <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button><Button size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={handleCreate}><PlusIcon className="mr-2 h-4 w-4" />Create leave type</Button></div>
           </div>
         </CardHeader>
-        <CardContent className="p-6">
-          {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search by name or code..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
-            </div>
-            <div className="w-full md:w-48">
-              <Select value={activeFilter} onValueChange={setActiveFilter}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="All Status" /></SelectTrigger>
-                <SelectContent className="bg-white"><SelectItem value="all">All</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Show</span>
-              <Select value={perPage.toString()} onValueChange={v => setPerPage(Number(v))}>
-                <SelectTrigger className="w-20"><SelectValue placeholder="15" /></SelectTrigger>
-                <SelectContent className="bg-white">{[10,15,25,50,100].map(s => <SelectItem key={s} value={String(s)}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-              <span className="text-sm text-gray-600">entries</span>
-            </div>
+        <CardContent className="space-y-4 p-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative min-w-[240px] flex-1"><SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input aria-label="Search leave types" placeholder="Search by name or code…" value={search} onChange={e => {setSearch(e.target.value);setPage(1);}} className="pl-10" /></div>
+            <div className="flex items-center gap-2 text-sm text-gray-600"><span>Show</span><SearchableSelect aria-label="Leave types per page" allowAll={false} widthClass="w-28" value={String(perPage)} onChange={v => {setPerPage(Number(v));setPage(1);}} options={[10,25,50,100].map(n=>({value:String(n),label:String(n)}))} /><span>entries</span></div><div className="basis-full" />
+            <SearchableSelect aria-label="Filter by status" allLabel="All statuses" value={activeFilter === "all" ? "" : activeFilter} onChange={v=>{setActiveFilter(v || "all");setPage(1);}} options={[{value:"active",label:"Active"},{value:"inactive",label:"Inactive"}]} widthClass="w-full sm:w-56" />
+            {(search || activeFilter !== "all") && <Button variant="ghost" size="sm" onClick={()=>{setSearch("");setActiveFilter("all");setPage(1);}}>Clear filters</Button>}
           </div>
-
           {/* Stats Bar */}
-          <div className="bg-blue-50 p-4 rounded-lg mb-4 flex justify-between items-center">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 flex justify-between items-center text-sm text-gray-600">
             <span className="text-sm">Showing {showingFrom} to {showingTo} of {totalEntries} entries</span>
-            {(isLoading || isFetching) && <Loader2 className="animate-spin h-5 w-5" />}
+            {(isLoading || isFetching) && <AppLoader variant="inline" label="Loading…" />}
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto border rounded-lg">
-            <table className="w-full">
-              <thead className="bg-gray-50">
+          <div className="overflow-hidden border border-gray-200 rounded-lg">
+            <div className="overflow-x-auto"><table className="w-full min-w-[1000px]">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 {table.getHeaderGroups().map(hg => (
                   <tr key={hg.id}>
                     {hg.headers.map(h => (
-                      <th key={h.id} className="py-3 px-4 text-left text-xs font-semibold uppercase cursor-pointer" onClick={h.column.getToggleSortingHandler()}>
-                        <div className="flex items-center gap-1">
+                      <th key={h.id} className="py-3 px-6 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 cursor-pointer" onClick={h.column.getToggleSortingHandler()}>
+                        <div className={`flex items-center gap-1 ${h.id === "actions" ? "justify-end" : ""}`}>
                           {flexRender(h.column.columnDef.header, h.getContext())}
                           {h.column.getIsSorted() === 'asc' ? <ChevronRight className="h-4 w-4" /> : h.column.getIsSorted() === 'desc' ? <ChevronLeft className="h-4 w-4" /> : null}
                         </div>
@@ -376,148 +297,87 @@ export default function LeaveTypesPage() {
                   </tr>
                 ))}
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-gray-100 bg-white">
                 {isLoading ? (
-                  <tr><td colSpan={columns.length} className="py-12 text-center"><Loader2 className="animate-spin mx-auto" /></td></tr>
-                ) : rows.length === 0 ? (
+                  <tr><td colSpan={columns.length} className="py-12 text-center"><AppLoader label="Loading leave types…" /></td></tr>
+                ) : error ? (<tr><td colSpan={columns.length} className="p-6"><ApiErrorState error={error} onRetry={() => void refetch()} /></td></tr>) : rows.length === 0 ? (
                   <tr><td colSpan={columns.length} className="py-12 text-center">No leave types found</td></tr>
                 ) : (
                   table.getRowModel().rows.map(row => (
                     <tr key={row.id} className="hover:bg-gray-50">
                       {row.getVisibleCells().map(cell => (
-                        <td key={cell.id} className="py-4 px-4 text-sm">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                        <td key={cell.id} className="py-4 px-6 text-sm">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                       ))}
                     </tr>
                   ))
                 )}
               </tbody>
-            </table>
-          </div>
+            </table></div>
 
           {/* Pagination */}
           {!isLoading && rows.length > 0 && (
-            <div className="flex justify-between items-center mt-4">
+            <div className="flex flex-wrap gap-3 justify-between items-center border-t border-gray-200 bg-gray-50 px-6 py-4">
               <span>Page {page} of {totalPages}</span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1}><ChevronsLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(1)} disabled={page === 1 || isFetching}><ChevronsLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || isFetching}><ChevronLeft className="h-4 w-4" /></Button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let num;
                   if (totalPages <= 5) num = i + 1;
                   else if (page <= 3) num = i + 1;
                   else if (page >= totalPages - 2) num = totalPages - 4 + i;
                   else num = page - 2 + i;
-                  return <Button key={num} variant={page === num ? "default" : "outline"} size="sm" onClick={() => setPage(num)}>{num}</Button>;
+                  return <Button key={num} variant={page === num ? "default" : "outline"} size="sm" className={page === num ? "bg-[#1E1B4B] hover:bg-[#2A2675]" : ""} disabled={isFetching} onClick={() => setPage(num)}>{num}</Button>;
                 })}
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}><ChevronRight className="h-4 w-4" /></Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(totalPages)} disabled={page === totalPages}><ChevronsRight className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || isFetching}><ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(totalPages)} disabled={page === totalPages || isFetching}><ChevronsRight className="h-4 w-4" /></Button>
               </div>
             </div>
           )}
+          </div>
         </CardContent>
       </Card>
 
       {/* Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+      <Dialog open={isModalOpen} onOpenChange={open => {if (!createMutation.isPending && !updateMutation.isPending) setIsModalOpen(open);}}>
+        <DialogContent className="sm:max-w-[740px] max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+          <DialogHeader className="shrink-0 border-b bg-gray-50/70 px-6 py-4">
             <DialogTitle>{modalMode === "create" ? "Add Leave Type" : modalMode === "edit" ? "Edit Leave Type" : "View Leave Type"}</DialogTitle>
-            <DialogDescription>{modalMode === "view" ? "Read-only view." : "Fill in the details."}</DialogDescription>
+            <DialogDescription>{modalMode === "view" ? "Review identity, capabilities and request rules." : "Define the leave identity and the capabilities available to its policies."}</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Name *</label>
-              <Input value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} disabled={modalMode === "view"} maxLength={100} />
-            </div>
-            {/* Code */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Code *</label>
-              <Input value={formData.code} onChange={e => setFormData(p => ({...p, code: e.target.value}))} disabled={modalMode === "view"} maxLength={20} />
-            </div>
-            {/* Accrual Type */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Accrual Type</label>
-              <Select value={formData.accrual_type} onValueChange={v => setFormData(p => ({...p, accrual_type: v as AccrualType | ''}))} disabled={modalMode === "view"}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>{ACCRUAL_TYPES.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            {/* Default Days Per Year */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Days Per Year</label>
-              <Input type="number" step="0.1" value={formData.default_days_per_year} onChange={e => setFormData(p => ({...p, default_days_per_year: e.target.value}))} disabled={modalMode === "view"} />
-            </div>
-            {/* Is Paid */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.is_paid} onCheckedChange={c => setFormData(p => ({...p, is_paid: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Paid</label>
-            </div>
-            {/* Is Encashable */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.is_encashable} onCheckedChange={c => setFormData(p => ({...p, is_encashable: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Encashable</label>
-            </div>
-            {/* Carry Forward */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.carry_forward_allowed} onCheckedChange={c => setFormData(p => ({...p, carry_forward_allowed: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Carry Forward</label>
-            </div>
-            {/* Carry Forward Max Days */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Carry Fwd Max Days</label>
-              <Input type="number" step="0.1" value={formData.carry_forward_max_days} onChange={e => setFormData(p => ({...p, carry_forward_max_days: e.target.value}))} disabled={modalMode === "view"} />
-            </div>
-            {/* Requires Attachment */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.requires_attachment} onCheckedChange={c => setFormData(p => ({...p, requires_attachment: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Requires Attachment</label>
-            </div>
-            {/* Allow Half Day */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.allow_half_day} onCheckedChange={c => setFormData(p => ({...p, allow_half_day: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Allow Half Day</label>
-            </div>
-            {/* Min Days Notice */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Min Days Notice</label>
-              <Input type="number" value={formData.min_days_notice} onChange={e => setFormData(p => ({...p, min_days_notice: Number(e.target.value) || 0}))} disabled={modalMode === "view"} />
-            </div>
-            {/* Is Gender Specific */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.is_gender_specific} onCheckedChange={c => setFormData(p => ({...p, is_gender_specific: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Gender Specific</label>
-            </div>
-            {/* Gender Restriction (dynamic from useGenders) */}
-            {formData.is_gender_specific && (
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Gender Restriction *</label>
-                <SearchableSelect
-                  options={genderOptions}
-                  value={formData.gender_restriction || ""}
-                  onChange={(v) => setFormData(p => ({ ...p, gender_restriction: v as GenderRestriction | '' }))}
-                  placeholder="Select gender restriction"
-                  groupLabel="Genders"
-                  allowAll={false}
-                  widthClass="w-full"
-                  disabled={modalMode === "view" || isLoadingGenders}
-                  multiple={false}
-                />
+          <fieldset disabled={modalMode === "view" || createMutation.isPending || updateMutation.isPending} className="min-h-0 overflow-y-auto p-6 space-y-5">
+            <section className="space-y-4" aria-labelledby="leave-basics">
+              <div className="flex items-center gap-3"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1E1B4B]/5 text-xs font-semibold text-[#1E1B4B]">01</span><h3 id="leave-basics" className="text-sm font-semibold text-gray-900">Basic details</h3></div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5"><label htmlFor="leave-type-name" className="text-sm font-medium text-gray-700">Leave name <span className="text-red-500">*</span></label><Input id="leave-type-name" required maxLength={100} placeholder="e.g. Annual leave" value={formData.name} onChange={e=>setFormData(p=>({...p,name:e.target.value}))} /></div>
+                <div className="space-y-1.5"><label htmlFor="leave-type-code" className="text-sm font-medium text-gray-700">Code <span className="text-red-500">*</span></label><Input id="leave-type-code" required maxLength={20} placeholder="e.g. AL" value={formData.code} onChange={e=>setFormData(p=>({...p,code:e.target.value}))} /></div>
               </div>
-            )}
-            {/* Active */}
-            <div className="flex items-center gap-2 pt-4">
-              <Checkbox checked={formData.is_active} onCheckedChange={c => setFormData(p => ({...p, is_active: !!c}))} disabled={modalMode === "view"} />
-              <label className="text-sm">Active</label>
-            </div>
-          </div>
-          <DialogFooter>
+              <label htmlFor="leave-type-active" className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-gray-200 px-3 py-2.5"><span><span className="block text-sm font-medium text-gray-800">Active leave type</span><span className="block text-xs text-gray-500">Available for use in leave policies.</span></span><Checkbox id="leave-type-active" checked={formData.is_active} onCheckedChange={v=>setFormData(p=>({...p,is_active:v === true}))} /></label>
+            </section>
+            <section className="space-y-4 border-t border-gray-100 pt-5" aria-labelledby="leave-entitlement">
+              <div className="flex items-center gap-3"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1E1B4B]/5 text-xs font-semibold text-[#1E1B4B]">02</span><h3 id="leave-entitlement" className="text-sm font-semibold text-gray-900">Leave capabilities</h3></div>
+              <p className="text-xs text-gray-500">Configure entitlement, numeric limits and accrual in Leave Policies.</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {([{key:"is_paid",label:"Paid leave",hint:"Leave days are paid."},{key:"is_encashable",label:"Encashment",hint:"Allow unused leave to be encashed."},{key:"allow_half_day",label:"Half-day leave",hint:"Allow requests for half a day."},{key:"carry_forward_allowed",label:"Carry forward",hint:"Allow unused days to carry forward."}] as const).map(item=><label key={item.key} htmlFor={`leave-${item.key}`} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5"><span><span className="block text-sm font-medium text-gray-800">{item.label}</span><span className="block text-xs text-gray-500">{item.hint}</span></span><Checkbox id={`leave-${item.key}`} checked={formData[item.key]} onCheckedChange={v=>setFormData(p=>({...p,[item.key]:v === true}))} /></label>)}
+              </div>
+            </section>
+            <section className="space-y-4 border-t border-gray-100 pt-5" aria-labelledby="leave-eligibility">
+              <div className="flex items-center gap-3"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1E1B4B]/5 text-xs font-semibold text-[#1E1B4B]">03</span><h3 id="leave-eligibility" className="text-sm font-semibold text-gray-900">Request rules & eligibility</h3></div>
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5"><label htmlFor="leave-notice" className="text-sm font-medium text-gray-700">Minimum notice (days)</label><Input id="leave-notice" type="number" min={0} max={255} step={1} value={formData.min_days_notice} onChange={e=>setFormData(p=>({...p,min_days_notice:Number(e.target.value)}))} /><p className="text-xs text-gray-500">Set to 0 for no advance notice.</p></div>
+                <label htmlFor="leave-attachment" className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5"><span><span className="block text-sm font-medium text-gray-800">Attachment required</span><span className="block text-xs text-gray-500">Require a supporting document.</span></span><Checkbox id="leave-attachment" checked={formData.requires_attachment} onCheckedChange={v=>setFormData(p=>({...p,requires_attachment:v === true}))} /></label>
+              </div>
+              <label htmlFor="leave-gender-specific" className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5"><span><span className="block text-sm font-medium text-gray-800">Gender-specific eligibility</span><span className="block text-xs text-gray-500">Restrict this leave type to a selected gender.</span></span><Checkbox id="leave-gender-specific" checked={formData.is_gender_specific} onCheckedChange={v=>setFormData(p=>({...p,is_gender_specific:v === true}))} /></label>
+              {formData.is_gender_specific && <div className="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50/70 p-3"><label htmlFor="leave-gender" className="text-sm font-medium text-gray-700">Eligible gender <span className="text-red-500">*</span></label><SearchableSelect id="leave-gender" options={genderOptions} value={formData.gender_restriction || ""} onChange={v=>setFormData(p=>({...p,gender_restriction:v as GenderRestriction}))} placeholder="Select gender" allowAll={false} widthClass="w-full sm:w-[260px]" disabled={modalMode === "view" || createMutation.isPending || updateMutation.isPending} /></div>}
+            </section>
+          </fieldset>
+          <DialogFooter className="shrink-0 border-t bg-gray-50/70 px-6 py-4">
             {modalMode !== "view" ? (
               <>
-                <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
+                <Button variant="outline" disabled={createMutation.isPending || updateMutation.isPending} onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                <Button className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
                   {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save
+                  {modalMode === "create" ? "Create leave type" : "Save changes"}
                 </Button>
               </>
             ) : (
@@ -528,12 +388,12 @@ export default function LeaveTypesPage() {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteUuid} onOpenChange={() => setDeleteUuid(null)}>
+      <AlertDialog open={!!deleteUuid} onOpenChange={open => {if (!open && !deleteMutation.isPending) setDeleteUuid(null);}}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Delete Leave Type?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700" disabled={deleteMutation.isPending}>
+            <AlertDialogAction onClick={e => {e.preventDefault();confirmDelete();}} className="bg-red-600 hover:bg-red-700" disabled={deleteMutation.isPending}>
               {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
             </AlertDialogAction>

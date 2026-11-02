@@ -22,7 +22,7 @@ export interface TeamPunch {
 export interface TeamAttendance {
   employee: TeamPerson;
   attendance_date: string;
-  status: string;
+  status: string | null;
   first_in: string | null;
   last_out: string | null;
   work_minutes: number;
@@ -67,7 +67,7 @@ export interface TeamLocationsResponse extends TeamEnvelope<TeamLocation[]> {
 export interface TeamMemberDetail {
   employee: TeamPerson;
   attendance_date: string;
-  status: string;
+  status: string | null;
   first_in: string | null;
   last_out: string | null;
   work_minutes: number;
