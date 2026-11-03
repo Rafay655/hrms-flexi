@@ -8,7 +8,7 @@
  * ⚠️ These describe LeaveEase-owned endpoints that ESS CONSUMES — it does not re-export them.
  *   - GET /v1/leave-ease/balances/my   (no permission; any auth user, self-scoped)
  *   - GET /v1/leave-ease/requests       (leave-request.view OR .create; self-scoped in the VM)
- *   - GET /v1/leave-ease/comp-off/my    (leave-balance.view OR comp-off.approve; self-scoped)
+ *   - GET /v1/leave-ease/comp-off/my    (leave-balance.view OR comp_off.approve; self-scoped)
  *
  * The `requests` self-scoping is the fix from 2026-07-17 (LE-04) — see
  * ListLeaveRequestsViewModel. Do not add an employee_id param to the request-list call here.

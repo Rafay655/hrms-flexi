@@ -10,6 +10,7 @@ import { modules, getModuleIdForPath } from "@/lib/sidebarData";
 import { activeModuleLink } from "@/lib/module-navigation";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { toggleDropdown } from "@/store/sidebarSlice";
+import { useLeaveDelegation } from "@/hooks/useLeaveDelegation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 type RawSubMenu = {
@@ -128,7 +129,14 @@ export const Sidebar: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }
 
   const mounted = React.useSyncExternalStore(subscribeToHydration, clientHydrationSnapshot, serverHydrationSnapshot);
 
-  const { navItems, moduleName, moduleTagline } = buildNavItemsFromModule(activeModuleId);
+  const { navItems: baseNavItems, moduleName, moduleTagline } = buildNavItemsFromModule(activeModuleId);
+  const delegation = useLeaveDelegation(activeModuleId === 5 || activeModuleId === 7);
+  const temporaryLinks: NavItem[] = [];
+  if (delegation.data?.is_temporary_approver && !delegation.isError) {
+    if (delegation.data.can_approve_team_leave) temporaryLinks.push({id:'temporary-leave-approvals',label:'Temporary Leave Approvals',icon:'ClipboardCheck',path:'/leave-ease/my-requests?scope=team'});
+    if (delegation.data.can_approve_team_regularization) temporaryLinks.push({id:'temporary-regularization-approvals',label:'Temporary Regularization Approvals',icon:'FileClock',path:'/time-sync/my-regularizations?scope=team'});
+  }
+  const navItems = [...baseNavItems, ...temporaryLinks];
 
   // ✅ “ready” condition: tweak as you like
   const isReady = mounted && !!activeModuleId && navItems.length > 0;

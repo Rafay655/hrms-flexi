@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { 
@@ -43,17 +44,19 @@ function extractTime(value: string | null | undefined) {
   return value.slice(0, 5);
 }
 
-export default function MyRegularizationsPage() {
+export default function MyRegularizationsPage() {return <Suspense fallback={<AppLoader label="Loading regularizations…" />}><RegularizationsRoute /></Suspense>;}
+function RegularizationsRoute() {
+  const params=useSearchParams();const initialScope=params.get('scope')==='team'?'team':'my';
   const company = useAppSelector(state => state.auth.company);
   const user = useAppSelector(state => state.auth.user?.id);
-  return <Directory key={`${company?.id}-${user}`} company={company?.id} user={user} timeZone={company?.timezone || 'Asia/Karachi'} />;
+  return <Directory key={`${company?.id}-${user}-${initialScope}`} initialScope={initialScope} company={company?.id} user={user} timeZone={company?.timezone || 'Asia/Karachi'} />;
 }
 
-function Directory({ company, user, timeZone }: { company?: string; user?: string; timeZone: string }) {
+function Directory({ company, user, timeZone, initialScope }: { initialScope:'my'|'team'; company?: string; user?: string; timeZone: string }) {
   const client = useQueryClient();
   
   // Tab State
-  const [scope, setScope] = useState<'my' | 'team'>('my');
+  const [scope, setScope] = useState<'my' | 'team'>(initialScope);
   
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');

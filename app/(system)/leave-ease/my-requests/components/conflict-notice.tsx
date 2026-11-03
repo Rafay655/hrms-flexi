@@ -1,0 +1,6 @@
+'use client';
+import type { LeaveRequest } from '@/types/leave-request';
+export function LeaveConflictNotice({row}:{row:LeaveRequest}){
+ const conflict=row.department_conflict;if(!conflict?.checked||!conflict.has_conflict)return null;
+ return <section className={`rounded-lg border p-4 text-sm ${conflict.approval_blocked?'border-rose-200 bg-rose-50':'border-amber-200 bg-amber-50'}`}><h3 className="font-semibold">{conflict.approval_blocked?'Approval blocked':'Department overlap · advisory'}</h3><p className="mt-1 text-xs">{conflict.approval_blocked?'The server has marked this overlap as blocking approval.':'Other employees have overlapping leave. This notice does not block approval.'}{conflict.priority_rank!=null?` Priority rank: ${conflict.priority_rank}.`:''}{conflict.higher_priority_count!=null?` ${conflict.higher_priority_count} higher-priority requests.`:''}</p><ul className="mt-3 space-y-2">{conflict.conflicts.map(item=><li key={item.request_id} className="rounded bg-white/70 p-2 text-xs"><strong>{item.employee_name}</strong> · {item.overlap_from_date} – {item.overlap_to_date}<span className="ml-1 capitalize">· {item.status.replaceAll('_',' ')}</span>{item.has_priority_over_current&&<span className="ml-1 font-medium">· Higher priority</span>}</li>)}</ul></section>;
+}

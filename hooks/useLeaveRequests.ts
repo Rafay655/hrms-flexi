@@ -1,19 +1,22 @@
+import { useAppSelector } from "@/store/hooks";
 import { showApiError } from "@/lib/error-toast";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveRequestService } from '@/services/leave-request.service';
 import toast from 'react-hot-toast';
-import type { LeaveRequestFormData } from '@/types/leave-request';
+import type { LeaveRequestFormData, LeaveRequestFilters } from '@/types/leave-request';
 
 export const leaveRequestKeys = {
   all: ['leave-requests'] as const,
   lists: () => [...leaveRequestKeys.all, 'list'] as const,
-  list: (params: any) => [...leaveRequestKeys.lists(), params] as const,
+  list: (params: LeaveRequestFilters) => [...leaveRequestKeys.lists(), params] as const,
 };
 
-export function useLeaveRequests(params?: { page?: number; per_page?: number; search?: string; status?: string }) {
+export function useLeaveRequests(params?: LeaveRequestFilters) {
+  const company=useAppSelector(s=>s.auth.company?.id);
+  const user=useAppSelector(s=>s.auth.user?.id);
   return useQuery({
-    queryKey: leaveRequestKeys.list(params || {}),
-    queryFn: () => leaveRequestService.getAll(params),
+    queryKey: [...leaveRequestKeys.list(params || {}),company,user],
+    queryFn: ({signal}) => leaveRequestService.getAll(params,signal),
     placeholderData: (prev) => prev,
   });
 }
@@ -24,9 +27,9 @@ export function useCreateLeaveRequest() {
     mutationFn: (data: LeaveRequestFormData) => leaveRequestService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: leaveRequestKeys.lists() });
-      toast.success('Leave request submitted');
+      toast.success('Leave request created');
     },
-    onError: (error: any) => showApiError(error, { fallbackMessage: error.response?.data?.message || 'Failed to submit' }),
+    onError: (error: unknown) => showApiError(error, { fallbackMessage: 'Failed to submit' }),
   });
 }
 
@@ -39,7 +42,7 @@ export function useUpdateLeaveRequest() {
       queryClient.invalidateQueries({ queryKey: leaveRequestKeys.lists() });
       toast.success('Leave request updated');
     },
-    onError: (error: any) => showApiError(error, { fallbackMessage: error.response?.data?.message || 'Failed to update' }),
+    onError: (error: unknown) => showApiError(error, { fallbackMessage: 'Failed to update' }),
   });
 }
 
@@ -51,6 +54,6 @@ export function useDeleteLeaveRequest() {
       queryClient.invalidateQueries({ queryKey: leaveRequestKeys.lists() });
       toast.success('Leave request deleted');
     },
-    onError: (error: any) => showApiError(error, { fallbackMessage: error.response?.data?.message || 'Failed to delete' }),
+    onError: (error: unknown) => showApiError(error, { fallbackMessage: 'Failed to delete' }),
   });
 }
