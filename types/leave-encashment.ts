@@ -1,44 +1,5 @@
-export interface LeaveEncashment {
-  uuid: string;
-  employee: {
-    id: string;           // UUID
-    name: string;
-  };
-  leave_type: {
-    id: string;           // UUID
-    name: string;
-    code: string;
-  };
-  year: number;
-  days_encashed: number;
-  rate_per_day: number;
-  amount: number;
-  status: 'pending' | 'approved' | 'rejected';  // likely statuses
-  approved_by: string | null;
-  approved_at: string | null;
-  payroll_included: boolean;
-  rejection_reason: string | null;
-  created_by: string;
-  created_at: string;
-}
-
-export interface LeaveEncashmentFormData {
-  company_id: string;       // UUID
-  employee_id: string;      // UUID
-  leave_type_id: string;    // UUID
-  year: number;
-  days_encashed: number;
-  rate_per_day: string;     // optional, may be empty
-}
-
-export interface PaginatedLeaveEncashmentsResponse {
-  success: boolean;
-  message: string;
-  data: LeaveEncashment[];   // array directly under data
-  meta: {
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-  };
-}
+export type EncashmentStatus='pending'|'approved'|'rejected'|'paid';
+export interface LeaveEncashment {uuid:string;id?:string;employee:{id:string;name:string;employee_code?:string}|null;leave_type:{id:string;name:string;code:string}|null;year:number;days_encashed:number|string;rate_per_day:number|string|null;amount:number|string|null;status:EncashmentStatus;approved_by:string|null;approved_at:string|null;payroll_included:boolean;rejection_reason:string|null;created_by?:string;created_at?:string;}
+export interface LeaveEncashmentFormData {employee_id:string;leave_type_id:string;year:number;days_encashed:number;rate_per_day:string;}
+export interface EncashmentFilters {search?:string;employee_id?:string;leave_type_id?:string;year?:number;status?:EncashmentStatus;payroll_included?:0|1;sort_by?:'created_at'|'year'|'days_encashed'|'amount'|'status';sort_dir?:'asc'|'desc';page?:number;per_page?:number;}
+export interface PaginatedLeaveEncashmentsResponse {success:boolean;message:string;data:LeaveEncashment[];meta:{current_page:number;last_page:number;per_page:number;total:number;};}

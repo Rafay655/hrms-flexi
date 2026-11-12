@@ -95,6 +95,12 @@ export const modules: ModuleItem[] = [
             pathname: "/connect-central/access",
           },
           {
+            id: 9043,
+            icon: "KeyRound",
+            title: "Permissions",
+            pathname: "/connect-central/access/permissions",
+          },
+          {
             id: 9042,
             icon: "Lock",
             title: "Account Locks",
@@ -715,7 +721,7 @@ export const modules: ModuleItem[] = [
     icon: "Palmtree",
     admin: false, // Default, can be overridden based on user
     Menu: [
-      {id: 70100, icon: "LayoutDashboard", title: "Dashboard (home page)", pathname: "/leave-ease"},
+      {id: 70100, icon: "LayoutDashboard", title: "Dashboard", pathname: "/leave-ease"},
       {
         id: 70200, icon: "Calendar", title: "My Leave",
         subMenu: [
@@ -723,7 +729,7 @@ export const modules: ModuleItem[] = [
           {id: 70202, icon: "List", title: "My Requests", pathname: "/leave-ease/my-requests"},
           {id: 70203, icon: "CalendarDays", title: "My Calendar", pathname: "/leave-ease/my-calendar"},
           {id: 70204, icon: "BookText", title: "Balance Ledger", pathname: "/leave-ease/balance-ledger"},
-          {id: 70205, icon: "Wallet", title: "Encashment (apply)", pathname: "/leave-ease/encashment"},
+          {id: 70205, icon: "Wallet", title: "Encashment", pathname: "/leave-ease/encashment"},
           {id: 70206, icon: "CalendarPlus", title: "Comp Off", pathname: "/leave-ease/comp-off"},
         ],
       },
@@ -753,7 +759,6 @@ export const modules: ModuleItem[] = [
           {id: 70504, icon: "Hourglass", title: "Accrual Rules", pathname: "/leave-ease/accrual-rules"},
           {id: 70505, icon: "FastForward", title: "Carry-Forward", pathname: "/leave-ease/carry-forward"},
           {id: 70506, icon: "CalendarX", title: "Blackout Dates", pathname: "/leave-ease/blackout"},
-          {id: 70507, icon: "XCircle", title: "Rejection Reasons", pathname: "/leave-ease/rejection-reasons"},
         ],
       },
       {
@@ -761,23 +766,14 @@ export const modules: ModuleItem[] = [
         subMenu: [
           {id: 70601, icon: "Sliders", title: "Balance Adjustments", pathname: "/leave-ease/balance-adjustments"},
           {id: 70602, icon: "ClipboardList", title: "Opening Balances", pathname: "/leave-ease/opening-balances"},
-          {id: 70603, icon: "CalendarMinus", title: "Unpaid Leave (LWP)", pathname: "/leave-ease/lwp"},
-          {id: 70604, icon: "Coins", title: "Encashments (HR list)", pathname: "/leave-ease/leave-encashments"},
-          {id: 70605, icon: "CalendarPlus", title: "Comp-Off Credits", pathname: "/leave-ease/co-credits"},
-          {id: 70606, icon: "Users", title: "Comp-Off All", pathname: "/leave-ease/co-all"},
-          {id: 70607, icon: "Cog", title: "Accrual Jobs", pathname: "/leave-ease/accrual-jobs"},
+          
+       
+       
           {id: 70608, icon: "RefreshCw", title: "Year-End Close", pathname: "/leave-ease/year-end"},
-          {id: 70609, icon: "Calendar", title: "Payroll Periods", pathname: "/leave-ease/payroll-periods"},
+       
         ],
       },
-      {
-        id: 70700, icon: "BarChart3", title: "Insights",
-        subMenu: [
-          {id: 70701, icon: "FileText", title: "Reports", pathname: "/leave-ease/reports"},
-          {id: 70702, icon: "BarChart3", title: "Analytics", pathname: "/leave-ease/analytics"},
-          {id: 70703, icon: "ScrollText", title: "Audit Logs", pathname: "/leave-ease/audit-logs"},
-        ],
-      },
+  
     ],
   },
 {

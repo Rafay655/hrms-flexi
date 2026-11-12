@@ -1,0 +1,5 @@
+export interface BalanceRow {id:string;uuid:string;company_id?:number;employee_id:number|string;employee?:{id?:string;uuid?:string;name?:string;employee_code?:string}|null;leave_type:{id:string;uuid?:string;name:string;code:string;is_paid?:boolean}|null;year:number;opening_balance:number|null;earned_balance:number|null;carried_forward:number|null;used_balance:number|null;encashed_balance:number|null;total_entitlement:number|null;available_balance:number|null;pending_deduction:number|null;projected_balance:number|null;locked:boolean;locked_at?:string|null;}
+export interface BalanceFilters {year:number;page?:number;per_page?:number;employee_id?:string;leave_type_id?:string;locked?:0|1;search?:string;}
+export interface BalancePage {rows:BalanceRow[];meta:{current_page:number;last_page:number;per_page:number;total:number};}
+export interface BalanceAdjustment {employee_id:string;leave_type_id:string;year:number;adjustment:number;reason:string;}
+export interface OpeningEntry {employee_id:string;leave_type_id:string;opening_balance:number;carried_forward?:number|null;}

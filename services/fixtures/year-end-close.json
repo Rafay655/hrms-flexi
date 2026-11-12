@@ -1,0 +1,130 @@
+{
+    "success": true,
+    "message": "Year-end close fetched successfully.",
+    "data": {
+        "id": "dfbc6a16-878d-4c90-9b35-7f8df82f4a42",
+        "closing_year": 2025,
+        "opening_year": 2026,
+        "status": "confirmed",
+        "trial_fingerprint": "b62c4fc7a55c3545aa646c1cbd0f5b292448d4ff228d706a1f5dca33defede58",
+        "trial_run_by": {
+            "id": null,
+            "name": "Super Admin"
+        },
+        "trial_run_at": "2025-12-30T17:00:00+05:00",
+        "confirmed_by": {
+            "id": null,
+            "name": "Super Admin"
+        },
+        "confirmed_at": "2026-01-01T00:05:00+05:00",
+        "rules_snapshot": [
+            {
+                "rule_uuid": "e8cdb060-4232-4303-aa82-038a882633d0",
+                "leave_type_id": 28,
+                "max_days": 7,
+                "expires": true,
+                "expiry_months": 3
+            },
+            {
+                "rule_uuid": "a5ae354f-e989-4c29-954c-1fbe62ad0a3b",
+                "leave_type_id": 29,
+                "max_days": 0,
+                "expires": false,
+                "expiry_months": null
+            },
+            {
+                "rule_uuid": "1c591914-c986-46c5-89f7-2c13024e1595",
+                "leave_type_id": 31,
+                "max_days": null,
+                "expires": false,
+                "expiry_months": null
+            }
+        ],
+        "applied_results": {
+            "plan": {
+                "closing_year": 2025,
+                "opening_year": 2026,
+                "types": [
+                    {
+                        "leave_type": {
+                            "id": "735e56f3-9019-46af-816a-b96ef14e0cc2",
+                            "name": "annual leave",
+                            "code": "AL",
+                            "carry_forward_allowed": true
+                        },
+                        "rule": {
+                            "rule_uuid": "e8cdb060-4232-4303-aa82-038a882633d0",
+                            "leave_type_id": 28,
+                            "max_days": 7,
+                            "expires": true,
+                            "expiry_months": 3
+                        },
+                        "rule_uuid": "e8cdb060-4232-4303-aa82-038a882633d0",
+                        "carry_expires_on": "2026-03-31",
+                        "employees": 4,
+                        "carry_total": 21.5,
+                        "lapsed_total": 6.5,
+                        "entries": [
+                            {
+                                "employee_id": 1,
+                                "employee_code": "EMP-001",
+                                "unused_days": 9,
+                                "carry_days": 7,
+                                "lapsed_days": 2,
+                                "locked": false
+                            },
+                            {
+                                "employee_id": 13,
+                                "employee_code": "EMP-013",
+                                "unused_days": 5.5,
+                                "carry_days": 5.5,
+                                "lapsed_days": 0,
+                                "locked": false
+                            },
+                            {
+                                "employee_id": 20,
+                                "employee_code": "EMP-020",
+                                "unused_days": 11,
+                                "carry_days": 7,
+                                "lapsed_days": 4,
+                                "locked": false
+                            },
+                            {
+                                "employee_id": 23,
+                                "employee_code": "EMP-023",
+                                "unused_days": 3.5,
+                                "carry_days": 2,
+                                "lapsed_days": 1.5,
+                                "locked": false
+                            }
+                        ]
+                    }
+                ],
+                "totals": {
+                    "leave_types": 1,
+                    "types_with_rules": 1,
+                    "employees": 4,
+                    "carry_total": 21.5,
+                    "lapsed_total": 6.5
+                },
+                "fingerprint": "b62c4fc7a55c3545aa646c1cbd0f5b292448d4ff228d706a1f5dca33defede58",
+                "note": "Demo history row seeded by LeaveEaseYearEndCloseSeeder; quantities are illustrative."
+            },
+            "balances_credited": 4,
+            "targets_skipped_locked": 0,
+            "closing_balances_locked": 4,
+            "expiry_by_leave_type": {
+                "735e56f3-9019-46af-816a-b96ef14e0cc2": "2026-03-31"
+            },
+            "confirmed_by": 1
+        },
+        "statistics": {
+            "carry_total": 21.5,
+            "lapsed_total": 6.5,
+            "balances_credited": 4,
+            "closing_balances_locked": 4
+        },
+        "created_at": "2025-12-30T17:00:00+05:00",
+        "updated_at": "2026-01-01T00:05:00+05:00"
+    }
+}

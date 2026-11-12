@@ -1,0 +1,2 @@
+export function monthCells(month:string){const [year,m]=month.split('-').map(Number);const start=new Date(Date.UTC(year,m-1,1));const offset=(start.getUTCDay()+6)%7;return Array.from({length:Math.ceil((offset+new Date(Date.UTC(year,m,0)).getUTCDate())/7)*7},(_,i)=>{const d=new Date(Date.UTC(year,m-1,i-offset+1));return {date:d.toISOString().slice(0,10),inMonth:d.getUTCMonth()===m-1,day:d.getUTCDate()};});}
+export function shiftMonth(month:string,amount:number){const [y,m]=month.split('-').map(Number);return new Date(Date.UTC(y,m-1+amount,1)).toISOString().slice(0,7);}

@@ -1,2 +1,2 @@
-import { LeavePreviewWorkspace } from '../components/preview-workspace';
-export default function Page() { return <LeavePreviewWorkspace kind="adjustment-approvals" />; }
+import { redirect } from 'next/navigation';
+export default function Page(){redirect('/leave-ease/balance-adjustments?status=pending');}

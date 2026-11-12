@@ -51,10 +51,6 @@ export function LeavePreviewWorkspace({ kind }: {
             toast.error('The end date must be on or after the start date');
             return;
         }
-        if (kind === 'balance-adjustments' && Number(form.Amount) === 0) {
-            toast.error('Adjustment cannot be zero');
-            return;
-        }
         if (kind === 'short-leave' && form['End time'] <= form['Start time']) { toast.error('End time must be after start time on the same day'); return; }
         const row = { ...form };
         if (kind === 'short-leave') {
@@ -67,15 +63,10 @@ export function LeavePreviewWorkspace({ kind }: {
             row.Status = 'Pending';
             row['Payroll included'] = 'No';
         }
-        if (['accrual-jobs', 'carry-forward', 'year-end', 'payroll-periods', 'delegations'].includes(kind))
+        if (kind === 'delegations')
             row.Status = 'Preview only';
-        if (kind === 'balance-adjustments') {
-            setResult(row);
-        }
-        else {
-            setRows(previous => [row, ...previous]);
-            setResult(row);
-        }
+        setRows(previous => [row, ...previous]);
+        setResult(row);
         setPage(1);
         setOpen(false);
         toast.success('Demo preview updated. No server changes were made.');
@@ -85,7 +76,7 @@ export function LeavePreviewWorkspace({ kind }: {
  {kind === 'encashment' && <p className="text-xs text-gray-500">Sample annual balance: 9 days. The entered rate is illustrative; the backend must provide the payable rate and validate eligibility.</p>}
  {result && <div role="status" className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-gray-700"><strong>Latest local preview</strong><p className="mt-1">{Object.entries(result).map(([k, v]) => `${k}: ${v}`).join(' · ')}</p><p className="mt-1 text-xs">Not saved to the server. Refreshing resets these changes.</p></div>}
  <div className="flex flex-wrap items-center gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"/><Input aria-label="Search preview records" placeholder="Search records…" className="pl-10" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}/></div>{kind === 'reports' && <SearchableSelect aria-label="Report type" allLabel="All reports" widthClass="w-48" value={reportType} onChange={v => { setReportType(v); setPage(1); }} options={['Balance summary', 'Leave taken'].map(v => ({ value: v, label: v }))}/>}<span className="text-sm text-gray-500">Show</span><SearchableSelect aria-label="Records per page" allowAll={false} widthClass="w-24" value={String(perPage)} options={[10, 25, 50].map(n => ({ value: String(n), label: String(n) }))} onChange={v => { setPerPage(Number(v)); setPage(1); }}/></div>
- <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-gray-600">{filtered.length} demo {filtered.length === 1 ? 'record' : 'records'}{kind === 'balance-adjustments' ? ' · No adjustment history is provided by the current backend.' : ''}</div>
+ <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-gray-600">{filtered.length} demo {filtered.length === 1 ? 'record' : 'records'}</div>
  <div className="overflow-hidden rounded-lg border border-gray-200"><div className="overflow-x-auto"><table className="w-full min-w-[700px]"><thead className="border-b bg-gray-50"><tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-700">{config.columns.map(c => <th key={c} className="px-6 py-3">{c}</th>)}<th className="px-6 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{visible.map((row, i) => <tr key={i} className="text-sm hover:bg-gray-50">{config.columns.map(c => <td key={c} className="px-6 py-4">{row[c] || '—'}</td>)}<td className="px-6 py-4 text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label="Record actions"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => setView(row)}><Eye className="mr-2 h-4 w-4"/>View details</DropdownMenuItem></DropdownMenuContent></DropdownMenu></td></tr>)}{!visible.length && <tr><td colSpan={config.columns.length + 1} className="p-12 text-center text-sm text-gray-500">{search ? 'No matching records.' : config.action ? 'No demo records yet. Create a preview to explore the form.' : 'No demo records available.'}</td></tr>}</tbody></table></div><div className="flex items-center justify-between border-t bg-gray-50 px-6 py-4 text-sm"><span>Page {current} of {pages}</span><div className="flex gap-2"><Button variant="outline" size="icon" aria-label="Previous page" disabled={current === 1} onClick={() => setPage(current - 1)}><ChevronLeft className="h-4 w-4"/></Button><Button variant="outline" size="icon" aria-label="Next page" disabled={current === pages} onClick={() => setPage(current + 1)}><ChevronRight className="h-4 w-4"/></Button></div></div></div>
  </CardContent></Card><Dialog open={open} onOpenChange={setOpen}><DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[640px]"><DialogHeader className="border-b bg-gray-50/70 p-6"><DialogTitle>{config.action}</DialogTitle><DialogDescription>Demo only. No payroll, leave balance or approval changes will be submitted.</DialogDescription></DialogHeader><form className="flex min-h-0 flex-col" onSubmit={e => { e.preventDefault(); save(); }}><div className="grid min-h-0 grid-cols-1 gap-4 overflow-y-auto p-6 sm:grid-cols-2">{config.fields.map(field => <div key={field.key} className={`space-y-1.5 ${field.key === 'Reason' ? 'sm:col-span-2' : ''}`}><Label htmlFor={`preview-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>{field.type === 'select' ? <SearchableSelect id={`preview-${field.key}`} widthClass="w-full" allowAll={false} value={form[field.key] || ''} options={(field.options || []).map(value => ({ value, label: value }))} onChange={value => setForm(p => ({ ...p, [field.key]: value }))}/> : <Input id={`preview-${field.key}`} type={field.type || 'text'} required={field.required} min={field.min} max={field.max} step={field.step} maxLength={field.type === 'text' || !field.type ? 2000 : undefined} value={form[field.key] || ''} onChange={e => setForm(p => ({ ...p, [field.key]: e.target.value }))}/>}</div>)}</div><DialogFooter className="border-t bg-gray-50/70 px-6 py-4"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" className="bg-[#1E1B4B] hover:bg-[#2A2675]">Preview locally</Button></DialogFooter></form></DialogContent></Dialog>
  <Dialog open={!!view} onOpenChange={v => { if (!v)

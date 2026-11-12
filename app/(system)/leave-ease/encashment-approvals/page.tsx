@@ -1,2 +1,2 @@
 import { redirect } from 'next/navigation';
-export default function Page() { redirect('/leave-ease/approvals-inbox?type=Encashment'); }
+export default function Page(){redirect('/leave-ease/encashment?view=approvals');}

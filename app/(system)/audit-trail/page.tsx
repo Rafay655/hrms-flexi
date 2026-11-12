@@ -153,7 +153,6 @@ function getModuleAuditHref(item: TimelineItem): string {
   if (item.stream === "activity") return "/audit-trail/activity";
   // business — route to the module-specific audit page
   switch (item.module) {
-    case "leave-ease":  return "/leave-ease/audit-logs";
     case "pay-edge":    return "/pay-edge/audit-logs";
     case "time-sync":   return "/time-sync/audit-logs";
     default:            return "#";

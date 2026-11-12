@@ -70,6 +70,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     children: [
       { label: "Roles & Permissions", href: "/connect-central/access" },
+      { label: "Permissions", href: "/connect-central/access/permissions" },
       { label: "Account Locks", href: "/connect-central/access/locks" },
     ],
   },
@@ -90,7 +91,7 @@ export default function CCNav() {
   const pathname = usePathname();
 
   const isActive = (href: string) =>
-    href === "/connect-central/security"
+    (href === "/connect-central/security" || href === "/connect-central/access")
       ? pathname === href
       : pathname.startsWith(href);
 

@@ -1,2 +1,1 @@
-import { LeavePreviewWorkspace } from '../components/preview-workspace';
-export default function Page() { return <LeavePreviewWorkspace kind="carry-forward" />; }
+export { default } from '../components/operations/carry-forward';

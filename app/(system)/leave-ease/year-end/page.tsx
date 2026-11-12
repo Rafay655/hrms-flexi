@@ -1,2 +1,1 @@
-import { LeavePreviewWorkspace } from '../components/preview-workspace';
-export default function Page() { return <LeavePreviewWorkspace kind="year-end" />; }
+export { default } from '../components/operations/year-end';

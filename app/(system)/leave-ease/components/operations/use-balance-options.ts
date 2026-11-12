@@ -1,0 +1,8 @@
+"use client";
+import { useQuery } from '@tanstack/react-query';
+import { useAppSelector } from '@/store/hooks';
+import { employeeService } from '@/services/employee.service';
+import { leaveTypeService } from '@/services/leave-type.service';
+import type { LeaveType } from '@/types/leave-type';
+export function useBalanceOptions({checkPermissions=true}:{checkPermissions?:boolean}={}){const company=useAppSelector(s=>s.auth.company);const user=useAppSelector(s=>s.auth.user);const canAdjust=!checkPermissions||!!user?.permissions.some(p=>['leave_balance.adjust','leave-balance.adjust','*'].includes(p));const employees=useQuery({queryKey:['leave-operation-options','employees',company?.id,user?.id],queryFn:({signal})=>employeeService.getAllForBatches(signal),enabled:!!company?.id&&canAdjust,retry:false});const types=useQuery({queryKey:['leave-operation-options','types',company?.id,user?.id],queryFn:async()=>{const rows:LeaveType[]=[];let page=1;while(true){const response=await leaveTypeService.getAll({page,per_page:100});rows.push(...response.data.data);if(page>=response.data.meta.last_page)break;if(response.data.meta.current_page!==page||!response.data.data.length)throw new Error('Unable to load all leave types.');page++;}return rows;},enabled:!!company?.id&&canAdjust,retry:false});return {employees:employees.data||[],types:types.data||[],loading:employees.isPending||types.isPending,error:employees.error||types.error,canAdjust,company,user,retry:()=>{void employees.refetch();void types.refetch();}};}
+export const balanceInvalidationKeys=[['leave-balances'],['leave-ease'],['leave-requests','my-balances'],['leave-requests','lookup-balances']];

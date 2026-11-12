@@ -1,0 +1,21 @@
+import React from 'react';
+import { beforeEach,afterEach,it,expect,vi } from 'vitest';
+import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
+import { render,screen,fireEvent,waitFor,cleanup } from '@testing-library/react';
+import Page from './page';
+import { leaveBalanceService as service } from '@/services/leave-balance.service';
+import { employeeService } from '@/services/employee.service';
+import { leaveTypeService } from '@/services/leave-type.service';
+import type { BalanceRow } from '@/types/leave-balance';
+vi.mock('@/store/hooks',()=>({useAppSelector:(select:(state:unknown)=>unknown)=>select({auth:{company:{id:'company',timezone:'Asia/Karachi'},user:{id:'user',permissions:['leave_balance.view','leave_balance.adjust']}}})}));
+vi.mock('@/services/leave-balance.service',()=>({leaveBalanceService:{my:vi.fn(),list:vi.fn(),employee:vi.fn(),adjust:vi.fn(),opening:vi.fn()}}));
+vi.mock('@/services/employee.service',()=>({employeeService:{getAll:vi.fn()}}));
+vi.mock('@/services/leave-type.service',()=>({leaveTypeService:{getAll:vi.fn()}}));
+vi.mock('@/components/ui/searchable-select',()=>({default:(p:{'aria-label'?:string;value:string;options:{value:string;label:string}[];onChange:(v:string)=>void;allLabel?:string})=><select aria-label={p['aria-label']} value={p.value} onChange={e=>p.onChange(e.target.value)}><option value="">{p.allLabel||'Select'}</option>{p.options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>}));
+const row={id:'balance',uuid:'balance',employee_id:1,leave_type:{id:'type',name:'Sick leave',code:'SL'},year:2026,opening_balance:10,earned_balance:0,carried_forward:0,used_balance:0,encashed_balance:0,total_entitlement:10,available_balance:10,pending_deduction:1,projected_balance:9,locked:false} as BalanceRow;
+let client:QueryClient;
+function mount(){client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});render(<QueryClientProvider client={client}><Page /></QueryClientProvider>);}
+beforeEach(()=>{vi.clearAllMocks();const result={rows:[row],meta:{current_page:1,last_page:1,per_page:15,total:1}};vi.mocked(service.my).mockResolvedValue(result);vi.mocked(service.list).mockResolvedValue(result);vi.mocked(service.employee).mockResolvedValue({...result,rows:[{...row,leave_type:{id:'annual',name:'Annual employee balance',code:'AL'}}]});vi.mocked(employeeService.getAll).mockResolvedValue([{id:1,uuid:'employee-uuid',name:'Test Employee',employee_code:'EMP-1'}]);vi.mocked(leaveTypeService.getAll).mockResolvedValue({success:true,data:{data:[],meta:{last_page:1}}} as unknown as Awaited<ReturnType<typeof leaveTypeService.getAll>>);});
+afterEach(()=>{cleanup();client.clear();});
+it('replaces dummy balances with a self-scoped API and collapses additional filters',async()=>{mount();await screen.findByText('Sick leave');expect(service.my).toHaveBeenCalled();expect(service.list).not.toHaveBeenCalled();expect(employeeService.getAll).not.toHaveBeenCalled();expect(screen.getByRole('navigation',{name:'Balance pagination'})).toBeInTheDocument();expect(screen.queryByLabelText('Balance lock filter')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'More filters'}));expect(screen.getByLabelText('Balance lock filter')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Hide filters'}));expect(screen.queryByLabelText('Balance lock filter')).not.toBeInTheDocument();});
+it('loads the paginated directory and switches to the employee UUID endpoint on selection',async()=>{mount();await screen.findByText('Sick leave');fireEvent.click(screen.getByRole('tab',{name:'All Balances'}));await waitFor(()=>expect(service.list).toHaveBeenCalled());await screen.findByRole('option',{name:'Test Employee (EMP-1)'});fireEvent.change(screen.getByLabelText('Employee filter'),{target:{value:'employee-uuid'}});await screen.findByText('Annual employee balance');expect(service.employee).toHaveBeenCalledWith('employee-uuid',expect.objectContaining({year:2026}),expect.anything());expect(screen.getByRole('button',{name:'Adjust balance'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Opening balances'})).toBeInTheDocument();});

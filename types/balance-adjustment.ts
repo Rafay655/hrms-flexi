@@ -1,0 +1,4 @@
+export interface BalanceAdjustment {uuid:string;employee_id?:string|number;employee_name:string;employee_code:string;leave_type_name:string;leave_type_code:string;year:number|null;adjustment_days:number|null;reason:string;effective_date:string;status:string;note?:string|null;decided_by?:string|null;decided_at?:string|null;created_at?:string|null;can_approve?:boolean;can_reject?:boolean;}
+export interface BalanceAdjustmentInput {employee_id:string;leave_type_id:string;year:number;adjustment_days:number;reason:string;effective_date:string;}
+export interface AdjustmentFilters {page?:number;per_page?:number;search?:string;direction?:'credit'|'debit';status?:string;year?:number;}
+export interface AdjustmentPage {rows:BalanceAdjustment[];meta:{current_page:number;last_page:number;per_page:number;total:number};}

@@ -1,0 +1,8 @@
+"use client";
+import { useQuery } from '@tanstack/react-query';
+import { useAppSelector } from '@/store/hooks';
+import { branchService } from '@/services/branch.service';
+import { leaveTypeService } from '@/services/leave-type.service';
+import type { Branch } from '@/types/branch';
+import type { LeaveType } from '@/types/leave-type';
+export function useBlackoutOptions(){const company=useAppSelector(s=>s.auth.company);const user=useAppSelector(s=>s.auth.user);const branches=useQuery({queryKey:['blackout-options','branches',company?.id,user?.id],queryFn:async()=>{const rows:Branch[]=[];let page=1;while(true){const r=await branchService.getAll({page,per_page:1000});if(r.success===false)throw new Error(r.message||'Unable to load branches.');rows.push(...r.data.data);if(page>=r.data.meta.last_page)break;if(r.data.meta.current_page!==page||!r.data.data.length)throw new Error('Unable to load every branch.');page++;}return rows;},enabled:!!company?.id,retry:false});const types=useQuery({queryKey:['blackout-options','types',company?.id,user?.id],queryFn:async()=>{const rows:LeaveType[]=[];let page=1;while(true){const r=await leaveTypeService.getAll({page,per_page:100});rows.push(...r.data.data);if(page>=r.data.meta.last_page)break;if(r.data.meta.current_page!==page||!r.data.data.length)throw new Error('Unable to load every leave type.');page++;}return rows;},enabled:!!company?.id,retry:false});return {company,user,branches:branches.data||[],types:types.data||[],loading:branches.isPending||types.isPending,error:branches.error||types.error,retry:()=>{void branches.refetch();void types.refetch();}};}
