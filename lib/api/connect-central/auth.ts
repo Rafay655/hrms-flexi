@@ -78,9 +78,9 @@ export async function confirm2FA(code: string): Promise<Confirm2FAResponse> {
   return data.data;
 }
 
-/** DELETE /api/v1/connect-central/2fa/disable — re-auth with the account password */
-export async function disable2FA(password: string): Promise<void> {
-  await api.delete("/connect-central/2fa/disable", { data: { password } });
+/** DELETE /api/v1/connect-central/2fa/disable — verify with an authenticator code */
+export async function disable2FA(code: string): Promise<void> {
+  await api.delete("/connect-central/2fa/disable", { data: { code } });
 }
 
 /** GET /api/v1/connect-central/2fa/recovery-codes

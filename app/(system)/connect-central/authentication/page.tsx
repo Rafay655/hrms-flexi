@@ -849,21 +849,22 @@ function RecoveryCodesSection({
 type Disable2FADialogProps = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onConfirm: (password: string) => void;
+  onConfirm: (code: string) => void;
   loading: boolean;
 };
 
 function Disable2FADialog({ open, onOpenChange, onConfirm, loading }: Disable2FADialogProps) {
-  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
 
   const handleOpenChange = (v: boolean) => {
-    if (!v) setPassword("");
+    if (loading) return;
+    if (!v) setCode("");
     onOpenChange(v);
   };
 
   const handleConfirm = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (password.length > 0) onConfirm(password);
+    if (/^\d{6}$/.test(code) && !loading) onConfirm(code);
   };
 
   return (
@@ -878,21 +879,26 @@ function Disable2FADialog({ open, onOpenChange, onConfirm, loading }: Disable2FA
           </div>
           <AlertDialogDescription>
             This removes the extra security layer from your account. Enter your
-            account password to confirm.
+            six-digit authenticator code to confirm.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="px-1 pb-2">
           <Input
-            type="password"
-            placeholder="Current password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            aria-label="Authenticator code"
+            disabled={loading}
+            placeholder="123456"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             className="h-11"
             autoFocus
           />
           <p className="text-[11px] text-gray-400 text-center mt-2">
-            Enter your account password to confirm
+            Enter the six-digit code from your authenticator app
           </p>
         </div>
 
@@ -900,7 +906,7 @@ function Disable2FADialog({ open, onOpenChange, onConfirm, loading }: Disable2FA
           <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={password.length === 0 || loading}
+            disabled={!/^\d{6}$/.test(code) || loading}
             className="bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500"
           >
             {loading ? (
@@ -961,7 +967,7 @@ export default function AuthenticationPage() {
 
   // Updated disable mutation with correct API endpoint
   const { mutate: doDisable, isPending: disabling } = useMutation({
-    mutationFn: (password: string) => disable2FA(password),
+    mutationFn: (code: string) => disable2FA(code),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cc-2fa-status"] });
       qc.removeQueries({ queryKey: ["cc-recovery-codes"] });
@@ -969,7 +975,7 @@ export default function AuthenticationPage() {
       toast.success("Two-factor authentication has been disabled.");
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || "Failed to disable 2FA. Please check your password and try again.";
+      const message = error?.response?.data?.message || "Failed to disable 2FA. Please check your authenticator code and try again.";
       showApiError(error, { fallbackMessage: message });
     },
   });
@@ -1165,9 +1171,10 @@ export default function AuthenticationPage() {
 
       {/* ── Disable 2FA dialog ───────────────────────────────────────────────── */}
       <Disable2FADialog
+        key={String(disableDialogOpen)}
         open={disableDialogOpen}
         onOpenChange={setDisableDialogOpen}
-        onConfirm={(password) => doDisable(password)}
+        onConfirm={(code) => doDisable(code)}
         loading={disabling}
       />
     </div>
