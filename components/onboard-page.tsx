@@ -1223,10 +1223,23 @@ export default function OnboardPage() {
             {readiness.isError ? <p role="alert" className="text-sm text-red-600">{parseApiError(readiness.error).message}</p> : readiness.data?.issues.length ? readiness.data.issues.map((issue, index) => (
               <div key={`${issue.field_key}-${index}`} className="rounded-lg border border-border p-4">
                 <p className="text-sm font-semibold text-foreground">{issue.field_label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{issue.step} · {issue.module}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{[issue.step, issue.module].filter(Boolean).join(" · ")}</p>
                 <p className="mt-2 text-sm text-muted-foreground">{issue.message}</p>
               </div>
             )) : <p className="text-sm text-muted-foreground">Onboarding configuration is incomplete.</p>}
+            {!!readiness.data?.required_fields?.length && <details className="rounded-lg border border-border p-4">
+              <summary className="cursor-pointer text-sm font-medium text-foreground">Required fields ({readiness.data.required_fields.length})</summary>
+              <p className="mt-2 text-xs text-muted-foreground">These are the required fields returned by the API. Configuration issues that block progress are listed above.</p>
+              <ul className="mt-3 divide-y divide-border">
+                {readiness.data.required_fields.map(field => <li key={field.field_key} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
+                  <div><p className="font-medium text-foreground">{field.field_label}</p><p className="mt-1 text-xs text-muted-foreground">{field.module}</p></div>
+                  <div className="flex flex-wrap gap-2">
+                    {field.required_in_detail !== undefined && <Badge variant="outline">{field.required_in_detail ? "Required in detailed" : "Optional in detailed"}</Badge>}
+                    {field.show_in_detail !== undefined && <Badge variant="outline">{field.show_in_detail ? "Visible in detailed" : "Hidden in detailed"}</Badge>}
+                  </div>
+                </li>)}
+              </ul>
+            </details>}
           </div>
           <DialogFooter className="border-t bg-muted/50 px-6 py-4">
             <Button variant="outline" onClick={() => setDismissedReadiness(readinessKey)}>Close</Button>

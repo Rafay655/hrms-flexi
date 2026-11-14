@@ -114,10 +114,19 @@ function extractEmployeeUuid(raw: unknown) {
   );
 }
 
+export type OnboardingReadinessField = {
+  field_key: string;
+  field_label: string;
+  required_in_detail?: boolean;
+  show_in_detail?: boolean;
+  table: string | null;
+  module: string;
+};
 export type OnboardingReadiness = {
   ready: boolean;
   mode: FormMode;
-  issues: { field_key: string; field_label: string; step: string; table: string; module: string; reason: string; message: string }[];
+  issues: (OnboardingReadinessField & { step: string | null; reason: string; message: string })[];
+  required_fields?: OnboardingReadinessField[];
 };
 
 export const onboardingService = {
