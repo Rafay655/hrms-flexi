@@ -37,8 +37,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
-import toast from "react-hot-toast";
-import { showApiError } from "@/lib/error-toast";
+import { useQuery } from "@tanstack/react-query";
+import { parseApiError } from "@/lib/api-error";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useAppSelector } from "@/store/hooks";
 import { useOnboardingForm } from "@/hooks/useOnboardingForm";
 import { onboardingHelpers, onboardingService } from "@/services/onboarding-form.service";
@@ -978,25 +979,18 @@ export default function OnboardPage() {
   const companyId = useAppSelector(state => state.auth.company?.id);
   const userId = useAppSelector(state => state.auth.user?.id);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const toastId = `onboarding-readiness:${companyId}:${userId}:${mode}`;
-    void onboardingService.readiness(mode, controller.signal).then(result => {
-      if (controller.signal.aborted || result.ready) return;
-      const messages = [...new Set(result.issues.map(issue => issue.message || `${issue.field_label}: no available options in ${issue.module}.`))];
-      toast.error(messages.length ? messages.join("\n\n") : "Onboarding setup is incomplete. Please review the required configuration.", {
-        id: toastId,
-        duration: 10000,
-        style: { maxWidth: "480px", whiteSpace: "pre-line" },
-      });
-    }).catch((error: unknown) => {
-      if (!controller.signal.aborted) showApiError(error);
-    });
-    return () => {
-      controller.abort();
-      toast.dismiss(toastId);
-    };
-  }, [mode, companyId, userId]);
+  const readiness = useQuery({
+    queryKey: ["onboarding-readiness", companyId, userId, mode],
+    queryFn: ({ signal }) => onboardingService.readiness(mode, signal),
+    retry: false,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  const readinessBlocked = readiness.isFetching || readiness.isError || !readiness.data?.ready || !!readiness.data?.issues.length;
+  const readinessHasIssues = !!readiness.data && (!readiness.data.ready || readiness.data.issues.length > 0);
+  const [dismissedReadiness, setDismissedReadiness] = useState("");
+  const readinessKey = `${companyId}:${userId}:${mode}:${readiness.dataUpdatedAt}:${readiness.errorUpdatedAt}`;
+  const readinessModalOpen = (readinessHasIssues || readiness.isError) && dismissedReadiness !== readinessKey;
 
   const [openPreviewStepIds, setOpenPreviewStepIds] = useState<Set<number>>(
     new Set(),
@@ -1219,6 +1213,34 @@ export default function OnboardPage() {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <Dialog open={readinessModalOpen} onOpenChange={open => { if (!open) setDismissedReadiness(readinessKey); }}>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b bg-muted/50 px-6 py-4">
+            <DialogTitle>Onboarding setup required</DialogTitle>
+            <DialogDescription>Resolve these configuration issues before continuing in {mode} mode.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 overflow-y-auto p-6">
+            {readiness.isError ? <p role="alert" className="text-sm text-red-600">{parseApiError(readiness.error).message}</p> : readiness.data?.issues.length ? readiness.data.issues.map((issue, index) => (
+              <div key={`${issue.field_key}-${index}`} className="rounded-lg border border-border p-4">
+                <p className="text-sm font-semibold text-foreground">{issue.field_label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{issue.step} · {issue.module}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{issue.message}</p>
+              </div>
+            )) : <p className="text-sm text-muted-foreground">Onboarding configuration is incomplete.</p>}
+          </div>
+          <DialogFooter className="border-t bg-muted/50 px-6 py-4">
+            <Button variant="outline" onClick={() => setDismissedReadiness(readinessKey)}>Close</Button>
+            <Button disabled={readiness.isFetching} onClick={() => void readiness.refetch()}>
+              {readiness.isFetching ? "Checking…" : "Check again"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {readinessBlocked && <div role="status" className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+        <span>{readiness.isFetching ? "Checking onboarding readiness…" : "Complete the onboarding setup before continuing."}</span>
+        {(readinessHasIssues || readiness.isError) && <Button size="sm" variant="outline" onClick={() => setDismissedReadiness("")}>View issues</Button>}
+      </div>}
+
       <div className="border-b bg-brand-900 px-5 py-4 text-white">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -1312,7 +1334,7 @@ export default function OnboardPage() {
                   steps={visibleSteps}
                   activeIndex={safeStepIndex}
                   disabled={stepSubmitting || publishing || previewMode}
-                  onStepClick={goToStep}
+                  onStepClick={index => { if (!readinessBlocked || index <= safeStepIndex) goToStep(index); }}
                 />
               )}
             </CardContent>
@@ -1415,8 +1437,8 @@ export default function OnboardPage() {
 
                 <Button
                   type="button"
-                  disabled={publishing}
-                  onClick={publishEmployee}
+                  disabled={readinessBlocked || publishing}
+                  onClick={() => { if (!readinessBlocked) void publishEmployee(); }}
                   className="gap-2 bg-emerald-700 text-white shadow-sm hover:bg-emerald-800"
                 >
                   {publishing ? (
@@ -1545,8 +1567,8 @@ export default function OnboardPage() {
               {safeStepIndex === visibleSteps.length - 1 ? (
                 <Button
                   type="button"
-                  disabled={loading || stepSubmitting}
-                  onClick={submitFinalStep}
+                  disabled={readinessBlocked || loading || stepSubmitting}
+                  onClick={() => { if (!readinessBlocked) void submitFinalStep(); }}
                   className="bg-green-700 text-white hover:bg-green-800"
                 >
                   {stepSubmitting ? (
@@ -1561,8 +1583,8 @@ export default function OnboardPage() {
               ) : (
                 <Button
                   type="button"
-                  disabled={loading || stepSubmitting || !visibleSteps.length}
-                  onClick={goNext}
+                  disabled={readinessBlocked || loading || stepSubmitting || !visibleSteps.length}
+                  onClick={() => { if (!readinessBlocked) void goNext(); }}
                 >
                   {stepSubmitting ? (
                     <>
