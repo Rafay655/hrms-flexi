@@ -19,8 +19,20 @@ export const employeeService = {
     } while (page <= lastPage);
     return [...new Map(employees.map((employee) => [employee.id, employee])).values()];
   },
-  getAll: async (params?: { per_page?: number; detailed?: number }): Promise<Employee[]> => {
-    const { data } = await api.get(BASE_PATH, { params });
-    return data.data;   // assuming response { success, data: Employee[], meta }
+  getAll: async <T = Employee>(params?: { per_page?: number; detailed?: number }, signal?: AbortSignal): Promise<T[]> => {
+    const rows: T[] = [];
+    let page = 1;
+    let lastPage = 1;
+    do {
+      const { data } = await api.get(BASE_PATH, { params: { ...params, page }, signal });
+      if (data.success === false) throw new Error(data.message || 'Unable to load employees.');
+      const records = Array.isArray(data.data) ? data.data : data.data?.data;
+      if (!Array.isArray(records)) throw new Error('Unexpected employee listing response.');
+      rows.push(...records);
+      const meta = data.meta ?? data.pagination ?? data.data?.meta;
+      lastPage = Number(meta?.last_page ?? 1);
+      page++;
+    } while (page <= lastPage);
+    return rows;
   },
 };
