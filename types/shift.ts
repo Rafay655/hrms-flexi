@@ -50,7 +50,7 @@ export interface ShiftApiPayload {
   start_time: string;
   end_time: string;
   working_days: Weekday[];
-  break_windows: ShiftBreakWindow[];
+  break_windows: { weekdays: Weekday[]; start_time: string; end_time: string; paid: boolean; label: string }[];
   overtime_allowed: boolean;
   max_ot_minutes_per_day: number | null;
   is_active: boolean;

@@ -17,8 +17,13 @@ function breakWindows(raw: unknown): ShiftBreakWindow[] {
   if (typeof value === 'string') { try { value = JSON.parse(value); } catch { throw new Error('The shift returned an invalid break schedule.'); } }
   if (!Array.isArray(value)) throw new Error('The shift returned an invalid break schedule.');
   return value.map((item: unknown) => {
-    if (!item || typeof item !== 'object' || !('days' in item) || !Array.isArray(item.days) || !('start' in item) || typeof item.start !== 'string' || !('end' in item) || typeof item.end !== 'string') throw new Error('The shift returned an incomplete break window.');
-    return { days: workingDays(item.days), start: item.start.slice(0, 5), end: item.end.slice(0, 5), paid: 'paid' in item && (item.paid === true || item.paid === 1), label: 'label' in item && typeof item.label === 'string' ? item.label : '' };
+    if (!item || typeof item !== 'object') throw new Error('The shift returned an incomplete break window.');
+    const window = item as Record<string, unknown>;
+    const start = window.start_time ?? window.start;
+    const end = window.end_time ?? window.end;
+    const days = window.weekdays ?? window.days;
+    if (!Array.isArray(days) || typeof start !== 'string' || typeof end !== 'string') throw new Error('The shift returned an incomplete break window.');
+    return { days: workingDays(days), start: start.slice(0, 5), end: end.slice(0, 5), paid: window.paid === true || window.paid === 1, label: typeof window.label === 'string' ? window.label : '' };
   });
 }
 const normalize = (shift: Shift): Shift => ({ ...shift, working_days: workingDays(shift.working_days), break_windows: breakWindows(shift.break_windows) });
@@ -38,7 +43,15 @@ export const shiftService = {
   },
   async getById(uuid: string): Promise<Shift> { return normalize(checked((await api.get<Envelope<Shift>>(`${ROOT}/${uuid}`)).data).data); },
   async save({ uuid, payload }: { uuid?: string; payload: Record<string, unknown> }): Promise<Shift> {
-    const response = uuid ? await api.put<Envelope<Shift>>(`${ROOT}/${uuid}`, payload) : await api.post<Envelope<Shift>>(ROOT, payload);
+    const body = { ...payload };
+    if (payload.break_windows !== undefined) {
+      body.break_windows = breakWindows(payload.break_windows).map(window => ({
+        weekdays: [...new Set(window.days)], start_time: window.start, end_time: window.end,
+        paid: window.paid, label: window.label.trim(),
+      }));
+    }
+    const config = { headers: { 'Content-Type': 'application/json' } };
+    const response = uuid ? await api.put<Envelope<Shift>>(`${ROOT}/${uuid}`, body, config) : await api.post<Envelope<Shift>>(ROOT, body, config);
     return normalize(checked(response.data).data);
   },
   async create(data: ShiftFormData) { return shiftService.save({ payload: payload(data) }); },
