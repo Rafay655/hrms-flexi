@@ -114,7 +114,18 @@ function extractEmployeeUuid(raw: unknown) {
   );
 }
 
+export type OnboardingReadiness = {
+  ready: boolean;
+  mode: FormMode;
+  issues: { field_key: string; field_label: string; step: string; table: string; module: string; reason: string; message: string }[];
+};
+
 export const onboardingService = {
+  async readiness(mode: FormMode, signal?: AbortSignal): Promise<OnboardingReadiness> {
+    const { data } = await api.get<{ success: boolean; message?: string; data: OnboardingReadiness }>(`${BASE_URL}/readiness`, { params: { mode }, signal });
+    if (!data.success) throw new Error(data.message || "Unable to check onboarding readiness.");
+    return data.data;
+  },
   getForm: async (mode: FormMode, companyUuid: string) => {
     const response = await api.get<FormResponse>(`${BASE_URL}/form`, {
       params: {

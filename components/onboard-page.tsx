@@ -37,8 +37,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
+import toast from "react-hot-toast";
+import { showApiError } from "@/lib/error-toast";
+import { useAppSelector } from "@/store/hooks";
 import { useOnboardingForm } from "@/hooks/useOnboardingForm";
-import { onboardingHelpers } from "@/services/onboarding-form.service";
+import { onboardingHelpers, onboardingService } from "@/services/onboarding-form.service";
 import { ApiField, ApiStep } from "@/types/onboarding-form";
 
 const iconMap: Record<string, LucideIcon> = {
@@ -971,6 +974,29 @@ export default function OnboardPage() {
     submitFinalStep,
     publishEmployee,
   } = useOnboardingForm();
+
+  const companyId = useAppSelector(state => state.auth.company?.id);
+  const userId = useAppSelector(state => state.auth.user?.id);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const toastId = `onboarding-readiness:${companyId}:${userId}:${mode}`;
+    void onboardingService.readiness(mode, controller.signal).then(result => {
+      if (controller.signal.aborted || result.ready) return;
+      const messages = [...new Set(result.issues.map(issue => issue.message || `${issue.field_label}: no available options in ${issue.module}.`))];
+      toast.error(messages.length ? messages.join("\n\n") : "Onboarding setup is incomplete. Please review the required configuration.", {
+        id: toastId,
+        duration: 10000,
+        style: { maxWidth: "480px", whiteSpace: "pre-line" },
+      });
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) showApiError(error);
+    });
+    return () => {
+      controller.abort();
+      toast.dismiss(toastId);
+    };
+  }, [mode, companyId, userId]);
 
   const [openPreviewStepIds, setOpenPreviewStepIds] = useState<Set<number>>(
     new Set(),
