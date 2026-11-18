@@ -158,6 +158,8 @@ export const ACTIVE_BATCH_STATUSES = new Set<BatchStatus>([
   'uploaded',
   'validating',
   'processing',
+  'pending_approval',
+  'approved',
 ]);
 
 /** Statuses that will never change further (terminal). */

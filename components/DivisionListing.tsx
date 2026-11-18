@@ -75,6 +75,16 @@ function useDebounced<T>(value: T, delay = 400) {
   return debounced;
 }
 
+function getDivisionHeadLabel(head: Division["head_employee_id"]) {
+  return typeof head === "object" && head !== null
+    ? head.name
+    : head ?? "Not assigned";
+}
+
+function getDivisionHeadId(head: Division["head_employee_id"]) {
+  return typeof head === "object" && head !== null ? head.id : head ?? "";
+}
+
 const DivisionListingPage: React.FC = () => {
   // Table state
   const [page, setPage] = useState(1);
@@ -133,7 +143,7 @@ const DivisionListingPage: React.FC = () => {
     setFormData({
       code: division.code,
       name: division.name,
-      head_employee_id: division.head_employee_id ?? "",
+      head_employee_id: getDivisionHeadId(division.head_employee_id),
       effective_from: division.effective_from,
       effective_to: division.effective_to,
       status: division.status,
@@ -147,7 +157,7 @@ const DivisionListingPage: React.FC = () => {
     setFormData({
       code: division.code,
       name: division.name,
-      head_employee_id: division.head_employee_id ?? "",
+      head_employee_id: getDivisionHeadId(division.head_employee_id),
       effective_from: division.effective_from,
       effective_to: division.effective_to,
       status: division.status,
@@ -257,7 +267,7 @@ const DivisionListingPage: React.FC = () => {
         header: "HEAD",
         cell: ({ row }) => (
           <div className="text-gray-500 italic">
-            {row.original.head_employee_id ?? "Not assigned"}
+            {getDivisionHeadLabel(row.original.head_employee_id)}
           </div>
         ),
       },
@@ -679,7 +689,7 @@ const DivisionListingPage: React.FC = () => {
               </label>
               <div className="w-full">
                 <Input
-                  value="Not assigned"
+                  value={getDivisionHeadLabel(selectedDivision?.head_employee_id ?? null)}
                   disabled
                   className="bg-gray-100 text-gray-500"
                 />

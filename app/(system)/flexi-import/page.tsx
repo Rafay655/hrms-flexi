@@ -52,7 +52,7 @@ type RecentBatch = {
   total_rows: number;
   successful_rows: number | null;
   failed_rows: number | null;
-  initiated_by: string;
+  initiated_by: string | { id: string | number; name: string } | null;
   created_at: string;
   completed_at: string | null;
 };
@@ -496,7 +496,9 @@ export default function FlexiImportDashboard() {
                       </td>
 
                       <td className="px-4 py-4 text-muted-foreground hidden md:table-cell">
-                        {batch.initiated_by}
+                        {(typeof batch.initiated_by === "string"
+                          ? batch.initiated_by
+                          : batch.initiated_by?.name) || "—"}
                       </td>
 
                       <td className="px-4 py-4 text-muted-foreground hidden sm:table-cell tabular-nums text-xs">

@@ -8,7 +8,7 @@
  * Supports inline editing (Framer Motion expand/collapse), set-as-default,
  * and delete with a confirmation dialog.
  *
- * Access gate: bulk-import permission (enforced by layout.tsx).
+ * Uses backend authorization for import template operations.
  *
  * API surface:
  *   GET    /api/v1/flexi-import/column-maps
@@ -18,6 +18,8 @@
  *   DELETE /api/v1/flexi-import/column-maps/{id}
  */
 
+import { employeeImportService } from "@/services/employee-import.service";
+import { normalizeFieldDefinition } from "@/lib/flexi-import";
 import { showApiError } from "@/lib/error-toast";
 import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,7 +34,7 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
 import {
   Dialog,
@@ -138,10 +140,10 @@ export default function ColumnMapsPage() {
   // Field definitions — always loaded for both types so preview labels resolve
   const { data: employeeFields = [] } = useQuery<FieldDefinition[]>({
     queryKey: ["flexi-import", "fields", "employee"],
-    queryFn: () =>
-      api
-        .get("/flexi-import/fields/employees")
-        .then((r) => r.data.data ?? r.data),
+    queryFn: async ({ signal }) => {
+      const results = await Promise.all([employeeImportService.fields('quick',false,signal), employeeImportService.fields('detailed',false,signal)]);
+      return [...new Map(results.flat().map(field => [field.key,field])).values()];
+    },
     staleTime: 5 * 60_000,
   });
 
@@ -150,7 +152,7 @@ export default function ColumnMapsPage() {
     queryFn: () =>
       api
         .get("/flexi-import/fields/flexi_meta_entities")
-        .then((r) => r.data.data ?? r.data),
+        .then((r) => (r.data.data ?? r.data).map(normalizeFieldDefinition)),
     staleTime: 5 * 60_000,
   });
 

@@ -13,7 +13,7 @@
 
 import { showApiError } from "@/lib/error-toast";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import toast from 'react-hot-toast';
 import { flexiImportService } from '@/services/flexi-import.service';
 import { isBatchActive } from '@/types/flexi-import';
 import type { BatchListParams } from '@/types/flexi-import';

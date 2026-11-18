@@ -2,7 +2,7 @@ export interface Division {
   id: number;
   code: string;
   name: string;
-  head_employee_id: number | null;
+  head_employee_id: number | { id: number; name: string } | null;
   effective_from: string;
   effective_to: string | null;
   status: "active" | "inactive";

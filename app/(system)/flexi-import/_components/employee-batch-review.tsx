@@ -1,0 +1,118 @@
+"use client";
+import { useState } from 'react';
+import Link from 'next/link';
+import { useMutation,useQuery,useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { RefreshCw,ArrowLeft,RotateCcw,Download,CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { AppLoader } from '@/components/ui/app-loader';
+import { ApiErrorState } from '@/components/ui/api-error-state';
+import { Frame,Modal } from '@/components/shared/directory-ui';
+import { useAppSelector } from '@/store/hooks';
+import { employeeImportService as service,type EmployeeImportBatch,type ImportOptions,type QueuedResult } from '@/services/employee-import.service';
+import { flexiImportService } from '@/services/flexi-import.service';
+import { canConfirmImport,displayImportValue,downloadImportFile,importPollInterval,observeImportProgress,importWaitingMessage,type ImportProgressSnapshot,IMPORT_TERMINAL_STATUSES } from '@/lib/employee-import';
+import { showApiError } from '@/lib/error-toast';
+import { ReferenceGaps } from './reference-gaps';
+import { ImportWorkflow } from './import-workflow';
+import { ImportRows } from './import-rows';
+import { ImportErrorFeedback } from './import-error-feedback';
+import { StatusBadge } from './status';
+import { ImportSteps,ImportSection,ImportStat,importPrimary } from './import-ui';
+type Action='process'|'revalidate'|'rollback'|'approve'|'reject';
+function waitForOperation(operation:{action:Action;at:number}|null,state:string|undefined,updatedAt:number):boolean{
+ if(!operation)return false;
+ if(updatedAt<=operation.at)return true;
+ if(operation.action==='rollback')return !['rolled_back','failed','rejected'].includes(state??'');
+ if(operation.action==='process')return !['processing','completed','failed','pending_approval','approved','rejected'].includes(state??'');
+ if(operation.action==='approve'||operation.action==='reject')return state==='pending_approval';
+ return !['validation_complete','pending_approval','failed','rejected'].includes(state??'');
+}
+export function EmployeeBatchReview({uuid}:{uuid:string}){
+ const client=useQueryClient();
+ const company=useAppSelector(s=>s.auth.company?.id),user=useAppSelector(s=>s.auth.user?.id);
+ const scope=`${company}:${user}`,root=['employee-import',scope,uuid],statusKey=[...root,'status'];
+ const [operation,setOperation]=useState<{action:Action;at:number}|null>(null),[resolvedAt,setResolvedAt]=useState(0),[revalidatedAt,setRevalidatedAt]=useState(0);
+ const [draftOptions,setDraftOptions]=useState<ImportOptions|null>(null),[confirmation,setConfirmation]=useState<'process'|'rollback'|'approve'|'reject'|null>(null),[comments,setComments]=useState('');
+ const [revision,setRevision]=useState(0);
+ const detail=useQuery({queryKey:[...root,'detail'],queryFn:({signal})=>service.detail(uuid,signal),retry:false,refetchInterval:query=>query.state.data?.status==='pending_approval'?importPollInterval('pending_approval',query.state.error,query.state.errorUpdateCount):false});
+ const status=useQuery({queryKey:statusKey,queryFn:async({signal})=>observeImportProgress(client.getQueryData<ImportProgressSnapshot>(statusKey),await service.status(uuid,signal)),retry:false,refetchInterval:query=>importPollInterval(query.state.data?.status??detail.data?.status,query.state.error,query.state.errorUpdateCount,waitForOperation(operation,query.state.data?.status,query.state.dataUpdatedAt),query.state.data?.unchangedChecks??0)});
+ const batch={...detail.data,...status.data} as EmployeeImportBatch;
+ const waiting=waitForOperation(operation,batch.status,status.dataUpdatedAt);
+ const queueMessage=importWaitingMessage(batch.status,status.data?.unchangedChecks??0);
+ const reviewing=batch.status==='validation_complete',terminal=IMPORT_TERMINAL_STATUSES.has(batch.status);
+ const hasPreview=reviewing||terminal||['pending_approval','approved'].includes(batch.status);
+ const gaps=useQuery({queryKey:[...root,'gaps',batch.status],queryFn:({signal})=>service.gaps(uuid,signal),enabled:reviewing,retry:false});
+ const summary=useQuery({queryKey:[...root,'summary',batch.status],queryFn:({signal})=>service.summary(uuid,signal),enabled:hasPreview,retry:false});
+ const approvalBound=batch.requires_approval===true||summary.data?.requires_approval===true;
+ const options=draftOptions??{import_mode:summary.data?.import_mode==='all_or_nothing'?'all_or_nothing':'skip_errors',send_welcome_email:batch.send_welcome_email??summary.data?.send_welcome_email??false,ignore_gaps:false};
+ const valid=Number(summary.data?.valid_rows??batch.valid_rows??batch.successful_rows??0),invalid=Number(summary.data?.invalid_rows??batch.invalid_rows??batch.failed_rows??0);
+ const unresolved=batch.has_gaps===true||gaps.data?.has_gaps===true;
+ const needsRevalidation=resolvedAt>revalidatedAt||(operation?.action==='revalidate'&&waiting);
+ function refresh(){void client.invalidateQueries({queryKey:root});void client.invalidateQueries({queryKey:['flexi-import']});setRevision(value=>value+1);}
+ function queued(action:Action,result:QueuedResult|null){
+  const at=status.dataUpdatedAt;setOperation({action,at});if(action==='revalidate')setRevalidatedAt(resolvedAt);
+  if(result?.status)client.setQueryData(statusKey,(previous:EmployeeImportBatch|undefined)=>({...previous,uuid,status:result.status!}));
+  setConfirmation(null);refresh();
+ }
+ function failure(error:unknown){showApiError(error);refresh();}
+ const revalidate=useMutation({mutationFn:()=>service.revalidate(uuid),retry:false,onSuccess:result=>{toast.success('Revalidation queued.');queued('revalidate',result);},onError:failure});
+ const process=useMutation({mutationFn:()=>service.process(uuid,options),retry:false,onSuccess:result=>{toast.success('Import queued. Tracking the server result.');queued('process',result);},onError:failure});
+ const rollback=useMutation({mutationFn:()=>service.rollback(uuid),retry:false,onSuccess:result=>{toast.success('Rollback queued.');queued('rollback',result);},onError:failure});
+ const approve=useMutation({mutationFn:()=>service.approve(uuid,comments.trim()),retry:false,onSuccess:result=>{toast.success('Approval submitted.');queued('approve',result);},onError:failure});
+ const reject=useMutation({mutationFn:()=>service.reject(uuid,comments.trim()),retry:false,onSuccess:result=>{toast.success('Rejection submitted.');queued('reject',result);},onError:failure});
+ const download=useMutation({mutationFn:()=>flexiImportService.downloadErrorReport(uuid),onSuccess:blob=>downloadImportFile(blob,`import-${uuid}-errors.csv`),onError:(error:unknown)=>showApiError(error)});
+ const busy=[revalidate,process,rollback,approve,reject].some(mutation=>mutation.isPending);
+ const canProcess=canConfirmImport({...batch,requires_approval:approvalBound},gaps.data,options)&&!needsRevalidation&&!waiting&&!gaps.isFetching&&!gaps.error&&!status.isFetching&&!status.error&&!detail.error&&!summary.isFetching&&!summary.error&&!busy&&(options.import_mode==='skip_errors'||invalid===0)&&valid>0;
+ const canRollback=!waiting&&!status.error&&batch.is_rollbackable===true&&batch.rollback_window_open===true;
+ const workflow=detail.data?.workflow;
+ const legacyApproval=batch.status==='pending_approval'&&(workflow===null||workflow?.owner==='legacy'&&workflow.owned!==true);
+ const actor=batch.initiated_by;
+ const actorId=typeof actor==='object'&&actor?(actor.uuid??actor.id):actor;
+ const isInitiator=actorId!==undefined&&String(actorId)===String(user);
+ const activeStep=terminal||['processing','pending_approval','approved'].includes(batch.status)||waiting&&operation?.action==='process'?6:reviewing?unresolved||needsRevalidation?4:5:3;
+ const processingResults=terminal||batch.status==='processing';
+ const progress=Math.min(100,Math.max(0,Number(batch.progress??batch.progress_percentage??0)));
+ if(detail.isPending)return <AppLoader label="Loading employee import…" />;
+ if(detail.error)return <ApiErrorState error={detail.error} onRetry={()=>void detail.refetch()} />;
+ return <Frame title="Employee Import Review" description={`${batch.file_name??uuid} · ${batch.form_mode==='detailed'?'Detailed':'Quick'} onboarding`} actions={<><Button size="sm" variant="outline" asChild><Link href="/flexi-import/batches"><ArrowLeft className="mr-2 h-4 w-4" />History</Link></Button><Button size="sm" variant="outline" disabled={busy||status.isFetching} onClick={refresh}><RefreshCw className={`mr-2 h-4 w-4 ${status.isFetching?'animate-spin':''}`} />Refresh</Button></>}>
+ <ImportSteps active={activeStep} />
+ <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-800/10 bg-brand-100 px-4 py-3"><div className="space-y-2"><StatusBadge status={batch.status} size="md" /><p className="text-xs text-muted-foreground">Batch {uuid}</p></div>{status.isFetching&&<AppLoader variant="inline" label="Refreshing status…" />}</div>
+ {queueMessage&&<p role="status" className="rounded-lg border border-brand-800/10 bg-brand-100/50 px-4 py-3 text-xs leading-5 text-muted-foreground">{queueMessage}</p>}
+ {status.error&&<ApiErrorState error={status.error} onRetry={()=>void status.refetch()} />}
+ {(batch.error_message||batch.rejection_reason)&&<div role="alert" className="rounded-lg border border-brand-400/40 bg-brand-400/10 p-4 text-sm text-destructive">{batch.error_message??batch.rejection_reason}</div>}
+ {waiting&&<p role="status" className="rounded-lg border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">{operation?.action==='rollback'?'Rollback was queued. Waiting for the import worker to finish.':operation?.action==='revalidate'?'Revalidation was queued. The previous preview cannot be confirmed yet.':'Request accepted. Waiting for the server to advance this batch.'}</p>}
+ {hasPreview&&<ImportSection number={3} title="Review before you import" description="Employee matching and proposed changes come from the server. Blank cells preserve existing values on update." actions={<Button size="sm" variant="outline" disabled={download.isPending} onClick={()=>download.mutate()}><Download className="mr-2 h-4 w-4" />Error report</Button>}>
+  {summary.isPending?<AppLoader label="Loading validation summary…" />:summary.error?<ApiErrorState error={summary.error} onRetry={()=>void summary.refetch()} />:<><div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><ImportStat label="New employees" value={summary.data?.new_rows??'—'} /><ImportStat label="Existing employees to update" value={summary.data?.update_rows??'—'} /><ImportStat label="Unchanged rows" value={summary.data?.unchanged_rows??'—'} /><ImportStat label="Rows needing attention" value={invalid} /></div><p className="text-xs text-muted-foreground">{valid.toLocaleString()} valid rows · {invalid.toLocaleString()} invalid rows · {batch.total_rows??summary.data?.total_rows??0} total</p>{!!Object.keys(summary.data?.errors_by_field??{}).length&&<details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-xs font-medium text-brand-800">Validation errors by field</summary><ul className="mt-3 space-y-2 text-xs text-destructive">{Object.entries(summary.data?.errors_by_field??{}).map(([label,value])=><li key={label}><strong>{label}</strong>: {typeof value==='number'?`${value} rows`:displayImportValue(value)}</li>)}</ul></details>}</>}
+  <ImportRows key={`${scope}-${uuid}-${revision}`} uuid={uuid} scope={scope} revision={revision} />
+  <div className="rounded-lg border border-brand-800/10 bg-brand-100/50 px-4 py-3 text-xs leading-5 text-muted-foreground">Blank update cells keep existing values. Use <strong className="text-brand-800">{'{clear}'}</strong> only to clear an optional field. Conflicting employee identities are blocked; identifiers such as Device Badge ID stay text.</div>
+ </ImportSection>}
+ {reviewing&&<ImportSection number={4} title="Complete missing reference data" description="Resolve values across their own source tables, then rebuild the preview.">
+  {gaps.isPending?<AppLoader label="Loading missing references…" />:gaps.error?<ApiErrorState error={gaps.error} onRetry={()=>void gaps.refetch()} />:gaps.data&&<ReferenceGaps uuid={uuid} report={gaps.data} disabled={busy||waiting||status.isFetching} onResolved={response=>{setResolvedAt(value=>value+1);if(response.failed.length)toast.error(`${response.failed.length} decisions need attention.`);else toast.success('Decisions applied. Revalidate to refresh the file.');void client.invalidateQueries({queryKey:[...root,'gaps']});}} onRefresh={()=>void client.invalidateQueries({queryKey:[...root,'gaps']})} />}
+  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><p className="max-w-lg text-xs leading-5 text-muted-foreground">After applying decisions or saving in setup, press Re-check. New parent values can reveal further child gaps.</p><Button className={importPrimary} disabled={busy||waiting||status.isFetching} onClick={()=>revalidate.mutate()}>Re-check / revalidate file</Button></div><ImportErrorFeedback error={revalidate.error} />
+ </ImportSection>}
+ {reviewing&&!approvalBound&&<ImportSection number={5} title="Confirm what will be saved" description="Choose how to handle invalid rows and whether to email newly created accounts.">
+  <fieldset disabled={busy||waiting||!!batch.confirmed_at} className="grid gap-5 sm:grid-cols-2"><div className="space-y-2"><legend className="mb-2 text-sm font-medium text-foreground">If rows still have errors</legend>{[{value:'skip_errors' as const,title:'Save valid rows only',description:'Invalid rows are skipped and included in the error report.'},{value:'all_or_nothing' as const,title:'Require every row to be valid',description:'Nothing is imported until all rows pass validation.'}].map(item=><label key={item.value} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${options.import_mode===item.value?'border-brand-800/30 bg-brand-100':'border-border'}`}><input type="radio" name="employee-processing-policy" checked={options.import_mode===item.value} onChange={()=>setDraftOptions({...options,import_mode:item.value,ignore_gaps:item.value==='all_or_nothing'?false:options.ignore_gaps})} className="mt-1 accent-brand-800" /><span><span className="block text-sm font-medium">{item.title}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.description}</span></span></label>)}</div><div className="space-y-3"><Label>Notifications</Label><label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4"><Checkbox checked={options.send_welcome_email} onCheckedChange={value=>setDraftOptions({...options,send_welcome_email:value===true})} /><span><span className="block text-sm font-medium">Share welcome credentials by email</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">New accounts only. Updating an employee does not reset or resend credentials.</span></span></label>{unresolved&&<label className="flex cursor-pointer items-start gap-3 rounded-lg border border-brand-400/50 bg-brand-400/10 p-4"><Checkbox checked={options.ignore_gaps} disabled={options.import_mode!=='skip_errors'} onCheckedChange={value=>setDraftOptions({...options,ignore_gaps:value===true})} /><span><span className="block text-sm font-medium">Skip employees with unresolved missing data</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">This explicitly skips affected employee rows. Those employees will not be imported. Available only with Save valid rows only.</span></span></label>}</div></fieldset>
+  {needsRevalidation&&<p className="text-xs text-destructive">Revalidate your saved reference decisions before confirming.</p>}{unresolved&&!options.ignore_gaps&&<p className="text-xs text-muted-foreground">Resolve missing data, or explicitly choose to skip affected employee rows.</p>}
+  <div className="flex justify-end border-t border-border pt-4"><Button className={importPrimary} disabled={!canProcess} onClick={()=>setConfirmation('process')}>Review & confirm import</Button></div>
+ </ImportSection>}
+ {((hasPreview&&approvalBound)||batch.status==='pending_approval')&&<ImportSection number={5} title={batch.status==='pending_approval'?'Awaiting another approver':'Approval is configured for this import'} description="The initiator cannot approve their own batch. Approval requirements are owned by the backend.">
+  <p className="text-sm leading-6 text-muted-foreground">Welcome email choice saved at upload: <strong className="text-foreground">{batch.send_welcome_email??summary.data?.send_welcome_email?'On':'Off'}</strong>. These options cannot be changed on a frozen approval-bound batch. Use a supported workflow amendment or upload a revised file.</p>
+  {workflow&&(workflow.owned===true||workflow.owner==='system_flex')?<ImportWorkflow workflow={workflow} uuid={uuid} scope={scope} onChanged={refresh} />:<p className="text-xs text-muted-foreground">The server checks approval access, company scope and separation of duties before applying any decision.</p>}
+  {legacyApproval&&<div className="flex flex-wrap gap-2"><Button className={importPrimary} disabled={busy||waiting||isInitiator} onClick={()=>{setComments('');setConfirmation('approve');}}>Approve legacy import</Button><Button variant="outline" disabled={busy||waiting||isInitiator} onClick={()=>{setComments('');setConfirmation('reject');}}>Reject legacy import</Button>{isInitiator&&<p className="w-full text-xs text-muted-foreground">You submitted this batch. Another eligible operator must decide.</p>}</div>}
+ </ImportSection>}
+ <ImportSection number={6} title="Track your import" description={processingResults?'Actual server processing results. Queue acceptance alone is not completion.':'Validation results are a preview; employee changes are not committed yet.'}>
+  <div role="progressbar" aria-label="Import progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="h-2 overflow-hidden rounded-full bg-brand-100"><div className="h-full rounded-full bg-brand-700 transition-[width] duration-300 motion-reduce:transition-none" style={{width:`${progress}%`}} /></div>
+  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{processingResults?<><ImportStat label="Rows processed" value={batch.processed_rows??0} /><ImportStat label="Successful rows" value={batch.successful_rows??0} /><ImportStat label="Failed rows" value={batch.failed_rows??0} /><ImportStat label="Skipped rows" value={batch.skipped_rows??0} /></>:<><ImportStat label="Rows in file" value={batch.total_rows??0} /><ImportStat label="Validation passed" value={batch.successful_rows??0} /><ImportStat label="Validation failed" value={batch.failed_rows??0} /><ImportStat label="Skipped rows" value={batch.skipped_rows??0} /></>}</div>
+  {batch.status==='completed'&&<p className="flex items-center gap-2 text-sm font-medium text-brand-800"><CheckCircle2 className="h-4 w-4" />The server marked this import completed.</p>}
+  <div className="flex flex-wrap justify-end gap-2 border-t pt-4"><Button size="sm" variant="outline" disabled={download.isPending} onClick={()=>download.mutate()}><Download className="mr-2 h-4 w-4" />Error report</Button>{canRollback&&<Button size="sm" variant="outline" disabled={busy||status.isFetching} onClick={()=>setConfirmation('rollback')}><RotateCcw className="mr-2 h-4 w-4" />Rollback</Button>}<Button size="sm" variant="outline" asChild><Link href="/flexi-import/new">New import</Link></Button></div>
+ </ImportSection>
+ {confirmation&&<Modal title={confirmation==='process'?'Confirm employee import':confirmation==='rollback'?'Rollback employee import':confirmation==='approve'?'Approve legacy import':'Reject legacy import'} description={confirmation==='rollback'?'Rollback restores eligible employee changes. Reference records created during resolution remain.':'Review your decision before it is sent to the server.'} busy={busy} onClose={()=>setConfirmation(null)} footer={<><Button variant="outline" disabled={busy} onClick={()=>setConfirmation(null)}>Cancel</Button><Button className={importPrimary} disabled={busy||(confirmation==='process'?!canProcess:confirmation==='rollback'?!canRollback:!legacyApproval||isInitiator||confirmation==='reject'&&!comments.trim())} onClick={()=>confirmation==='process'?process.mutate():confirmation==='rollback'?rollback.mutate():confirmation==='approve'?approve.mutate():reject.mutate()}>{busy?'Submitting…':confirmation==='process'?'Confirm import':confirmation==='rollback'?'Confirm rollback':confirmation==='approve'?'Submit approval':'Submit rejection'}</Button></>}>
+  {confirmation==='process'?<div className="space-y-3 text-sm"><p>Mode: <strong>{options.import_mode==='all_or_nothing'?'Require every row to be valid':'Save valid rows only'}</strong></p><p>Send welcome credentials: <strong>{options.send_welcome_email?'Yes':'No'}</strong></p><p>{valid} valid rows · {invalid} invalid rows</p>{options.ignore_gaps&&<p className="rounded-lg border border-brand-400/40 bg-brand-400/10 p-3 text-xs leading-5 text-destructive">You explicitly chose to skip employees with unresolved missing reference data. This does not import every employee in the file.</p>}</div>:confirmation==='rollback'?<p className="text-sm leading-6 text-muted-foreground">The server checks both eligibility and the rollback window again. Processing stays asynchronous.</p>:<div className="space-y-2"><Label htmlFor="legacy-import-decision">{confirmation==='reject'?'Reason *':'Comments'}</Label><Textarea id="legacy-import-decision" maxLength={500} required={confirmation==='reject'} value={comments} onChange={event=>setComments(event.target.value)} /><p className="text-xs text-muted-foreground">{comments.length}/500</p></div>}
+  <ImportErrorFeedback error={confirmation==='process'?process.error:confirmation==='rollback'?rollback.error:confirmation==='approve'?approve.error:reject.error} />
+ </Modal>}
+ </Frame>;
+}
