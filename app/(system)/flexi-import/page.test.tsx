@@ -11,3 +11,11 @@ it('renders a dashboard containing id/name relationships without React error 31'
  render(<QueryClientProvider client={client}><Page /></QueryClientProvider>);
  expect(await screen.findByText('Import operator')).toBeInTheDocument();expect(screen.getByText('Employee records')).toBeInTheDocument();client.clear();
 });
+it('normalizes relationship objects already present in the shared query cache',async()=>{
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ client.setQueryData(['flexi-import','dashboard'],{recent_batches:[{uuid:'cached-batch',import_type:{id:1,name:'Cached employees'},status:{id:2,name:'Completed'},initiated_by:{id:3,name:'Cached operator'},created_at:'2026-11-18T10:00:00Z'}]});
+ render(<QueryClientProvider client={client}><Page /></QueryClientProvider>);
+ expect(screen.getByText('Cached operator')).toBeInTheDocument();
+ expect(screen.getByText('Cached employees')).toBeInTheDocument();
+ client.clear();
+});

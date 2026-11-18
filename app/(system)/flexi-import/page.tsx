@@ -122,6 +122,7 @@ export default function FlexiImportDashboard() {
     queryKey: ["flexi-import", "dashboard"],
     queryFn: () =>
       api.get("/flexi-import/dashboard").then((r) => { if (r.data.success === false) throw r.data; return normalizeImportDashboard(r.data.data); }),
+    select: normalizeImportDashboard,
     staleTime: 60_000,
   });
 
