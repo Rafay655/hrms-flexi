@@ -29,6 +29,7 @@ export type ImportOptions = { import_mode: 'all_or_nothing' | 'skip_errors'; sen
 export type ImportRow = {
   row_number: number; raw_data: Record<string, unknown> | null; status: string;
   validation_errors: { field?: string; message?: string }[] | null; processing_error: string | null;
+  created_record_id?: number|string|null; created_record_type?: string|null;
   row_action?: 'new'|'create'|'update'|'unchanged'|string; matched_employee_id?: number|null;
   value_diff?: { key: string; field: string; role?: string|null; old: unknown; new: unknown }[];
 };
@@ -40,6 +41,7 @@ export type ImportSummary = {
   gap_summary?: { has_gaps: boolean; gap_values: number; gap_tables: string[]; decisions_made: number };
   errors_by_field?: Record<string, unknown>; sample_errors?: unknown[];
 };
+export type RetryFailedResult = { batch_uuid: string; status: string; retry_rows: number };
 export type QueuedResult = { uuid?: string; batch_uuid?: string; status?: string };
 export type ImportHistory = { data: EmployeeImportBatch[]; page: number; hasNext: boolean; total?: number; lastPage?: number };
 const ROOT='/flexi-import';
@@ -95,6 +97,7 @@ export const employeeImportService = {
   },
   async revalidate(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/revalidate`,{})).data);},
   async process(uuid:string,options:ImportOptions):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/process`,options)).data);},
+  async retryFailed(uuid:string):Promise<RetryFailedResult>{return importData((await api.post(`${ROOT}/batches/${uuid}/retry-failed`)).data);},
   async rollback(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/rollback`,{})).data);},
   async approve(uuid:string,comments:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/approve`,{comments})).data);},
   async reject(uuid:string,reason:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/reject`,{reason})).data);},

@@ -64,3 +64,9 @@ it('retains error envelopes and support references',()=>{
  const error={success:false,error:{code:'VALIDATION_FAILED',message:'Invalid mapping',request_id:'support-id',field_errors:{file:['Invalid file']}}};
  try{importData(error);throw new Error('Expected failure');}catch(actual){expect(actual).toBe(error);}
 });
+
+it('queues failed-row retry without a request body',async()=>{
+ const result={batch_uuid:'batch',status:'validation_complete',retry_rows:1};vi.mocked(api.post).mockResolvedValue({data:{success:true,message:'Retry queued.',data:result}});
+ expect(await service.retryFailed('batch')).toEqual(result);
+ expect(api.post).toHaveBeenCalledWith('/flexi-import/batches/batch/retry-failed');
+});

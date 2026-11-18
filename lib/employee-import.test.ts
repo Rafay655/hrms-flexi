@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {canConfirmImport,gapIdentity,gapSetupPath,importPollInterval,displayImportValue,observeImportProgress,importWaitingMessage,normalizeGapSuggestion} from './employee-import';
+import {canConfirmImport,gapIdentity,gapSetupPath,importPollInterval,displayImportValue,observeImportProgress,importWaitingMessage,normalizeGapSuggestion,hasRetryableImportFailures} from './employee-import';
 import type {GapReport} from '@/services/employee-import.service';
 const gaps:GapReport={status:'validation_complete',has_gaps:false,total_gap_values:0,tables:[]};
 it('requires ready validation and never processes an approval-bound batch',()=>{
@@ -44,4 +44,15 @@ it('normalizes actual suggestion names without inventing labels or ids',()=>{
  expect(normalizeGapSuggestion({id:7})).toBeNull();
  expect(normalizeGapSuggestion({name:'No id'})).toBeNull();
  expect(normalizeGapSuggestion({id:7,label:'undefined'})).toBeNull();
+});
+
+it('offers retry only for terminal skip-errors employee processing failures',()=>{
+ const batch={uuid:'batch',status:'completed',import_type:'employees',import_mode:'skip_errors'};
+ expect(hasRetryableImportFailures(batch,[{status:'failed',created_record_id:null}])).toBe(true);
+ expect(hasRetryableImportFailures({...batch,status:'failed'},[{status:'failed'}])).toBe(true);
+ expect(hasRetryableImportFailures(batch,[{status:'invalid'}])).toBe(false);
+ expect(hasRetryableImportFailures({...batch,import_mode:'all_or_nothing'},[{status:'failed'}])).toBe(false);
+ expect(hasRetryableImportFailures({...batch,status:'processing'},[{status:'failed'}])).toBe(false);
+ expect(hasRetryableImportFailures({...batch,import_type:'flexi_meta_entities'},[{status:'failed'}])).toBe(false);
+ expect(hasRetryableImportFailures(batch,[{status:'failed',created_record_id:9}])).toBe(false);
 });

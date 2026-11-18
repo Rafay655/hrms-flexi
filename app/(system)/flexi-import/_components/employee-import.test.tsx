@@ -13,7 +13,7 @@ vi.mock('next/navigation',()=>({useRouter:()=>({push})}));
 vi.mock('@/store/hooks',()=>({useAppSelector:(select:(state:{auth:typeof auth})=>unknown)=>select({auth})}));
 vi.mock('react-hot-toast',()=>({default:{success:vi.fn(),error:vi.fn(),dismiss:vi.fn()}}));
 vi.mock('@/components/ui/searchable-select',()=>({default:({value,options,onChange,allLabel,allowAll=true,disabled,...props}:{value:string;options:{value:string;label:string}[];onChange:(value:string)=>void;allLabel?:string;allowAll?:boolean;disabled?:boolean;'aria-label'?:string})=><select aria-label={props['aria-label']} value={value} disabled={disabled} onChange={event=>onChange(event.target.value)}>{allowAll&&<option value="">{allLabel}</option>}{!allowAll&&!value&&<option value="">Select</option>}{options.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select>}));
-vi.mock('@/services/employee-import.service',()=>({employeeImportService:{fields:vi.fn(),template:vi.fn(),upload:vi.fn(),validateMapping:vi.fn(),detail:vi.fn(),status:vi.fn(),gaps:vi.fn(),summary:vi.fn(),rows:vi.fn(),process:vi.fn(),resolve:vi.fn(),revalidate:vi.fn(),rollback:vi.fn(),approve:vi.fn(),reject:vi.fn()}}));
+vi.mock('@/services/employee-import.service',()=>({employeeImportService:{fields:vi.fn(),template:vi.fn(),upload:vi.fn(),validateMapping:vi.fn(),detail:vi.fn(),status:vi.fn(),gaps:vi.fn(),summary:vi.fn(),rows:vi.fn(),process:vi.fn(),resolve:vi.fn(),revalidate:vi.fn(),rollback:vi.fn(),retryFailed:vi.fn(),approve:vi.fn(),reject:vi.fn()}}));
 vi.mock('@/services/flexi-import.service',()=>({flexiImportService:{downloadErrorReport:vi.fn()}}));
 let client:QueryClient,batch:EmployeeImportBatch,report:GapReport,summary:ImportSummary;
 function mount(node:ReactNode){client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});render(<QueryClientProvider client={client}>{node}</QueryClientProvider>);}
@@ -115,4 +115,32 @@ it('supports the live banks/divisions/shifts payload without field labels',async
  fireEvent.click(screen.getByRole('button',{name:'Apply decisions'}));
  await waitFor(()=>expect(service.resolve).toHaveBeenCalledWith('batch',[{source_key:'divisions',value:'Information Technlogy',action:'use_existing',existing_id:8}]));
  expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+});
+
+it('queues a retry without reupload and refreshes results when processing finishes',async()=>{
+ batch.status='completed';batch.import_mode='skip_errors';batch.failed_rows=1;
+ let failed=true;
+ vi.mocked(service.rows).mockImplementation(async(_uuid,status)=>({page:1,hasNext:false,data:status==='failed'&&failed?[{row_number:3,status:'failed',raw_data:{'Employee ID':'EMP-001'},processing_error:'Backend error',validation_errors:null,created_record_id:null}]:[]}));
+ vi.mocked(service.retryFailed).mockImplementation(async()=>{batch={...batch,status:'validation_complete'};return {batch_uuid:'batch',status:'validation_complete',retry_rows:1};});
+ mount(<EmployeeBatchReview uuid="batch" />);
+ const retry=await screen.findByRole('button',{name:'Retry failed rows'});await waitFor(()=>expect(retry).toBeEnabled());fireEvent.click(retry);
+ expect(within(screen.getByRole('dialog')).getByText(/Deploy the backend fix before retrying/)).toBeInTheDocument();
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Queue retry'}));
+ await waitFor(()=>expect(service.retryFailed).toHaveBeenCalledWith('batch'));
+ await screen.findByText(/Retry is queued or in progress/);
+ expect(screen.queryByRole('button',{name:'Retry failed rows'})).not.toBeInTheDocument();expect(service.upload).not.toHaveBeenCalled();expect(service.process).not.toHaveBeenCalled();
+ const summaryCalls=vi.mocked(service.summary).mock.calls.length;
+ failed=false;batch={...batch,status:'completed',failed_rows:0,successful_rows:2};
+ const refresh=screen.getByRole('button',{name:'Refresh'});await waitFor(()=>expect(refresh).toBeEnabled());fireEvent.click(refresh);
+ await waitFor(()=>expect(vi.mocked(service.summary).mock.calls.length).toBeGreaterThan(summaryCalls));
+ await screen.findByText('The server marked this import completed.');
+});
+it('refreshes and displays the server conflict when retry is refused',async()=>{
+ batch.status='failed';batch.import_mode='skip_errors';batch.failed_rows=1;
+ vi.mocked(service.rows).mockResolvedValue({page:1,hasNext:false,data:[{row_number:3,status:'failed',raw_data:null,processing_error:'Backend error',validation_errors:null}]});
+ vi.mocked(service.retryFailed).mockRejectedValue({response:{status:409,data:{success:false,message:'Retry is already in progress.'}}});
+ mount(<EmployeeBatchReview uuid="batch" />);const retry=await screen.findByRole('button',{name:'Retry failed rows'});await waitFor(()=>expect(retry).toBeEnabled());fireEvent.click(retry);
+ const calls=vi.mocked(service.status).mock.calls.length;fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Queue retry'}));
+ await waitFor(()=>expect(screen.getAllByText('Retry is already in progress.').length).toBeGreaterThan(0));
+ await waitFor(()=>expect(vi.mocked(service.status).mock.calls.length).toBeGreaterThan(calls));
 });

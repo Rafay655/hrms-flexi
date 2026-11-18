@@ -57,3 +57,7 @@ export function normalizeGapSuggestion(raw:unknown):GapSuggestion|null{
 export function gapFieldLabel(gap:{field?:string;source_key:string;source_table?:string}):string{
  return gap.field?.trim()||(gap.source_table||gap.source_key).split('_').filter(Boolean).map(word=>word.charAt(0).toUpperCase()+word.slice(1)).join(' ');
 }
+
+export function hasRetryableImportFailures(batch:EmployeeImportBatch,failedRows:{status:string;created_record_id?:number|string|null}[]):boolean{
+ return ['completed','failed'].includes(batch.status)&&['employees','employee'].includes(batch.import_type??'')&&batch.import_mode==='skip_errors'&&failedRows.some(row=>row.status==='failed')&&!failedRows.some(row=>row.created_record_id!==undefined&&row.created_record_id!==null);
+}
