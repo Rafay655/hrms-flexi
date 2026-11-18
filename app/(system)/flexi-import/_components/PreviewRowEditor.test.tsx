@@ -1,0 +1,23 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {render,screen,fireEvent,waitFor,cleanup} from '@testing-library/react';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {employeeImportService as service} from '@/services/employee-import.service';
+import {PreviewRowEditor} from './PreviewRowEditor';
+vi.mock('@/services/employee-import.service',()=>({employeeImportService:{previewFields:vi.fn(),rows:vi.fn(),correctRows:vi.fn()}}));
+afterEach(()=>{cleanup();vi.clearAllMocks();});
+it('edits invalid rows with labels and sends only changed field keys before awaiting validation',async()=>{
+ vi.mocked(service.previewFields).mockResolvedValue([{key:'field_phone',label:'Emergency contact',type:'text',required:true},{key:'field_department',label:'Department',type:'text',required:true}]);
+ vi.mocked(service.rows).mockResolvedValue({data:[{row_number:3,status:'invalid',raw_data:{'Emergency contact':'bad',Department:'Payroll'},validation_errors:[{message:'Phone is invalid'}],processing_error:null}],page:1,hasNext:false});
+ vi.mocked(service.correctRows).mockResolvedValue({batch_uuid:'batch',status:'validating'});
+ const queued=vi.fn(),client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><PreviewRowEditor uuid="batch" scope="company:user" mode="detailed" revision={0} onQueued={queued} onRefresh={vi.fn()} /></QueryClientProvider>);
+ fireEvent.click(await screen.findByRole('button',{name:'Edit row'}));
+ fireEvent.change(await screen.findByLabelText('Emergency contact'),{target:{value:'+923001234567'}});
+ expect(screen.queryByText('field_phone')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
+ await waitFor(()=>expect(service.correctRows).toHaveBeenCalledWith('batch',[{row_number:3,fields:{field_phone:'+923001234567'}}]));
+ await waitFor(()=>expect(queued).toHaveBeenCalledWith({batch_uuid:'batch',status:'validating'}));
+ expect(service.previewFields).toHaveBeenCalledWith('detailed',expect.any(AbortSignal));
+ expect(service.rows).toHaveBeenCalledWith('batch','invalid',1,expect.any(AbortSignal));
+ client.clear();
+});

@@ -5,6 +5,7 @@ import type { FormMode } from '@/types/onboarding-form';
 
 export type TemplateSelection = { form_mode: FormMode; required_only: boolean };
 export type EmployeeImportBatch = {
+  can_edit_preview?: boolean;
   uuid: string; status: string; import_type?: string; form_mode?: FormMode; file_name?: string;
   total_rows?: number; processed_rows?: number; successful_rows?: number; failed_rows?: number; skipped_rows?: number;
   valid_rows?: number; invalid_rows?: number; has_gaps?: boolean; requires_approval?: boolean; confirmed_at?: string | null;
@@ -56,6 +57,16 @@ function paginated<T>(raw: T[]|{data:T[];meta?:Record<string,number>},outer:Reco
   return {data,page:meta?.current_page??page,hasNext:meta?.last_page!==undefined?page<meta.last_page:data.length===size,...(meta?.total!==undefined?{total:meta.total}:{}),...(meta?.last_page!==undefined?{lastPage:meta.last_page}:{})};
 }
 export const employeeImportService = {
+  async previewFields(mode:FormMode,signal?:AbortSignal):Promise<FieldDefinition[]> {
+    const {data}=await api.get(`${ROOT}/fields/employees`,{params:{form_mode:mode,include_values:0},signal});
+    const raw=importData<Record<string,unknown>[]>(data);
+    if(!Array.isArray(raw))throw new Error('Unexpected import field response.');
+    return raw.filter(field=>field.hidden!==true&&field.visible!==false&&field.show!==false&&field.type!=='file').map(field=>normalizeFieldDefinition({...field,key:field.field_key??field.key})).filter(field=>!!field.key&&!!field.label);
+  },
+  async correctRows(uuid:string,changes:{row_number:number;fields:Record<string,string|null>}[]):Promise<QueuedResult>{
+    if(!changes.length||changes.length>100||changes.some(change=>!Number.isInteger(change.row_number)||Object.keys(change.fields).length===0||Object.keys(change.fields).length>200||Object.values(change.fields).some(value=>value!==null&&(typeof value!=='string'||value.length>5000))))throw new Error('Select up to 100 rows with 1–200 changed fields, each at most 5,000 characters.');
+    return importData((await api.patch(`${ROOT}/batches/${uuid}/rows`,{changes})).data);
+  },
   async fields(mode:FormMode,requiredOnly=false,signal?:AbortSignal):Promise<FieldDefinition[]> {
     const {data}=await api.get(`${ROOT}/fields/employees`,{params:{form_mode:mode,required_only:requiredOnly?1:0},signal});
     const raw=importData<unknown>(data);

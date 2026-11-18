@@ -1,7 +1,7 @@
 import {beforeEach,expect,it,vi} from 'vitest';
 import {api} from '@/lib/api';
 import {employeeImportService as service,importData,type GapDecision} from './employee-import.service';
-vi.mock('@/lib/api',()=>({api:{get:vi.fn(),post:vi.fn()}}));
+vi.mock('@/lib/api',()=>({api:{get:vi.fn(),post:vi.fn(),patch:vi.fn()}}));
 beforeEach(()=>{vi.clearAllMocks();vi.mocked(api.post).mockResolvedValue({data:{success:true,data:{uuid:'batch',status:'uploaded'}}});});
 it.each([['quick',false],['quick',true],['detailed',false],['detailed',true]] as const)('uses independent form and fields choices for %s/%s',async(mode,required)=>{
  vi.mocked(api.get).mockResolvedValue({data:{success:true,data:[{field_key:'dynamic-key',label:'Department',required:true}]}});
@@ -69,4 +69,16 @@ it('queues failed-row retry without a request body',async()=>{
  const result={batch_uuid:'batch',status:'validation_complete',retry_rows:1};vi.mocked(api.post).mockResolvedValue({data:{success:true,message:'Retry queued.',data:result}});
  expect(await service.retryFailed('batch')).toEqual(result);
  expect(api.post).toHaveBeenCalledWith('/flexi-import/batches/batch/retry-failed');
+});
+
+it('uses preview field keys and sends corrections to PATCH without processing employees',async()=>{
+ vi.mocked(api.get).mockResolvedValue({data:{success:true,data:[{field_key:'contact',label:'Contact',type:'text'},{field_key:'upload',label:'Document',type:'file'}]}});
+ expect(await service.previewFields('quick')).toEqual([expect.objectContaining({key:'contact',label:'Contact'})]);
+ expect(api.get).toHaveBeenLastCalledWith('/flexi-import/fields/employees',{params:{form_mode:'quick',include_values:0},signal:undefined});
+ vi.mocked(api.patch).mockResolvedValue({data:{success:true,data:{batch_uuid:'batch',status:'validating'}}});
+ const changes=[{row_number:3,fields:{contact:'0042'}}];
+ expect(await service.correctRows('batch',changes)).toEqual({batch_uuid:'batch',status:'validating'});
+ expect(api.patch).toHaveBeenCalledWith('/flexi-import/batches/batch/rows',{changes});
+ await expect(service.correctRows('batch',[{row_number:3,fields:{}}])).rejects.toThrow();
+ await expect(service.correctRows('batch',[{row_number:3,fields:{contact:'x'.repeat(5001)}}])).rejects.toThrow();
 });
