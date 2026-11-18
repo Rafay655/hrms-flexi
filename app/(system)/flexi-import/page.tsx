@@ -30,40 +30,11 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { normalizeImportDashboard, type ImportDashboardData as DashboardData } from "@/lib/flexi-import-dashboard";
 
 // ── API types ─────────────────────────────────────────────────────────────────
 
-type BatchStatus =
-  | "pending"
-  | "validating"
-  | "validation_complete"
-  | "pending_approval"
-  | "approved"
-  | "processing"
-  | "completed"
-  | "failed"
-  | "rejected"
-  | "rolled_back";
-
-type RecentBatch = {
-  uuid: string;
-  import_type: string;
-  status: BatchStatus;
-  total_rows: number;
-  successful_rows: number | null;
-  failed_rows: number | null;
-  initiated_by: string | { id: string | number; name: string } | null;
-  created_at: string;
-  completed_at: string | null;
-};
-
-type DashboardData = {
-  total_imports_month: number;
-  successful_rows_month: number;
-  failed_rows_month: number;
-  pending_approval_count: number;
-  recent_batches: RecentBatch[];
-};
+type BatchStatus = string;
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -150,7 +121,7 @@ export default function FlexiImportDashboard() {
   const { data, isLoading, isError } = useQuery<DashboardData>({
     queryKey: ["flexi-import", "dashboard"],
     queryFn: () =>
-      api.get("/flexi-import/dashboard").then((r) => r.data.data),
+      api.get("/flexi-import/dashboard").then((r) => { if (r.data.success === false) throw r.data; return normalizeImportDashboard(r.data.data); }),
     staleTime: 60_000,
   });
 
@@ -496,9 +467,7 @@ export default function FlexiImportDashboard() {
                       </td>
 
                       <td className="px-4 py-4 text-muted-foreground hidden md:table-cell">
-                        {(typeof batch.initiated_by === "string"
-                          ? batch.initiated_by
-                          : batch.initiated_by?.name) || "—"}
+                        {batch.initiated_by || "—"}
                       </td>
 
                       <td className="px-4 py-4 text-muted-foreground hidden sm:table-cell tabular-nums text-xs">
