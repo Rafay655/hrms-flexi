@@ -1,0 +1,22 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {cleanup,render,screen,fireEvent} from '@testing-library/react';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {FieldVisibilityEditor} from './FieldVisibilityEditor';
+import {onboardingService} from '@/services/onboarding-form.service';
+import type {OnboardSettingField} from '@/types/onboard-settings';
+vi.mock('@/services/onboarding-form.service',()=>({onboardingService:{getLookupOptions:vi.fn()}}));
+afterEach(()=>{cleanup();vi.clearAllMocks();});
+it('uses company lookup option values and clears rules with null',async()=>{
+ vi.mocked(onboardingService.getLookupOptions).mockResolvedValue([{label:'Married',value:42},{label:'Single',value:17}]);
+ const parent={id:1,system_key:'actual_marital',type:'select',label:'Marital status',source_type:'dynamic',source_table:'marital_statuses'} as OnboardSettingField;
+ const child={id:2,system_key:'spouse',type:'text',label:'Spouse',visibility_condition:{field_key:'actual_marital',values:['42']}} as OnboardSettingField;
+ const changed=vi.fn(),client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><FieldVisibilityEditor field={child} fields={[parent,child]} companyUuid="company" onChange={changed} /></QueryClientProvider>);
+ expect(await screen.findByRole('checkbox',{name:'Married'})).toBeChecked();
+ fireEvent.click(screen.getByRole('checkbox',{name:'Single'}));
+ expect(changed).toHaveBeenLastCalledWith({field_key:'actual_marital',values:['42','17']});
+ fireEvent.click(screen.getByRole('button',{name:'Clear condition'}));
+ expect(changed).toHaveBeenLastCalledWith(null);
+ expect(onboardingService.getLookupOptions).toHaveBeenCalledWith({companyUuid:'company',sourceKey:'marital_statuses'});
+ client.clear();
+});

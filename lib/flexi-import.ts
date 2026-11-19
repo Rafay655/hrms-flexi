@@ -1,3 +1,4 @@
+import type { VisibilityCondition } from "@/lib/onboarding-visibility";
 /**
  * FlexiImport wizard — pure, framework-free helpers + shared DTO types.
  *
@@ -9,6 +10,7 @@
  */
 
 export interface FieldDefinition {
+  visibility_condition?: VisibilityCondition | null;
   key: string;
   label: string;
   type: string;
@@ -47,6 +49,7 @@ export function normalizeFieldDefinition(
   raw: Record<string, unknown>
 ): FieldDefinition {
   return {
+    ...(raw.visibility_condition !== undefined ? {visibility_condition: raw.visibility_condition as VisibilityCondition | null} : {}),
     key: String(raw.key ?? raw.field_key ?? ""),
     label: String(raw.label ?? raw.field_key ?? raw.key ?? ""),
     type: String(raw.type ?? "text"),

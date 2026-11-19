@@ -1,3 +1,4 @@
+import type { VisibilityCondition } from "@/lib/onboarding-visibility";
 export type FormMode = "quick" | "detailed";
 
 export type ComplianceTag = "nadra" | "eobi" | "fbr" | "safety" | "ss" | string;
@@ -21,6 +22,8 @@ export type ApiFieldValueObject = {
 };
 
 export type ApiField = {
+  visibility_condition?: VisibilityCondition | null;
+  is_core?: boolean;
   id: number;
   label: string;
 
@@ -54,6 +57,7 @@ export type ApiField = {
   validations?: ApiFieldValidation[];
 
   value?:
+    | boolean
     | string
     | number
     | string[]
@@ -61,6 +65,7 @@ export type ApiField = {
     | ApiFieldValueObject[]
     | null;
   current_value?:
+    | boolean
     | string
     | number
     | string[]
@@ -68,6 +73,7 @@ export type ApiField = {
     | ApiFieldValueObject[]
     | null;
   default_value?:
+    | boolean
     | string
     | number
     | string[]
@@ -167,5 +173,6 @@ export type StepSubmitPayload = {
   step_id: number;
   values: FormValues;
   fields: ApiField[];
+  allFields?: ApiField[];
   employee_uuid?: string;
 };

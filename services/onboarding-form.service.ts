@@ -1,3 +1,4 @@
+import { visibleFieldKeys, conditionFieldKey } from "@/lib/onboarding-visibility";
 import { api } from "@/lib/api";
 import {
   ApiField,
@@ -82,7 +83,9 @@ function buildStepFormData(payload: StepSubmitPayload) {
   formData.append("form_mode", payload.form_mode);
   formData.append("step_id", String(payload.step_id));
 
-  payload.fields.forEach((field) => {
+  const allFields=payload.allFields??payload.fields;
+  const visible=visibleFieldKeys(allFields,payload.values,payload.form_mode);
+  payload.fields.filter(field=>visible.has(conditionFieldKey(field))).forEach((field) => {
     const fieldKey = getFieldKey(field);
     const value = payload.values[fieldKey];
 
@@ -130,6 +133,22 @@ export type OnboardingReadiness = {
 };
 
 export const onboardingService = {
+  async validateStep(payload:StepSubmitPayload,companyUuid:string){
+    const allFields=payload.allFields??payload.fields;
+    const visible=visibleFieldKeys(allFields,payload.values,payload.form_mode);
+    const keys=new Set(payload.fields.filter(field=>visible.has(conditionFieldKey(field))).map(conditionFieldKey));
+    const byKey=new Map(allFields.map(field=>[conditionFieldKey(field),field]));
+    for(const field of payload.fields){
+      let parent=field.visibility_condition?.field_key;
+      const seen=new Set<string>();
+      while(parent&&!seen.has(parent)){
+        seen.add(parent);if(visible.has(parent))keys.add(parent);
+        parent=byKey.get(parent)?.visibility_condition?.field_key;
+      }
+    }
+    const data=Object.fromEntries(Object.entries(payload.values).filter(([key,value])=>keys.has(key)&&!(value instanceof File)));
+    return (await api.post(`${BASE_URL}/validate-step`,{form_mode:payload.form_mode,step_id:payload.step_id,data},{headers:{'X-Company-ID':companyUuid}})).data;
+  },
   async readiness(mode: FormMode, signal?: AbortSignal): Promise<OnboardingReadiness> {
     const { data } = await api.get<{ success: boolean; message?: string; data: OnboardingReadiness }>(`${BASE_URL}/readiness`, { params: { mode }, signal });
     if (!data.success) throw new Error(data.message || "Unable to check onboarding readiness.");

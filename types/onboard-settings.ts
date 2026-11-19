@@ -1,3 +1,4 @@
+import type { VisibilityCondition } from "@/lib/onboarding-visibility";
 export const FIELD_TYPES = [
   "text",
   "email",
@@ -42,6 +43,8 @@ export type FieldValidationRule = {
 };
 
 export type OnboardSettingField = {
+  visibility_condition?: VisibilityCondition | null;
+  is_core?: boolean;
   id: number;
   step_id: number;
   label: string;
@@ -118,6 +121,7 @@ export type ValidationRuleCatalogItem = {
 };
 
 export type SaveOnboardFieldPayload = {
+  visibility_condition?: VisibilityCondition | null;
   step_id: number;
   label: string;
   type: FieldType;

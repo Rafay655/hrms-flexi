@@ -214,7 +214,7 @@ function getPreviewValue(
     return match ? match.label : value ? String(value) : "—";
   }
 
-  if (field.type === "checkbox") {
+  if ((field.type === "checkbox" || field.type === "toggle")) {
     return value === "1" ? "Yes" : "No";
   }
 
@@ -1163,7 +1163,7 @@ export default function OnboardPage() {
               </label>
             ))}
           </div>
-        ) : field.type === "checkbox" ? (
+        ) : (field.type === "checkbox" || field.type === "toggle") ? (
           <label
             className={
               errorMessage
@@ -1175,7 +1175,7 @@ export default function OnboardPage() {
               type="checkbox"
               checked={value === "1"}
               onChange={(event) =>
-                setFieldValue(fieldKey, event.target.checked ? "1" : "")
+                setFieldValue(fieldKey, event.target.checked ? "1" : "0")
               }
               className="h-4 w-4 accent-[var(--brand-800)]"
             />

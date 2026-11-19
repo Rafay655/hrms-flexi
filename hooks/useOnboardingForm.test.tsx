@@ -1,0 +1,24 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {act,cleanup,renderHook,waitFor} from '@testing-library/react';
+import {useOnboardingForm} from './useOnboardingForm';
+import {onboardingService as service} from '@/services/onboarding-form.service';
+vi.mock('next/navigation',()=>({useParams:()=>({})}));
+vi.mock('@/services/onboarding-form.service',async(importOriginal)=>{const actual=await importOriginal<typeof import('@/services/onboarding-form.service')>();return {...actual,onboardingService:{...actual.onboardingService,getForm:vi.fn(),submitStep:vi.fn()}};});
+afterEach(()=>{cleanup();vi.clearAllMocks();});
+it('keeps cross-step parents, removes hidden errors and applies independent mode requirements',async()=>{
+ vi.mocked(service.getForm).mockResolvedValue({success:true,message:'ok',data:[{id:1,name:'Identity',icon:null,order:1,fields_count:1,required_count:1,fields:[{id:1,system_key:'marital',type:'select',label:'Marital status',is_required:true,is_login_email:false}]},{id:2,name:'Family',icon:null,order:2,fields_count:1,required_count:1,fields:[{id:2,system_key:'spouse',type:'text',label:'Spouse',is_required:true,required_in_quick:false,required_in_detail:true,is_login_email:false,visibility_condition:{field_key:'marital',values:['42']}}]}],meta:{mode:'quick',total_steps:2,total_fields:2,total_required:2}});
+ vi.mocked(service.submitStep).mockResolvedValue({success:true,message:'Saved',employeeUuid:'employee',errors:{},raw:{success:true,message:'Saved'}});
+ const {result}=renderHook(()=>useOnboardingForm());
+ await waitFor(()=>expect(result.current.loading).toBe(false));
+ act(()=>result.current.setFieldValue('marital','42'));
+ act(()=>result.current.setCurrentStepIndex(1));
+ expect(result.current.currentFields[0].is_required).toBe(false);
+ act(()=>{result.current.setFieldValue('spouse','Saved value');result.current.setFieldErrors({spouse:'Old error'});});
+ act(()=>result.current.setFieldValue('marital','1'));
+ expect(result.current.currentFields).toHaveLength(0);expect(result.current.fieldErrors).toEqual({});
+ expect(result.current.values.spouse).toBe('Saved value');
+ await act(()=>result.current.goNext());
+ expect(service.submitStep).toHaveBeenLastCalledWith(expect.objectContaining({fields:[],allFields:expect.any(Array)}),expect.any(String));
+ act(()=>result.current.setFieldValue('marital','42'));
+ expect(result.current.currentFields[0].label).toBe('Spouse');expect(result.current.fieldErrors).toEqual({});
+});

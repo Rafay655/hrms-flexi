@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { visibleFieldKeys, conditionFieldKey } from "@/lib/onboarding-visibility";
 import { useParams } from "next/navigation";
 
 import {
@@ -68,7 +69,7 @@ function normalizeApiValueToFieldValue(rawValue: unknown): FieldValue {
 
           if (fileUrl) return String(fileUrl);
 
-          return String(objectValue.id ?? objectValue.value ?? "");
+          return String(objectValue.value ?? objectValue.id ?? "");
         }
 
         return String(item);
@@ -100,11 +101,12 @@ function normalizeApiValueToFieldValue(rawValue: unknown): FieldValue {
       return fileUrl;
     }
 
-    const finalValue = objectValue.id ?? objectValue.value ?? "";
+    const finalValue = objectValue.value ?? objectValue.id ?? "";
 
     return finalValue === "" ? null : String(finalValue);
   }
 
+  if (typeof rawValue === "boolean") return rawValue ? "1" : "0";
   return String(rawValue);
 }
 
@@ -132,7 +134,7 @@ function buildFormConfigInitialValues(steps: ApiStep[]) {
       if (!fieldKey) return;
 
       const rawValue =
-        field.current_value ?? field.value ?? field.default_value ?? null;
+        field.current_value ?? field.value ?? field.default_value ?? (["checkbox", "toggle"].includes(field.type) ? "0" : null);
 
       const finalValue = normalizeApiValueToFieldValue(rawValue);
 
@@ -218,11 +220,15 @@ export function useOnboardingForm() {
 
   const isEditMode = Boolean(routeEmployeeUuid);
 
+  const allFields = useMemo(() => steps.flatMap(step => step.fields), [steps]);
+  const visibleKeys = useMemo(() => visibleFieldKeys(allFields, values, mode), [allFields, values, mode]);
   const visibleSteps = useMemo(() => {
-    return [...steps].sort((a, b) =>
-      a.order !== b.order ? a.order - b.order : a.id - b.id
-    );
-  }, [steps]);
+    return [...steps].sort((a,b)=>a.order!==b.order?a.order-b.order:a.id-b.id).map(step=>({
+      ...step, fields:step.fields.filter(field=>visibleKeys.has(conditionFieldKey(field))).map(field=>({
+        ...field, is_required:(mode==='quick'?field.required_in_quick:field.required_in_detail)??field.is_required,
+      })),
+    }));
+  }, [steps, visibleKeys, mode]);
 
   const safeStepIndex = Math.min(
     currentStepIndex,
@@ -496,9 +502,8 @@ const cacheKey = `${fieldKey}:${sourceKey}:${"parent_value"}:${parentValue}`;
     clearDependentValues(fieldKey);
 
     setFieldErrors((prev) => {
-      if (!prev[fieldKey]) return prev;
-
-      const next = { ...prev };
+      const nextKeys=visibleFieldKeys(allFields,{...values,[fieldKey]:value},mode);
+      const next = Object.fromEntries(Object.entries(prev).filter(([key])=>nextKeys.has(key)));
       delete next[fieldKey];
 
       return next;
@@ -545,6 +550,7 @@ const cacheKey = `${fieldKey}:${sourceKey}:${"parent_value"}:${parentValue}`;
           step_id: currentStep.id,
           values,
           fields: currentFields,
+          allFields,
           employee_uuid: employeeUuid || undefined,
         },
         companyUuid
@@ -654,7 +660,7 @@ const cacheKey = `${fieldKey}:${sourceKey}:${"parent_value"}:${parentValue}`;
     values,
     setFieldValue,
 
-    fieldErrors,
+    fieldErrors: Object.fromEntries(Object.entries(fieldErrors).filter(([key])=>visibleKeys.has(key))),
     setFieldErrors,
 
     lazyOptions,

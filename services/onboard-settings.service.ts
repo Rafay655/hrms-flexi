@@ -84,7 +84,7 @@ async getValidationRules() {
     return response.data;
   },
   async updateField(fieldId: number, payload: SaveOnboardFieldPayload) {
-  const response = await api.put(
+  const response = await api.patch(
     `/flexi-hq/onboard-settings/fields/${fieldId}`,
     payload
   );

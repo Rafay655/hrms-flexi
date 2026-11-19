@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldVisibilityEditor } from "@/components/FieldVisibilityEditor";
+import { createsVisibilityCycle } from "@/lib/onboarding-visibility";
 import { showApiError } from "@/lib/error-toast";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -559,12 +561,21 @@ export default function SettingsPage() {
 
       tags: field.tags,
       is_login_email: field.is_login_email,
+      visibility_condition: field.is_core || field.is_login_email ? null : field.visibility_condition ?? null,
     };
   };
 
   const handleSaveField = () => {
     if (!selectedField) return;
 
+    const condition=selectedField.visibility_condition;
+    if(condition){
+      const formFields=steps.flatMap(step=>step.id===activeStep?.id?fields:step.fields);
+      const parent=formFields.find(field=>field.system_key===condition.field_key);
+      if(selectedField.is_core||selectedField.is_login_email||!parent||!['select','radio','checkbox','toggle'].includes(parent.type)||!condition.values.length||createsVisibilityCycle(formFields,selectedField.system_key??'',condition.field_key)){
+        toast.error('Choose an eligible controlling field and at least one value. Conditions cannot form a cycle or apply to core fields.');return;
+      }
+    }
     if (!selectedField.label.trim()) {
       toast.error("Field label is required.");
       return;
@@ -1372,6 +1383,10 @@ export default function SettingsPage() {
                           </div>
                         </div>
 
+                        <div className="border-b border-gray-100 px-5 py-4">
+                          <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Conditional visibility</h4>
+                          <FieldVisibilityEditor field={selectedField} fields={steps.flatMap(step=>step.id===activeStep?.id?fields:step.fields)} companyUuid={companyUuid??''} onChange={rule=>updateField(selectedField.client_id,{visibility_condition:rule})} />
+                        </div>
                         <div className="border-b border-gray-100 px-5 py-4">
                           <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                             Required Per Mode
