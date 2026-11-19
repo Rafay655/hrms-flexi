@@ -5,7 +5,9 @@ import type { FormMode } from '@/types/onboarding-form';
 
 export type TemplateSelection = { form_mode: FormMode; required_only: boolean };
 export type EmployeeImportBatch = {
-  can_edit_preview?: boolean;
+  validation_errors?:{row?:number;field?:string;message?:string}[]|null;
+  template_uuid?:string|null; template_version?:number|null;
+  can_edit_preview?: boolean; can_retry_failed?: boolean;
   uuid: string; status: string; import_type?: string; form_mode?: FormMode; file_name?: string;
   total_rows?: number; processed_rows?: number; successful_rows?: number; failed_rows?: number; skipped_rows?: number;
   valid_rows?: number; invalid_rows?: number; has_gaps?: boolean; requires_approval?: boolean; confirmed_at?: string | null;
@@ -15,7 +17,7 @@ export type EmployeeImportBatch = {
   workflow?: Record<string, unknown> | null;
 };
 export type GapSuggestion = { id: number; label: string; confidence?: number };
-export type GapExtraField = { key: string; label: string; type: string; required: boolean; options?: GapSuggestion[] };
+export type GapExtraField = { key: string; label: string; type: string; required: boolean; default?: string|number|boolean|null; options?: {id?:number|string;value?:number|string;label:string}[] };
 export type ReferenceGap = {
   field?: string; value: string; source_key: string; source_table?: string; message?: string;
   parent_source_key: string | null; parent_id: number | null; parent_label: string | null;
@@ -29,7 +31,7 @@ export type GapResolutionResult = { created: { source_key: string; value: string
 export type ImportOptions = { import_mode: 'all_or_nothing' | 'skip_errors'; send_welcome_email: boolean; ignore_gaps: boolean };
 export type ImportRow = {
   row_number: number; raw_data: Record<string, unknown> | null; status: string;
-  validation_errors: { field?: string; message?: string }[] | null; processing_error: string | null;
+  validation_errors: { field?: string; message?: string; code?: string; severity?: 'error'|'warning'; gap?: boolean }[] | null; processing_error: string | null;
   created_record_id?: number|string|null; created_record_type?: string|null;
   row_action?: 'new'|'create'|'update'|'unchanged'|string; matched_employee_id?: number|null;
   value_diff?: { key: string; field: string; role?: string|null; old: unknown; new: unknown }[];
@@ -37,7 +39,7 @@ export type ImportRow = {
 export type ImportRows = { data: ImportRow[]; page: number; hasNext: boolean; total?: number; lastPage?: number };
 export type ImportSummary = {
   status: string; total_rows: number; valid_rows: number; invalid_rows: number;
-  new_rows?: number; update_rows?: number; unchanged_rows?: number; salary_changes?: number;
+  warning_rows?: number; new_rows?: number; update_rows?: number; unchanged_rows?: number; salary_changes?: number;
   requires_approval?: boolean; send_welcome_email?: boolean; import_mode?: string;
   gap_summary?: { has_gaps: boolean; gap_values: number; gap_tables: string[]; decisions_made: number };
   errors_by_field?: Record<string, unknown>; sample_errors?: unknown[];
@@ -57,11 +59,11 @@ function paginated<T>(raw: T[]|{data:T[];meta?:Record<string,number>},outer:Reco
   return {data,page:meta?.current_page??page,hasNext:meta?.last_page!==undefined?page<meta.last_page:data.length===size,...(meta?.total!==undefined?{total:meta.total}:{}),...(meta?.last_page!==undefined?{lastPage:meta.last_page}:{})};
 }
 export const employeeImportService = {
-  async previewFields(mode:FormMode,signal?:AbortSignal):Promise<FieldDefinition[]> {
-    const {data}=await api.get(`${ROOT}/fields/employees`,{params:{form_mode:mode,include_values:0},signal});
+  async previewFields(mode:FormMode,signal?:AbortSignal,importType='employees'):Promise<FieldDefinition[]> {
+    const {data}=await api.get(`${ROOT}/fields/${encodeURIComponent(importType)}`,{params:{form_mode:mode,include_values:0},signal});
     const raw=importData<Record<string,unknown>[]>(data);
     if(!Array.isArray(raw))throw new Error('Unexpected import field response.');
-    return raw.filter(field=>field.hidden!==true&&field.visible!==false&&field.show!==false&&field.type!=='file').map(field=>normalizeFieldDefinition({...field,key:field.field_key??field.key})).filter(field=>!!field.key&&!!field.label);
+    return raw.filter(field=>field.hidden!==true&&field.visible!==false&&field.can_view!==false&&field.show!==false&&field.type!=='file').map(field=>normalizeFieldDefinition({...field,key:field.field_key??field.key})).filter(field=>!!field.key&&!!field.label);
   },
   async correctRows(uuid:string,changes:{row_number:number;fields:Record<string,string|null>}[]):Promise<QueuedResult>{
     if(!changes.length||changes.length>100||changes.some(change=>!Number.isInteger(change.row_number)||Object.keys(change.fields).length===0||Object.keys(change.fields).length>200||Object.values(change.fields).some(value=>value!==null&&(typeof value!=='string'||value.length>5000))))throw new Error('Select up to 100 rows with 1–200 changed fields, each at most 5,000 characters.');
@@ -71,7 +73,7 @@ export const employeeImportService = {
     const {data}=await api.get(`${ROOT}/fields/employees`,{params:{form_mode:mode,required_only:requiredOnly?1:0},signal});
     const raw=importData<unknown>(data);
     if(!Array.isArray(raw))throw new Error('Unexpected import field response.');
-    return raw.map(field=>normalizeFieldDefinition(field as Record<string,unknown>));
+    return raw.filter(field=>field&&typeof field==='object'&&!Array.isArray(field)).map(field=>field as Record<string,unknown>).filter(field=>field.visible!==false&&field.hidden!==true&&field.can_view!==false).map(field=>normalizeFieldDefinition(field));
   },
   async template(selection:TemplateSelection,format:'xlsx'|'csv'='xlsx',type:'create'|'update'='create'):Promise<Blob>{
     return (await api.get(`${ROOT}/templates/employees/download`,{params:{form_mode:selection.form_mode,required_only:type==='update'?0:selection.required_only?1:0,...(format==='csv'?{format}:{}),...(type==='update'?{type}:{} )},responseType:'blob'})).data;
@@ -80,10 +82,10 @@ export const employeeImportService = {
     const {data}=await api.post(`${ROOT}/validate-mapping`,{import_type:'employees',form_mode:mode,csv_headers:headers,column_mapping:mapping});
     return importData<{valid:boolean;unmapped_required_fields:string[];unknown_csv_columns:string[]}>(data);
   },
-  async upload(file:File,mode:FormMode,mapping?:Record<string,string>,sendWelcomeEmail=false):Promise<EmployeeImportBatch>{
+  async upload(file:File,mode:FormMode,mapping?:Record<string,string>,sendWelcomeEmail=false,onProgress?:(percent:number)=>void):Promise<EmployeeImportBatch>{
     const body=new FormData();body.append('file',file);body.append('import_type','employees');body.append('form_mode',mode);body.append('auto_process','0');body.append('send_welcome_email',sendWelcomeEmail?'1':'0');
     if(mapping)for(const [header,key] of Object.entries(mapping))if(key)body.append(`column_mapping[${header}]`,key);
-    const {data}=await api.post(`${ROOT}/batches`,body,{headers:{'Content-Type':undefined}});
+    const {data}=await api.post(`${ROOT}/batches`,body,{headers:{'Content-Type':undefined},...(onProgress?{onUploadProgress:(event:{loaded:number;total?:number})=>{if(event.total)onProgress(Math.min(100,Math.round(event.loaded/event.total*100)));}}:{})});
     const result=importData<EmployeeImportBatch>(data);if(!result?.uuid)throw new Error('The upload did not return a batch UUID.');return result;
   },
   async detail(uuid:string,signal?:AbortSignal):Promise<EmployeeImportBatch>{return importData((await api.get(`${ROOT}/batches/${uuid}`,{signal})).data);},
@@ -107,9 +109,9 @@ export const employeeImportService = {
     return importData((await api.post(`${ROOT}/batches/${uuid}/gaps/resolve`,{decisions})).data);
   },
   async revalidate(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/revalidate`,{})).data);},
-  async process(uuid:string,options:ImportOptions):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/process`,options)).data);},
+  async process(uuid:string,options:ImportOptions,importType='employees'):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/process`,importType==='employees'?options:{import_mode:options.import_mode,ignore_gaps:options.ignore_gaps})).data);},
   async retryFailed(uuid:string):Promise<RetryFailedResult>{return importData((await api.post(`${ROOT}/batches/${uuid}/retry-failed`)).data);},
-  async rollback(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/rollback`,{})).data);},
+  async rollback(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/rollback`)).data);},
   async approve(uuid:string,comments:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/approve`,{comments})).data);},
   async reject(uuid:string,reason:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/reject`,{reason})).data);},
 };

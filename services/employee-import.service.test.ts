@@ -82,3 +82,10 @@ it('uses preview field keys and sends corrections to PATCH without processing em
  await expect(service.correctRows('batch',[{row_number:3,fields:{}}])).rejects.toThrow();
  await expect(service.correctRows('batch',[{row_number:3,fields:{contact:'x'.repeat(5001)}}])).rejects.toThrow();
 });
+
+it('omits employee-only options for other scope processing and sends no rollback body',async()=>{
+ vi.mocked(api.post).mockResolvedValue({data:{success:true,data:null}});
+ await service.process('batch',{import_mode:'skip_errors',ignore_gaps:false,send_welcome_email:true},'expense_claims');
+ expect(api.post).toHaveBeenLastCalledWith('/flexi-import/batches/batch/process',{import_mode:'skip_errors',ignore_gaps:false});
+ await service.rollback('batch');expect(api.post).toHaveBeenLastCalledWith('/flexi-import/batches/batch/rollback');
+});

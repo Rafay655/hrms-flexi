@@ -10,6 +10,12 @@ import type { VisibilityCondition } from "@/lib/onboarding-visibility";
  */
 
 export interface FieldDefinition {
+  editable?: boolean;
+  visible?: boolean;
+  sensitive?: boolean;
+  parent_field_key?: string;
+  source_key?: string;
+  section?: string;
   visibility_condition?: VisibilityCondition | null;
   key: string;
   label: string;
@@ -50,10 +56,16 @@ export function normalizeFieldDefinition(
 ): FieldDefinition {
   return {
     ...(raw.visibility_condition !== undefined ? {visibility_condition: raw.visibility_condition as VisibilityCondition | null} : {}),
+    ...(typeof raw.editable === "boolean" ? {editable:raw.editable} : {}),
+    ...((raw.visible===false||raw.hidden===true||raw.can_view===false)?{visible:false}:typeof raw.visible === "boolean"?{visible:raw.visible}:{}),
+    ...(typeof raw.sensitive === "boolean" ? {sensitive:raw.sensitive} : {}),
+    ...(typeof (raw.parent_field_key ?? raw.parent_system_key) === "string" ? {parent_field_key:(raw.parent_field_key ?? raw.parent_system_key) as string} : {}),
+    ...(typeof raw.source_key === "string" ? {source_key:raw.source_key} : {}),
+    ...(typeof raw.section === "string" ? {section:raw.section} : {}),
     key: String(raw.key ?? raw.field_key ?? ""),
     label: String(raw.label ?? raw.field_key ?? raw.key ?? ""),
     type: String(raw.type ?? "text"),
-    required: Boolean(raw.required),
+    required: Boolean(raw.required ?? raw.is_required),
     description: (raw.description ?? raw.note ?? undefined) as string | undefined,
     allowed_values: (raw.allowed_values ??
       raw.available_values ??
@@ -131,12 +143,12 @@ export function autoMatchColumns(
 ): Record<string, string> {
   const mapping: Record<string, string> = {};
   headers.forEach((header) => {
-    const lc = header.toLowerCase();
-    const match = fields.find(
-      (f) => f.label.toLowerCase() === lc || f.key.toLowerCase() === lc
-    );
-    if (match) mapping[header] = match.key;
+    const matches=fields.filter(field=>field.label.toLowerCase()===header.toLowerCase()||field.key.toLowerCase()===header.toLowerCase());
+    if(matches.length===1)mapping[header]=matches[0].key;
   });
+  const assigned=Object.values(mapping);
+  for(const header of Object.keys(mapping))if(assigned.filter(key=>key===mapping[header]).length>1)delete mapping[header];
+
   return mapping;
 }
 

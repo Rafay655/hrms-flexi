@@ -72,7 +72,7 @@ export const modules: ModuleItem[] = [
             title: "2FA & OAuth",
             pathname: "/connect-central/authentication",
           },
-       
+
           {
             id: 9033,
             icon: "Globe2",
@@ -193,7 +193,6 @@ export const modules: ModuleItem[] = [
         title: "System Settings",
         pathname: "/system-flex/system",
       },
-  
     ],
   },
 
@@ -310,6 +309,12 @@ export const modules: ModuleItem[] = [
         icon: "LayoutDashboard",
         title: "Dashboard",
         pathname: "/flexi-import",
+      },
+      {
+        id: 250500,
+        icon: "FileSpreadsheet",
+        title: "Importer templates",
+        pathname: "/flexi-import/templates",
       },
       {
         id: 250200,
@@ -435,7 +440,7 @@ export const modules: ModuleItem[] = [
         title: "Employee Directory",
         pathname: "/people-hub/employees",
       },
-    
+
       {
         id: 20300,
         icon: "Hourglass",
@@ -460,15 +465,13 @@ export const modules: ModuleItem[] = [
         title: "Approvals",
         pathname: "/people-hub/approvals",
       },
-    
+
       {
         id: 20700,
         icon: "UploadCloud",
         title: "Bulk Import",
         pathname: "/people-hub/bulk-import",
-      }
-      
-    
+      },
     ],
     admin: false,
   },
@@ -503,7 +506,7 @@ export const modules: ModuleItem[] = [
         icon: "User",
         title: "MY ATTENDANCE",
         subMenu: [
-         {
+          {
             id: 50301,
             icon: "History",
             title: "My Timeline",
@@ -648,7 +651,6 @@ export const modules: ModuleItem[] = [
         ],
       },
 
-    
       {
         id: 50800,
         icon: "ShieldAlert",
@@ -721,273 +723,394 @@ export const modules: ModuleItem[] = [
     icon: "Palmtree",
     admin: false, // Default, can be overridden based on user
     Menu: [
-      {id: 70100, icon: "LayoutDashboard", title: "Dashboard", pathname: "/leave-ease"},
       {
-        id: 70200, icon: "Calendar", title: "My Leave",
+        id: 70100,
+        icon: "LayoutDashboard",
+        title: "Dashboard",
+        pathname: "/leave-ease",
+      },
+      {
+        id: 70200,
+        icon: "Calendar",
+        title: "My Leave",
         subMenu: [
-          {id: 70201, icon: "WalletCards", title: "My Balance", pathname: "/leave-ease/my-balance"},
-          {id: 70202, icon: "List", title: "My Requests", pathname: "/leave-ease/my-requests"},
-          {id: 70203, icon: "CalendarDays", title: "My Calendar", pathname: "/leave-ease/my-calendar"},
-          {id: 70204, icon: "BookText", title: "Balance Ledger", pathname: "/leave-ease/balance-ledger"},
-          {id: 70205, icon: "Wallet", title: "Encashment", pathname: "/leave-ease/encashment"},
-          {id: 70206, icon: "CalendarPlus", title: "Comp Off", pathname: "/leave-ease/comp-off"},
+          {
+            id: 70201,
+            icon: "WalletCards",
+            title: "My Balance",
+            pathname: "/leave-ease/my-balance",
+          },
+          {
+            id: 70202,
+            icon: "List",
+            title: "My Requests",
+            pathname: "/leave-ease/my-requests",
+          },
+          {
+            id: 70203,
+            icon: "CalendarDays",
+            title: "My Calendar",
+            pathname: "/leave-ease/my-calendar",
+          },
+          {
+            id: 70204,
+            icon: "BookText",
+            title: "Balance Ledger",
+            pathname: "/leave-ease/balance-ledger",
+          },
+          {
+            id: 70205,
+            icon: "Wallet",
+            title: "Encashment",
+            pathname: "/leave-ease/encashment",
+          },
+          {
+            id: 70206,
+            icon: "CalendarPlus",
+            title: "Comp Off",
+            pathname: "/leave-ease/comp-off",
+          },
         ],
       },
       {
-        id: 70300, icon: "ClipboardCheck", title: "Approvals",
+        id: 70300,
+        icon: "ClipboardCheck",
+        title: "Approvals",
         subMenu: [
-          {id: 70301, icon: "ClipboardCheck", title: "Approvals Inbox", pathname: "/leave-ease/approvals-inbox"},
-          {id: 70302, icon: "CheckSquare", title: "Comp-Off Approvals", pathname: "/leave-ease/co-approvals"},
-          {id: 70303, icon: "Coins", title: "Encashment Approvals", pathname: "/leave-ease/encashment-approvals"},
-          {id: 70304, icon: "ShieldCheck", title: "Adjustment Approvals", pathname: "/leave-ease/adjustment-approvals"},
-          {id: 70305, icon: "UserCheck", title: "Delegations", pathname: "/leave-ease/delegations"},
+          {
+            id: 70301,
+            icon: "ClipboardCheck",
+            title: "Approvals Inbox",
+            pathname: "/leave-ease/approvals-inbox",
+          },
+          {
+            id: 70302,
+            icon: "CheckSquare",
+            title: "Comp-Off Approvals",
+            pathname: "/leave-ease/co-approvals",
+          },
+          {
+            id: 70303,
+            icon: "Coins",
+            title: "Encashment Approvals",
+            pathname: "/leave-ease/encashment-approvals",
+          },
+          {
+            id: 70304,
+            icon: "ShieldCheck",
+            title: "Adjustment Approvals",
+            pathname: "/leave-ease/adjustment-approvals",
+          },
+          {
+            id: 70305,
+            icon: "UserCheck",
+            title: "Delegations",
+            pathname: "/leave-ease/delegations",
+          },
         ],
       },
       {
-        id: 70400, icon: "Users", title: "Team",
+        id: 70400,
+        icon: "Users",
+        title: "Team",
         subMenu: [
-          {id: 70401, icon: "CalendarRange", title: "Team Calendar", pathname: "/leave-ease/team-calendar"},
-          {id: 70402, icon: "Scale", title: "Team Balances", pathname: "/leave-ease/team-balances"},
+          {
+            id: 70401,
+            icon: "CalendarRange",
+            title: "Team Calendar",
+            pathname: "/leave-ease/team-calendar",
+          },
+          {
+            id: 70402,
+            icon: "Scale",
+            title: "Team Balances",
+            pathname: "/leave-ease/team-balances",
+          },
         ],
       },
       {
-        id: 70500, icon: "SlidersHorizontal", title: "Leave Setup (HR)",
+        id: 70500,
+        icon: "SlidersHorizontal",
+        title: "Leave Setup (HR)",
         subMenu: [
-          {id: 70501, icon: "Tags", title: "Leave Types", pathname: "/leave-ease/leave-types"},
-          {id: 70502, icon: "ShieldCheck", title: "Leave Policies", pathname: "/leave-ease/leave-policies"},
-          {id: 70503, icon: "PartyPopper", title: "Holiday Calendar", pathname: "/leave-ease/holiday-calendar"},
-          {id: 70504, icon: "Hourglass", title: "Accrual Rules", pathname: "/leave-ease/accrual-rules"},
-          {id: 70505, icon: "FastForward", title: "Carry-Forward", pathname: "/leave-ease/carry-forward"},
-          {id: 70506, icon: "CalendarX", title: "Blackout Dates", pathname: "/leave-ease/blackout"},
+          {
+            id: 70501,
+            icon: "Tags",
+            title: "Leave Types",
+            pathname: "/leave-ease/leave-types",
+          },
+          {
+            id: 70502,
+            icon: "ShieldCheck",
+            title: "Leave Policies",
+            pathname: "/leave-ease/leave-policies",
+          },
+          {
+            id: 70503,
+            icon: "PartyPopper",
+            title: "Holiday Calendar",
+            pathname: "/leave-ease/holiday-calendar",
+          },
+          {
+            id: 70504,
+            icon: "Hourglass",
+            title: "Accrual Rules",
+            pathname: "/leave-ease/accrual-rules",
+          },
+          {
+            id: 70505,
+            icon: "FastForward",
+            title: "Carry-Forward",
+            pathname: "/leave-ease/carry-forward",
+          },
+          {
+            id: 70506,
+            icon: "CalendarX",
+            title: "Blackout Dates",
+            pathname: "/leave-ease/blackout",
+          },
         ],
       },
       {
-        id: 70600, icon: "Wallet", title: "Balance Operations (HR)",
+        id: 70600,
+        icon: "Wallet",
+        title: "Balance Operations (HR)",
         subMenu: [
-          {id: 70601, icon: "Sliders", title: "Balance Adjustments", pathname: "/leave-ease/balance-adjustments"},
-          {id: 70602, icon: "ClipboardList", title: "Opening Balances", pathname: "/leave-ease/opening-balances"},
-          
-       
-       
-          {id: 70608, icon: "RefreshCw", title: "Year-End Close", pathname: "/leave-ease/year-end"},
-       
+          {
+            id: 70601,
+            icon: "Sliders",
+            title: "Balance Adjustments",
+            pathname: "/leave-ease/balance-adjustments",
+          },
+          {
+            id: 70602,
+            icon: "ClipboardList",
+            title: "Opening Balances",
+            pathname: "/leave-ease/opening-balances",
+          },
+
+          {
+            id: 70608,
+            icon: "RefreshCw",
+            title: "Year-End Close",
+            pathname: "/leave-ease/year-end",
+          },
         ],
       },
-  
     ],
   },
-{
-  id: 36,
-  name: "Pakistan Compliance",
-  icon: "Gavel",
-  admin: false,
-  Menu: [
-    // Dashboard
-    {
-      id: 360100,
-      icon: "LayoutDashboard",
-      title: "Dashboard",
-      pathname: "/compliance/dashboard",
-    },
-    // Configuration
-    {
-      id: 360200,
-      icon: "Settings",
-      title: "Configuration",
-      subMenu: [
-        {
-          id: 360201,
-          icon: "Calendar",
-          title: "Tax Years & Slabs",
-          pathname: "/compliance/tax-years",
-        },
-        {
-          id: 360202,
-          icon: "Coins",
-          title: "EOBI Config",
-          pathname: "/compliance/eobi",
-        },
-        {
-          id: 360203,
-          icon: "Shield",
-          title: "Social Security Config",
-          pathname: "/compliance/social-security",
-        },
-        {
-          id: 360204,
-          icon: "Gift",
-          title: "Gratuity Config",
-          pathname: "/compliance/gratuity",
-        },
-        {
-          id: 360205,
-          icon: "Gift",
-          title: "Provident Fund Config",
-          pathname: "/compliance/provident-fund",
-        },
-        {
-          id: 360206,
-          icon: "Money",
-          title: "Minimum Wages Config",
-          pathname: "/compliance/minimum-wages",
-        },
-      ],
-    },
-    // Employee Statutory Data
-    {
-      id: 360300,
-      icon: "Users",
-      title: "Employee Statutory Data",
-      pathname: "/compliance/employee-statutory",
-    },
-    {
-      id: 360301,
-      icon: "Users",
-      title: "Entity Profiles",
-      pathname: "/compliance/entity-profiles",
-    },
-    // Reports & Filings
-    {
-      id: 360400,
-      icon: "FileText",
-      title: "Reports & Filings",
-      subMenu: [
-        {
-          id: 360401,
-          icon: "FileSpreadsheet",
-          title: "EOBI Schedule (R‑6/R‑9)",
-          pathname: "/compliance/reports/eobi",
-        },
-        {
-          id: 360402,
-          icon: "FileSpreadsheet",
-          title: "Social Security Schedule",
-          pathname: "/compliance/reports/ss",
-        },
-        {
-          id: 360403,
-          icon: "Receipt",
-          title: "Tax Register",
-          pathname: "/compliance/reports/tax-register",
-        },
-        {
-          id: 360404,
-          icon: "PieChart",
-          title: "Gratuity Liability",
-          pathname: "/compliance/reports/gratuity-liability",
-        },
-        {
-          id: 360405,
-          icon: "DollarSign",
-          title: "Employer Statutory Cost",
-          pathname: "/compliance/reports/employer-cost",
-        },
-        {
-          id: 360406,
-          icon: "AlertTriangle",
-          title: "Minimum Wage Violations",
-          pathname: "/compliance/reports/min-wage",
-        },
-        {
-          id: 360407,
-          icon: "RefreshCw",
-          title: "Year‑End Reconciliation",
-          pathname: "/compliance/reports/reconciliation",
-        },
-        {
-          id: 360408,
-          icon: "UserCheck",
-          title: "Filer / Non‑Filer Status",
-          pathname: "/compliance/reports/filer-status",
-        },
-      ],
-    },
-    // Certificates
-    {
-      id: 360500,
-      icon: "Files",
-      title: "Certificates",
-      subMenu: [
-        {
-          id: 360501,
-          icon: "FilePlus",
-          title: "Tax Certificate",
-          pathname: "/compliance/tax-certificates",
-        },
-        {
-          id: 360502,
-          icon: "FileText",
-          title: "My Certificates",
-          pathname: "/compliance/certificates/my",
-        },
-      ],
-    },
-    // Ledger & Remittances
-    {
-      id: 360600,
-      icon: "BookOpen",
-      title: "Ledger & Remittances",
-      subMenu: [
-        {
-          id: 360601,
-          icon: "List",
-          title: "Contribution Ledger",
-          pathname: "/compliance/ledger",
-        },
-        {
-          id: 360602,
-          icon: "CheckCircle",
-          title: "Mark Remitted",
-          pathname: "/compliance/ledger/remit",
-        },
-        {
-          id: 360603,
-          icon: "RefreshCw",
-          title: "Reconciliation",
-          pathname: "/compliance/ledger/reconcile",
-        },
-      ],
-    },
-    // Employee Self‑Service
-    {
-      id: 360700,
-      icon: "User",
-      title: "Tax Calculations",
-      subMenu: [
-        {
-          id: 360701,
-          icon: "Receipt",
-          title: "Tax Calculations",
-          pathname: "/compliance/calculator",
-        },
-        {
-          id: 360701,
-          icon: "Receipt",
-          title: "My Tax Summary",
-          pathname: "/compliance/ess/tax-summary",
-        },
-        {
-          id: 360702,
-          icon: "FileText",
-          title: "My Tax Certificate",
-          pathname: "/compliance/ess/certificate",
-        },
-        {
-          id: 360703,
-          icon: "History",
-          title: "My EOBI History",
-          pathname: "/compliance/ess/eobi-history",
-        },
-        {
-          id: 360704,
-          icon: "Gift",
-          title: "My Gratuity Estimate",
-          pathname: "/compliance/ess/gratuity-estimate",
-        },
-      ],
-    },
-  ],
-},
+  {
+    id: 36,
+    name: "Pakistan Compliance",
+    icon: "Gavel",
+    admin: false,
+    Menu: [
+      // Dashboard
+      {
+        id: 360100,
+        icon: "LayoutDashboard",
+        title: "Dashboard",
+        pathname: "/compliance/dashboard",
+      },
+      // Configuration
+      {
+        id: 360200,
+        icon: "Settings",
+        title: "Configuration",
+        subMenu: [
+          {
+            id: 360201,
+            icon: "Calendar",
+            title: "Tax Years & Slabs",
+            pathname: "/compliance/tax-years",
+          },
+          {
+            id: 360202,
+            icon: "Coins",
+            title: "EOBI Config",
+            pathname: "/compliance/eobi",
+          },
+          {
+            id: 360203,
+            icon: "Shield",
+            title: "Social Security Config",
+            pathname: "/compliance/social-security",
+          },
+          {
+            id: 360204,
+            icon: "Gift",
+            title: "Gratuity Config",
+            pathname: "/compliance/gratuity",
+          },
+          {
+            id: 360205,
+            icon: "Gift",
+            title: "Provident Fund Config",
+            pathname: "/compliance/provident-fund",
+          },
+          {
+            id: 360206,
+            icon: "Money",
+            title: "Minimum Wages Config",
+            pathname: "/compliance/minimum-wages",
+          },
+        ],
+      },
+      // Employee Statutory Data
+      {
+        id: 360300,
+        icon: "Users",
+        title: "Employee Statutory Data",
+        pathname: "/compliance/employee-statutory",
+      },
+      {
+        id: 360301,
+        icon: "Users",
+        title: "Entity Profiles",
+        pathname: "/compliance/entity-profiles",
+      },
+      // Reports & Filings
+      {
+        id: 360400,
+        icon: "FileText",
+        title: "Reports & Filings",
+        subMenu: [
+          {
+            id: 360401,
+            icon: "FileSpreadsheet",
+            title: "EOBI Schedule (R‑6/R‑9)",
+            pathname: "/compliance/reports/eobi",
+          },
+          {
+            id: 360402,
+            icon: "FileSpreadsheet",
+            title: "Social Security Schedule",
+            pathname: "/compliance/reports/ss",
+          },
+          {
+            id: 360403,
+            icon: "Receipt",
+            title: "Tax Register",
+            pathname: "/compliance/reports/tax-register",
+          },
+          {
+            id: 360404,
+            icon: "PieChart",
+            title: "Gratuity Liability",
+            pathname: "/compliance/reports/gratuity-liability",
+          },
+          {
+            id: 360405,
+            icon: "DollarSign",
+            title: "Employer Statutory Cost",
+            pathname: "/compliance/reports/employer-cost",
+          },
+          {
+            id: 360406,
+            icon: "AlertTriangle",
+            title: "Minimum Wage Violations",
+            pathname: "/compliance/reports/min-wage",
+          },
+          {
+            id: 360407,
+            icon: "RefreshCw",
+            title: "Year‑End Reconciliation",
+            pathname: "/compliance/reports/reconciliation",
+          },
+          {
+            id: 360408,
+            icon: "UserCheck",
+            title: "Filer / Non‑Filer Status",
+            pathname: "/compliance/reports/filer-status",
+          },
+        ],
+      },
+      // Certificates
+      {
+        id: 360500,
+        icon: "Files",
+        title: "Certificates",
+        subMenu: [
+          {
+            id: 360501,
+            icon: "FilePlus",
+            title: "Tax Certificate",
+            pathname: "/compliance/tax-certificates",
+          },
+          {
+            id: 360502,
+            icon: "FileText",
+            title: "My Certificates",
+            pathname: "/compliance/certificates/my",
+          },
+        ],
+      },
+      // Ledger & Remittances
+      {
+        id: 360600,
+        icon: "BookOpen",
+        title: "Ledger & Remittances",
+        subMenu: [
+          {
+            id: 360601,
+            icon: "List",
+            title: "Contribution Ledger",
+            pathname: "/compliance/ledger",
+          },
+          {
+            id: 360602,
+            icon: "CheckCircle",
+            title: "Mark Remitted",
+            pathname: "/compliance/ledger/remit",
+          },
+          {
+            id: 360603,
+            icon: "RefreshCw",
+            title: "Reconciliation",
+            pathname: "/compliance/ledger/reconcile",
+          },
+        ],
+      },
+      // Employee Self‑Service
+      {
+        id: 360700,
+        icon: "User",
+        title: "Tax Calculations",
+        subMenu: [
+          {
+            id: 360701,
+            icon: "Receipt",
+            title: "Tax Calculations",
+            pathname: "/compliance/calculator",
+          },
+          {
+            id: 360701,
+            icon: "Receipt",
+            title: "My Tax Summary",
+            pathname: "/compliance/ess/tax-summary",
+          },
+          {
+            id: 360702,
+            icon: "FileText",
+            title: "My Tax Certificate",
+            pathname: "/compliance/ess/certificate",
+          },
+          {
+            id: 360703,
+            icon: "History",
+            title: "My EOBI History",
+            pathname: "/compliance/ess/eobi-history",
+          },
+          {
+            id: 360704,
+            icon: "Gift",
+            title: "My Gratuity Estimate",
+            pathname: "/compliance/ess/gratuity-estimate",
+          },
+        ],
+      },
+    ],
+  },
   {
     id: 6,
     name: "PayEdge",
@@ -1085,7 +1208,7 @@ export const modules: ModuleItem[] = [
           //   title: "Gratuity Policies",
           //   pathname: "/pay-edge/gratuity-policies",
           // },
-        
+
           {
             id: 60305,
             icon: "LayoutTemplate",
@@ -1239,8 +1362,7 @@ export const modules: ModuleItem[] = [
             title: "Gratuity Provisions",
             pathname: "/pay-edge/gratuity-provisions",
           },
-         
-        
+
           {
             id: 60510,
             icon: "RefreshCw",
@@ -1284,7 +1406,7 @@ export const modules: ModuleItem[] = [
             title: "Policy Copilot",
             pathname: "/pay-edge/policy-copilot",
           },
-        
+
           {
             id: 60603,
             icon: "Bell",
@@ -1307,56 +1429,150 @@ export const modules: ModuleItem[] = [
       },
     ],
   },
- {
+  {
     id: 32,
     name: "LoanHub",
     icon: "HandCoins",
     admin: false,
     Menu: [
-      { id: 320100, icon: "LayoutDashboard", title: "Dashboard", pathname: "/loan-hub" },
-      { id: 320200, icon: "FileText", title: "Applications", pathname: "/loan-hub/applications" },
-      { id: 320300, icon: "Wallet", title: "Loans", pathname: "/loan-hub/active" },
-      { id: 320400, icon: "Banknote", title: "Recovery", pathname: "/loan-hub/recovery" },
-      { id: 320500, icon: "BarChart3", title: "Reports", pathname: "/loan-hub/reports" },
-      { id: 320600, icon: "UserRound", title: "My Loans", pathname: "/loan-hub/my-loans" },
+      {
+        id: 320100,
+        icon: "LayoutDashboard",
+        title: "Dashboard",
+        pathname: "/loan-hub",
+      },
+      {
+        id: 320200,
+        icon: "FileText",
+        title: "Applications",
+        pathname: "/loan-hub/applications",
+      },
+      {
+        id: 320300,
+        icon: "Wallet",
+        title: "Loans",
+        pathname: "/loan-hub/active",
+      },
+      {
+        id: 320400,
+        icon: "Banknote",
+        title: "Recovery",
+        pathname: "/loan-hub/recovery",
+      },
+      {
+        id: 320500,
+        icon: "BarChart3",
+        title: "Reports",
+        pathname: "/loan-hub/reports",
+      },
+      {
+        id: 320600,
+        icon: "UserRound",
+        title: "My Loans",
+        pathname: "/loan-hub/my-loans",
+      },
       {
         id: 320700,
         icon: "Settings",
         title: "Settings",
         subMenu: [
-          { id: 320710, icon: "Layers", title: "Loan Types", pathname: "/loan-hub/settings/types" },
-          { id: 320720, icon: "SlidersHorizontal", title: "Policies", pathname: "/loan-hub/settings/policies" },
+          {
+            id: 320710,
+            icon: "Layers",
+            title: "Loan Types",
+            pathname: "/loan-hub/settings/types",
+          },
+          {
+            id: 320720,
+            icon: "SlidersHorizontal",
+            title: "Policies",
+            pathname: "/loan-hub/settings/policies",
+          },
         ],
       },
     ],
   },
-   {
+  {
     id: 38,
     name: "ExpenseHub",
     icon: "ReceiptText",
     admin: false,
     Menu: [
-      { id: 380100, icon: "LayoutDashboard", title: "Dashboard", pathname: "/expense-hub" },
-      { id: 380200, icon: "FileText", title: "Claims", pathname: "/expense-hub/claims" },
-      { id: 380300, icon: "CheckCircle2", title: "Approvals", pathname: "/expense-hub/approvals" },
-      { id: 380400, icon: "Plane", title: "Travel", pathname: "/expense-hub/travel" },
-      { id: 380500, icon: "Receipt", title: "Receipts", pathname: "/expense-hub/receipts" },
-      { id: 380600, icon: "BarChart3", title: "Reports", pathname: "/expense-hub/reports" },
+      {
+        id: 380100,
+        icon: "LayoutDashboard",
+        title: "Dashboard",
+        pathname: "/expense-hub",
+      },
+      {
+        id: 380200,
+        icon: "FileText",
+        title: "Claims",
+        pathname: "/expense-hub/claims",
+      },
+      {
+        id: 380300,
+        icon: "CheckCircle2",
+        title: "Approvals",
+        pathname: "/expense-hub/approvals",
+      },
+      {
+        id: 380400,
+        icon: "Plane",
+        title: "Travel",
+        pathname: "/expense-hub/travel",
+      },
+      {
+        id: 380500,
+        icon: "Receipt",
+        title: "Receipts",
+        pathname: "/expense-hub/receipts",
+      },
+      {
+        id: 380600,
+        icon: "BarChart3",
+        title: "Reports",
+        pathname: "/expense-hub/reports",
+      },
       {
         id: 380700,
         icon: "Settings",
         title: "Config",
         subMenu: [
-          { id: 380710, icon: "Layers", title: "Categories", pathname: "/expense-hub/categories" },
-          { id: 380720, icon: "SlidersHorizontal", title: "Policies", pathname: "/expense-hub/policies" },
-          { id: 380730, icon: "MapPin", title: "Per-diem Rates", pathname: "/expense-hub/per-diem-rates" },
-          { id: 380740, icon: "Car", title: "Mileage Rates", pathname: "/expense-hub/mileage-rates" },
-          { id: 380750, icon: "Settings2", title: "Settings", pathname: "/expense-hub/settings" },
+          {
+            id: 380710,
+            icon: "Layers",
+            title: "Categories",
+            pathname: "/expense-hub/categories",
+          },
+          {
+            id: 380720,
+            icon: "SlidersHorizontal",
+            title: "Policies",
+            pathname: "/expense-hub/policies",
+          },
+          {
+            id: 380730,
+            icon: "MapPin",
+            title: "Per-diem Rates",
+            pathname: "/expense-hub/per-diem-rates",
+          },
+          {
+            id: 380740,
+            icon: "Car",
+            title: "Mileage Rates",
+            pathname: "/expense-hub/mileage-rates",
+          },
+          {
+            id: 380750,
+            icon: "Settings2",
+            title: "Settings",
+            pathname: "/expense-hub/settings",
+          },
         ],
       },
     ],
   },
-
 
   {
     id: 3,
@@ -1561,8 +1777,6 @@ export const modules: ModuleItem[] = [
     admin: false,
   },
 
-
-
   {
     id: 11,
     name: "ProjectEdge",
@@ -1650,45 +1864,35 @@ export const modules: ModuleItem[] = [
     name: "SkillForge",
     icon: "GraduationCap",
     admin: false,
-    Menu: [
-      { id: 270100, icon: "GraduationCap", title: "Overview" },
-    ],
+    Menu: [{ id: 270100, icon: "GraduationCap", title: "Overview" }],
   },
   {
     id: 28,
     name: "LeadershipLab",
     icon: "Award",
     admin: false,
-    Menu: [
-      { id: 280100, icon: "Award", title: "Overview" },
-    ],
+    Menu: [{ id: 280100, icon: "Award", title: "Overview" }],
   },
   {
     id: 29,
     name: "CultureCore",
     icon: "Heart",
     admin: false,
-    Menu: [
-      { id: 290100, icon: "Heart", title: "Overview" },
-    ],
+    Menu: [{ id: 290100, icon: "Heart", title: "Overview" }],
   },
   {
     id: 30,
     name: "BenefitHub",
     icon: "ShieldPlus",
     admin: false,
-    Menu: [
-      { id: 300100, icon: "ShieldPlus", title: "Overview" },
-    ],
+    Menu: [{ id: 300100, icon: "ShieldPlus", title: "Overview" }],
   },
   {
     id: 31,
     name: "WellNest",
     icon: "Leaf",
     admin: false,
-    Menu: [
-      { id: 310100, icon: "Leaf", title: "Overview" },
-    ],
+    Menu: [{ id: 310100, icon: "Leaf", title: "Overview" }],
   },
 
   {
@@ -1696,9 +1900,7 @@ export const modules: ModuleItem[] = [
     name: "WorkforcePlanning",
     icon: "Workflow",
     admin: false,
-    Menu: [
-      { id: 330100, icon: "Waypoints", title: "Overview" },
-    ],
+    Menu: [{ id: 330100, icon: "Waypoints", title: "Overview" }],
   },
   {
     id: 34,
@@ -1783,16 +1985,50 @@ export const modules: ModuleItem[] = [
     // the ESS portal (/ess/tickets); this system entry is for HR / resolvers. Only pages that exist
     // are linked: more items land with the resolver workspace (Sprint 2) and settings (Sprint 6, now built).
     Menu: [
-      { id: 350050, icon: "LayoutDashboard", title: "Overview", pathname: "/flexi-desk/admin" },
-      { id: 350100, icon: "Headset", title: "Tickets", pathname: "/flexi-desk/tickets" },
-      { id: 350200, icon: "Scale", title: "Grievances", pathname: "/flexi-desk/grievances" },
-      { id: 350300, icon: "BookOpen", title: "Knowledge base", pathname: "/flexi-desk/knowledge-base" },
-      { id: 350400, icon: "Heart", title: "Satisfaction", pathname: "/flexi-desk/csat" },
-      { id: 350500, icon: "Settings", title: "Settings", pathname: "/flexi-desk/settings/categories" },
-      { id: 350600, icon: "BarChart3", title: "Reports", pathname: "/flexi-desk/reports" },
+      {
+        id: 350050,
+        icon: "LayoutDashboard",
+        title: "Overview",
+        pathname: "/flexi-desk/admin",
+      },
+      {
+        id: 350100,
+        icon: "Headset",
+        title: "Tickets",
+        pathname: "/flexi-desk/tickets",
+      },
+      {
+        id: 350200,
+        icon: "Scale",
+        title: "Grievances",
+        pathname: "/flexi-desk/grievances",
+      },
+      {
+        id: 350300,
+        icon: "BookOpen",
+        title: "Knowledge base",
+        pathname: "/flexi-desk/knowledge-base",
+      },
+      {
+        id: 350400,
+        icon: "Heart",
+        title: "Satisfaction",
+        pathname: "/flexi-desk/csat",
+      },
+      {
+        id: 350500,
+        icon: "Settings",
+        title: "Settings",
+        pathname: "/flexi-desk/settings/categories",
+      },
+      {
+        id: 350600,
+        icon: "BarChart3",
+        title: "Reports",
+        pathname: "/flexi-desk/reports",
+      },
     ],
   },
-
 
   {
     id: 14,
@@ -1967,7 +2203,6 @@ export const modules: ModuleItem[] = [
         ],
       },
 
-
       {
         id: 140400,
         icon: "Coins",
@@ -2037,7 +2272,7 @@ export const modules: ModuleItem[] = [
             title: "Salary Components",
             pathname: "/flexi-meta/salary-components",
           },
-        
+
           {
             id: 140602,
             icon: "Zap",
@@ -2271,7 +2506,6 @@ export const modules: ModuleItem[] = [
     ],
     admin: true,
   },
-
 ];
 
 /**
@@ -2288,10 +2522,10 @@ export const modules: ModuleItem[] = [
  */
 const MODULE_LANDING_OVERRIDES: Record<number, string> = {
   7: "/leave-ease",
-  9: "/connect-central",  // Menu[0] is /connect-central/security; tile lands on the module root
-  12: "/system-flex",     // Menu[0] is a sub-route; tile lands on the module root
-  14: "/flexi-meta",      // Menu[0] is a sub-route; tile lands on the module root
-  23: "/notify-pro",      // Menu[0] is a sub-route; tile lands on the module root
+  9: "/connect-central", // Menu[0] is /connect-central/security; tile lands on the module root
+  12: "/system-flex", // Menu[0] is a sub-route; tile lands on the module root
+  14: "/flexi-meta", // Menu[0] is a sub-route; tile lands on the module root
+  23: "/notify-pro", // Menu[0] is a sub-route; tile lands on the module root
 };
 
 /**

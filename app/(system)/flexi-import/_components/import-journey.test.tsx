@@ -1,0 +1,73 @@
+import {expect,it,vi,afterEach} from 'vitest';
+import {render,screen,fireEvent,waitFor,act,cleanup,within} from '@testing-library/react';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {api} from '@/lib/api';
+import Designer from '../templates/new/page';
+import NewImport from '../new/page';
+import {EmployeeBatchReview} from './employee-batch-review';
+const navigation=vi.hoisted(()=>({url:'/flexi-import/templates/new',push:vi.fn((url:string)=>{navigation.url=url;})}));
+vi.mock('next/navigation',()=>({useSearchParams:()=>new URLSearchParams(navigation.url.split('?')[1]),useRouter:()=>({push:navigation.push,replace:navigation.push})}));
+vi.mock('@/store/hooks',()=>({useAppSelector:(selector:(state:unknown)=>unknown)=>selector({auth:{company:{id:'company'},user:{id:'user'}}})}));
+vi.mock('@/lib/api',()=>({api:{get:vi.fn(),post:vi.fn(),patch:vi.fn()}}));
+vi.mock('react-hot-toast',()=>({default:{success:vi.fn(),error:vi.fn()}}));
+afterEach(()=>{cleanup();vi.clearAllMocks();navigation.url='/flexi-import/templates/new';});
+it('connects save, pinned upload, correction, revalidation and commit using actual API adapters',async()=>{
+ const fields=[{field_key:'code',label:'Employee Code',type:'text',required:true},{field_key:'name',label:'Employee Name',type:'text',required:true}];
+ const template={template_uuid:'tpl',version:1,name:'Team template',import_type:'employees',form_mode:'detailed',operation:'create_or_update',schema_version:'schema-1',selected_field_keys:['code','name'],fields,download_available:true};
+ let status='uploaded',name='',uploadBody:FormData|undefined;
+ const urls:string[]=[];
+ const batch=()=>({uuid:'batch',status,import_type:'employees',form_mode:'detailed',file_name:'team.xlsx',template_uuid:'tpl',template_version:1,total_rows:1,valid_rows:name?1:0,invalid_rows:name?0:1,requires_approval:false,has_gaps:false,workflow:null,can_edit_preview:status==='validation_complete',processed_rows:status==='completed'?1:0,successful_rows:status==='completed'?1:0,failed_rows:0,skipped_rows:0});
+ vi.mocked(api.get).mockImplementation(vi.fn(async(url:string)=>{
+  urls.push(url);let data:unknown;
+  if(url==='/flexi-import/import-types')data=[{import_type:'employees',title:'Employees',operations:['create_or_update']}];
+  else if(url==='/flexi-import/schemas/employees')data={import_type:'employees',schema_version:'schema-1',fields};
+  else if(url==='/flexi-import/importer-templates/tpl')data=template;
+  else if(url.endsWith('/summary'))data={status,total_rows:1,valid_rows:name?1:0,invalid_rows:name?0:1,new_rows:1,update_rows:0,unchanged_rows:0};
+  else if(url.endsWith('/gaps'))data={status,has_gaps:false,total_gap_values:0,tables:[]};
+  else if(url.endsWith('/rows'))data=[{row_number:3,status:status==='completed'?'committed':name?'valid':'invalid',raw_data:{code:'000123',name},validation_errors:name?[]:[{field:'name',message:'Employee Name is required.'}],processing_error:null,row_action:'create'}];
+  else if(url.endsWith('/audit'))data={events:[],has_more:false};
+  else data=batch();
+  return {data:{success:true,data}};
+ }) as typeof api.get);
+ vi.mocked(api.post).mockImplementation(vi.fn(async(url:string,body:unknown)=>{
+  if(url==='/flexi-import/importer-templates')return {data:{success:true,data:template}};
+  if(url==='/flexi-import/batches'){uploadBody=body as FormData;return {data:{success:true,data:batch()}};}
+  if(url.endsWith('/process')){status='processing';return {data:{success:true,data:null}};}
+  throw new Error(`Unexpected write: ${url}`);
+ }) as typeof api.post);
+ vi.mocked(api.patch).mockImplementation(vi.fn(async(_url:string,body:{changes:{fields:Record<string,string>}[]})=>{name=body.changes[0].fields.name;status='validating';return {data:{success:true,data:{batch_uuid:'batch',status}}};}) as typeof api.patch);
+ const client=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
+ const wrap=(node:React.ReactNode)=><QueryClientProvider client={client}>{node}</QueryClientProvider>;
+ const view=render(wrap(<Designer />));
+ await screen.findByRole('checkbox',{name:'Select Employee Code'});
+ fireEvent.change(screen.getByLabelText('Template name'),{target:{value:'Team template'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save template'}));
+ await waitFor(()=>expect(navigation.push).toHaveBeenCalledWith('/flexi-import/templates'));
+ navigation.url='/flexi-import/new?template_uuid=tpl&version=1';
+ view.rerender(wrap(<NewImport />));
+ await screen.findByLabelText('Employee spreadsheet');
+ fireEvent.change(screen.getByLabelText('Employee spreadsheet'),{target:{files:[new File(['code,name\n000123,'],'team.csv')]}});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Upload & validate'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'Upload & validate'}));
+ await waitFor(()=>expect(navigation.push).toHaveBeenCalledWith('/flexi-import/batches/batch'));
+ expect(uploadBody?.get('template_uuid')).toBe('tpl');expect(uploadBody?.get('template_version')).toBe('1');expect(uploadBody?.has('column_mapping')).toBe(false);
+ view.rerender(wrap(<EmployeeBatchReview uuid="batch" />));
+ await screen.findByText('File uploaded. Waiting for the server to start validation.');
+ async function poll(next:string){status=next;await act(async()=>{await client.refetchQueries({queryKey:['employee-import','company:user','batch','status']});});}
+ await poll('validation_complete');
+ fireEvent.click(await screen.findByRole('button',{name:'Edit row'}));
+ fireEvent.change(await screen.findByLabelText('Employee Name'),{target:{value:'Rafay'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
+ await waitFor(()=>expect(api.patch).toHaveBeenCalledWith('/flexi-import/batches/batch/rows',{changes:[{row_number:3,fields:{name:'Rafay'}}]}));
+ await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+ await poll('validation_complete');
+ const review=await screen.findByRole('button',{name:'Review import impact →'});await waitFor(()=>expect(review).toBeEnabled());fireEvent.click(review);
+ const confirm=await screen.findByRole('button',{name:'Review & confirm import'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Confirm import'}));
+ await waitFor(()=>expect(api.post).toHaveBeenCalledWith('/flexi-import/batches/batch/process',{import_mode:'skip_errors',send_welcome_email:false,ignore_gaps:false}));
+ await poll('completed');
+ await screen.findByText('Import finished');
+ expect(urls.some(url=>url.includes('/fields/employees'))).toBe(false);
+ expect(screen.getByRole('heading',{name:/Import results/})).toBeInTheDocument();
+ client.clear();
+});

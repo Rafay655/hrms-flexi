@@ -6,6 +6,7 @@ export const useFormBuilders = (params: FormBuildersQueryParams) => {
   return useQuery({
     queryKey: ['form-builders', params],
     queryFn: () => fetchFormBuilders(params),
+    enabled: Boolean(params.company_uuid?.trim()),
     staleTime: 1000 * 60 * 2,
   });
 };

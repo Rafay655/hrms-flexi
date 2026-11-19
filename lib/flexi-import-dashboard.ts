@@ -1,6 +1,6 @@
 export type ImportDashboardData={
- total_imports_month:number;successful_rows_month:number;failed_rows_month:number;pending_approval_count:number;
- recent_batches:{uuid:string;import_type:string;status:string;total_rows:number;successful_rows:number|null;failed_rows:number|null;initiated_by:string|null;created_at:string;completed_at:string|null}[];
+ can_view_pending_approvals:boolean;total_imports_month:number;successful_rows_month:number;failed_rows_month:number;pending_approval_count:number;
+ recent_batches:{uuid:string;import_type:string;status:string;total_rows:number;skipped_rows:number|null;successful_rows:number|null;failed_rows:number|null;initiated_by:string|null;created_at:string;completed_at:string|null}[];
 };
 function record(value:unknown):Record<string,unknown>{return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};}
 function displayText(value:unknown,depth=0):string{
@@ -15,10 +15,11 @@ function count(value:unknown):number{const number=typeof value==='string'||typeo
 export function normalizeImportDashboard(value:unknown):ImportDashboardData{
  const data=record(value);
  return {
+  can_view_pending_approvals:data.can_view_pending_approvals===true,
   total_imports_month:count(data.total_imports_month),successful_rows_month:count(data.successful_rows_month),failed_rows_month:count(data.failed_rows_month),pending_approval_count:count(data.pending_approval_count),
   recent_batches:(Array.isArray(data.recent_batches)?data.recent_batches:[]).map(item=>{
    const row=record(item),actor=row.initiated_by;
-   return {uuid:displayText(row.uuid),import_type:displayText(row.import_type)||'Employee import',status:(displayText(row.status)||'unknown').toLowerCase().replaceAll(' ','_'),total_rows:count(row.total_rows),successful_rows:row.successful_rows==null?null:count(row.successful_rows),failed_rows:row.failed_rows==null?null:count(row.failed_rows),initiated_by:typeof actor==='string'?actor:displayText(record(actor).name)||null,created_at:displayText(row.created_at),completed_at:row.completed_at==null?null:displayText(row.completed_at)};
+   return {uuid:displayText(row.uuid),import_type:displayText(row.import_type)||'Employee import',status:(displayText(row.status)||'unknown').toLowerCase().replaceAll(' ','_'),total_rows:count(row.total_rows),skipped_rows:row.skipped_rows==null?null:count(row.skipped_rows),successful_rows:row.successful_rows==null?null:count(row.successful_rows),failed_rows:row.failed_rows==null?null:count(row.failed_rows),initiated_by:typeof actor==='string'?actor:displayText(record(actor).name)||null,created_at:displayText(row.created_at),completed_at:row.completed_at==null?null:displayText(row.completed_at)};
   }).filter(row=>!!row.uuid),
  };
 }

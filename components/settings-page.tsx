@@ -198,7 +198,7 @@ function mapBackendFieldToEditable(field: OnboardSettingField): EditableField {
     show_in_detail: Boolean(field.show_in_detail),
     required_in_quick: Boolean(field.required_in_quick),
     required_in_detail: Boolean(field.required_in_detail),
-    is_login_email: Boolean(field.is_login_email),
+    is_login_email: field.type === "email" && Boolean(field.is_login_email),
   };
 }
 
@@ -560,7 +560,7 @@ export default function SettingsPage() {
       })),
 
       tags: field.tags,
-      is_login_email: field.is_login_email,
+      is_login_email: field.type === "email" && field.is_login_email,
       visibility_condition: field.is_core || field.is_login_email ? null : field.visibility_condition ?? null,
     };
   };
@@ -1081,6 +1081,7 @@ export default function SettingsPage() {
                                 onValueChange={(value) =>
                                   updateField(selectedField.client_id, {
                                     type: value as FieldType,
+                                    is_login_email: value === "email" && selectedField.is_login_email,
                                     options: needsOptions(value as FieldType)
                                       ? selectedField.options
                                       : [],
@@ -1561,7 +1562,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
 
-                            <ToggleBox
+                            {selectedField.type === "email" && <ToggleBox
                               label="Use as Login Email"
                               checked={selectedField.is_login_email}
                               onChange={(checked) =>
@@ -1569,7 +1570,7 @@ export default function SettingsPage() {
                                   is_login_email: checked,
                                 })
                               }
-                            />
+                            />}
                           </div>
                         </div>
                       </div>

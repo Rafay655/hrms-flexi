@@ -17,7 +17,7 @@ export function parseImportCsvHeader(text:string):string[] {
   if(quoted)throw new Error('The CSV header contains an unclosed quote.');
   result.push(value.trim());return result;
 }
-export async function importWorkbookHeaders(file:File):Promise<string[]> {
+export async function importWorkbookHeaders(file:File,options?:{xlsxRow?:1|2;allowDuplicates?:boolean}):Promise<string[]> {
   if(!file.size||file.size>10*1024*1024)throw new Error('Choose a non-empty CSV or XLSX file up to 10 MB.');
   let headers:string[];
   if(file.name.toLowerCase().endsWith('.csv')) headers=parseImportCsvHeader(await file.text());
@@ -37,8 +37,9 @@ export async function importWorkbookHeaders(file:File):Promise<string[]> {
     const path=target.startsWith('/')?target.slice(1):`xl/${target.replace(/^\.\//,'')}`;
     const sheetDoc=xml(entries[path]);
     const shared=entries['xl/sharedStrings.xml']?Array.from(xml(entries['xl/sharedStrings.xml']).getElementsByTagName('si')).map(item=>Array.from(item.getElementsByTagName('t')).map(t=>t.textContent??'').join('')):[];
-    const row=sheetDoc.getElementsByTagName('row')[0];
-    if(!row)throw new Error('The Data sheet is empty.');
+    const sheetRows=Array.from(sheetDoc.getElementsByTagName('row'));
+    const row=options?.xlsxRow===2?sheetRows.find(item=>item.getAttribute('r')==='2'):sheetRows[0];
+    if(!row)throw new Error(options?.xlsxRow===2?'Keep the hidden field-key row from the saved template export.':'The Data sheet is empty.');
     headers=[];
     for(const cell of Array.from(row.getElementsByTagName('c'))){
       const column=(cell.getAttribute('r')??'').replace(/\d/g,'');
@@ -50,6 +51,6 @@ export async function importWorkbookHeaders(file:File):Promise<string[]> {
   }else throw new Error('Only CSV and XLSX files are supported.');
   while(headers.length&&!headers[headers.length-1])headers.pop();
   if(!headers.length||Array.from(headers).some(h=>!h))throw new Error('The header row has blank columns. Keep the supplied template headers.');
-  if(new Set(headers).size!==headers.length)throw new Error('Column headers must be unique.');
+  if(!options?.allowDuplicates&&new Set(headers).size!==headers.length)throw new Error('Column headers must be unique.');
   return headers;
 }

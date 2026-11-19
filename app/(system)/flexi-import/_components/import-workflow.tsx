@@ -16,14 +16,14 @@ import { displayImportValue } from '@/lib/employee-import';
 import { ImportErrorFeedback } from './import-error-feedback';
 import { importPrimary } from './import-ui';
 const labels={approve:'Approve',reject:'Reject',return:'Return for correction'};
-export function ImportWorkflow({workflow,uuid,scope,onChanged}:{workflow:Record<string,unknown>;uuid:string;scope:string;onChanged:()=>void}){
+export function ImportWorkflow({readOnly=false,workflow,uuid,scope,onChanged}:{readOnly?:boolean;workflow:Record<string,unknown>;uuid:string;scope:string;onChanged:()=>void}){
  const [decision,setDecision]=useState<WorkflowDecision|null>(null);
  const task=workflow.task as {id?:number;allowed_decisions?:WorkflowDecision[]}|null;
  const owned=workflow.owned===true||workflow.owner==='system_flex';
  const chain=Array.isArray(workflow.chain)?workflow.chain as {node?:string;state?:string;by?:string;decision?:string}[]:[];
  return <div className="space-y-4 rounded-lg border border-brand-800/15 bg-brand-100 p-4"><h3 className="text-sm font-semibold text-brand-800">SystemFlex-managed approval</h3><dl className="grid gap-3 text-sm sm:grid-cols-2">{['state','process','instance_id'].filter(key=>workflow[key]!=null).map(key=><div key={key}><dt className="text-xs capitalize text-muted-foreground">{key.replaceAll('_',' ')}</dt><dd className="mt-1 text-foreground">{displayImportValue(workflow[key])}</dd></div>)}</dl>
  {chain.length>0&&<ol className="space-y-2">{chain.map((step,index)=><li key={`${step.node}-${index}`} className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-800/10 pt-2 text-xs"><span className="font-medium text-brand-800">{step.node?.replaceAll('_',' ')??`Step ${index+1}`}</span><span className="text-muted-foreground">{[step.state,step.by,step.decision].filter(Boolean).join(' · ')}</span></li>)}</ol>}
- {owned&&task?.id&&<div className="flex flex-wrap gap-2">{task.allowed_decisions?.filter(value=>Object.hasOwn(labels,value)).map(value=><Button key={value} size="sm" variant={value==='approve'?'default':'outline'} className={value==='approve'?importPrimary:''} onClick={()=>setDecision(value)}>{labels[value]}</Button>)}</div>}
+ {!readOnly&&owned&&task?.id&&<div className="flex flex-wrap gap-2">{task.allowed_decisions?.filter(value=>Object.hasOwn(labels,value)).map(value=><Button key={value} size="sm" variant={value==='approve'?'default':'outline'} className={value==='approve'?importPrimary:''} onClick={()=>setDecision(value)}>{labels[value]}</Button>)}</div>}
  {!task?.id&&<p className="text-xs leading-5 text-muted-foreground">Waiting for an eligible approver or the next workflow step. No direct legacy approval is available for this workflow-owned import.</p>}
  {decision&&task?.id&&<WorkflowDecisionModal key={`${task.id}-${decision}`} uuid={uuid} taskId={task.id} scope={scope} decision={decision} onClose={()=>setDecision(null)} onChanged={onChanged} />}
  </div>;

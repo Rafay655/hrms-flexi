@@ -59,5 +59,5 @@ export function gapFieldLabel(gap:{field?:string;source_key:string;source_table?
 }
 
 export function hasRetryableImportFailures(batch:EmployeeImportBatch,failedRows:{status:string;created_record_id?:number|string|null}[]):boolean{
- return ['completed','failed'].includes(batch.status)&&['employees','employee'].includes(batch.import_type??'')&&batch.import_mode==='skip_errors'&&failedRows.some(row=>row.status==='failed')&&!failedRows.some(row=>row.created_record_id!==undefined&&row.created_record_id!==null);
+ return batch.can_retry_failed!==false&&['completed','failed'].includes(batch.status)&&['employees','employee'].includes(batch.import_type??'')&&batch.import_mode==='skip_errors'&&failedRows.some(row=>row.status==='failed')&&!failedRows.some(row=>row.created_record_id!==undefined&&row.created_record_id!==null);
 }

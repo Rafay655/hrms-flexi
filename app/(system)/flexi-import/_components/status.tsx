@@ -36,7 +36,7 @@ export const FI_STATUS_META: Record<string, StatusMeta> = {
   pending:             { label: "Pending",          color: "#CBD5E1", badge: "bg-slate-100 text-slate-600 ring-slate-200" },
   uploaded:            { label: "Uploaded",         color: "#C7BFE0", badge: "bg-[#F1EEF8] text-brand-700 ring-[#E2DAF1]" },
   validating:          { label: "Validating",       color: "#9F93C8", badge: "bg-[#EFEAF7] text-brand-700 ring-[#E2DAF1]" },
-  validation_complete: { label: "Validated",        color: "#5C5490", badge: "bg-[#EDECF2] text-brand-800 ring-[#DAD7E6]" },
+  validation_complete: { label: "Ready for review",        color: "#5C5490", badge: "bg-[#EDECF2] text-brand-800 ring-[#DAD7E6]" },
   pending_approval:    { label: "Pending Approval", color: "#F3AB9D", badge: "bg-[#FCEDE9] text-[#b4452f] ring-[#F6D8D0]" },
   approved:            { label: "Approved",         color: "#49426E", badge: "bg-[#EDECF2] text-brand-800 ring-[#DAD7E6]" },
   processing:          { label: "Processing",       color: "#EEC293", badge: "bg-[#FBF1E3] text-[#9a6b2f] ring-[#F2E3CC]" },
