@@ -43,3 +43,10 @@ Saved uploads pre-check the selected columns: generated XLSX files use their hid
 ## Lookup interaction adjustment
 
 Lookup correction fields use one editable combobox: typing searches the authenticated paginated endpoint and options appear directly below the same field. There is no separate Search button or second search input. Selection preserves the server option ID for dependencies while submitting its spreadsheet label. Arrow/Enter/Escape controls and existing pagination remain available. Template save and revision actions return to the template listing.
+
+
+### FlexiMeta destinations (20 November)
+- New Import keeps one FlexiMeta card, then groups the server-provided destinations by category. No master-table list is hardcoded.
+- The selected destination's exact `import_type` is used for schema, mapping, download, upload, saved template versions, and history filters. Existing mixed-entity saved templates retain their pinned snapshot.
+- Schema notes, fixed options and reference guidance are shown in template design and the upload field-guidance panel. Parent records must exist before importing dependent records.
+- The service supports destination-specific schema lookups with server search, pagination and numeric parent IDs; returned spreadsheet values stay separate from display labels and record IDs. Non-employee preview rows remain read-only under the current correction contract.

@@ -66,3 +66,10 @@ it('pins both identifiers and omits mapping overrides on saved-version uploads',
  expect(body.get('template_uuid')).toBe('tpl');expect(body.get('template_version')).toBe('2');expect(body.get('form_mode')).toBe('detailed');expect(body.get('auto_process')).toBe('0');expect(body.get('send_welcome_email')).toBe('1');
  expect([...body.keys()].some(key=>key.startsWith('column_mapping'))).toBe(false);expect(body.has('column_map_id')).toBe(false);
 });
+
+it('uses the destination schema lookup and preserves spreadsheet values separately from parent IDs',async()=>{
+ vi.mocked(api.get).mockResolvedValue({data:{success:true,data:{options:[{id:7,label:'Administration',value:'ADM'}],has_more:false}}});
+ const result=await service.schemaLookup('flexi_meta_departments','division_id','admin',2,'3');
+ expect(api.get).toHaveBeenCalledWith('/flexi-import/schemas/flexi_meta_departments/lookups/division_id',{params:{q:'admin',page:2,parent_id:'3'},signal:undefined});
+ expect(result.options[0]).toEqual({id:7,label:'Administration',value:'ADM'});
+});

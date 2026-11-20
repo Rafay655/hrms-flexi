@@ -15,6 +15,8 @@ export interface FieldDefinition {
   sensitive?: boolean;
   parent_field_key?: string;
   source_key?: string;
+  reference?: unknown;
+  options?: Array<string | {value?: string | number; id?: string | number; label?: string}>;
   section?: string;
   visibility_condition?: VisibilityCondition | null;
   key: string;
@@ -62,6 +64,8 @@ export function normalizeFieldDefinition(
     ...(typeof (raw.parent_field_key ?? raw.parent_system_key) === "string" ? {parent_field_key:(raw.parent_field_key ?? raw.parent_system_key) as string} : {}),
     ...(typeof raw.source_key === "string" ? {source_key:raw.source_key} : {}),
     ...(typeof raw.section === "string" ? {section:raw.section} : {}),
+    ...(raw.reference !== undefined ? {reference:raw.reference} : {}),
+    ...(Array.isArray(raw.options) ? {options:raw.options as FieldDefinition["options"]} : {}),
     key: String(raw.key ?? raw.field_key ?? ""),
     label: String(raw.label ?? raw.field_key ?? raw.key ?? ""),
     type: String(raw.type ?? "text"),
