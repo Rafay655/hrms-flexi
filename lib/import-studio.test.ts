@@ -16,7 +16,7 @@ it('does not auto-match ambiguous labels or duplicate target assignments',()=>{
 });
 it('distinguishes reference problems and keeps target mutation features unavailable',()=>{
  expect(issueCategory({code:'lookup_not_found'})).toBe('Missing reference');expect(issueCategory({code:'lookup_scope_mismatch'})).toBe('Wrong parent or company');expect(issueCategory({severity:'warning'})).toBe('Warning');
- expect(TARGET_IMPORT_FEATURES.templates).toBe(true);expect(TARGET_IMPORT_FEATURES.directEntry).toBe(false);expect(TARGET_IMPORT_FEATURES.allRowEditing).toBe(false);expect(TARGET_IMPORT_FEATURES.recoveryPreview).toBe(false);
+ expect(TARGET_IMPORT_FEATURES.templates).toBe(true);expect(TARGET_IMPORT_FEATURES.directEntry).toBe(false);expect(TARGET_IMPORT_FEATURES.allRowEditing).toBe(true);expect(TARGET_IMPORT_FEATURES.recoveryPreview).toBe(false);
 });
 
 it('distinguishes known conditional visibility from unresolved spreadsheet lookups',()=>{

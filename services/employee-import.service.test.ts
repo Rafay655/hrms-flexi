@@ -22,7 +22,7 @@ it('supports update and CSV downloads',async()=>{
 it('omits mappings for downloaded templates and saves the upload email option',async()=>{
  await service.upload(new File(['data'],'employees.xlsx'),'detailed',undefined,true);
  const call=vi.mocked(api.post).mock.calls[0],body=call[1] as FormData;
- expect(body.get('form_mode')).toBe('detailed');expect(body.get('auto_process')).toBe('0');expect(body.get('send_welcome_email')).toBe('1');expect([...body.keys()].some(key=>key.startsWith('column_mapping'))).toBe(false);expect(body.has('company_id')).toBe(false);
+ expect(body.get('form_mode')).toBe('detailed');expect(body.get('auto_process')).toBe('0');expect(body.get('review_before_approval')).toBe('1');expect(body.get('send_welcome_email')).toBe('1');expect([...body.keys()].some(key=>key.startsWith('column_mapping'))).toBe(false);expect(body.has('company_id')).toBe(false);
  expect(call[2]).toEqual({headers:{'Content-Type':undefined}});
 });
 it('validates and submits custom mappings behind readable labels',async()=>{
@@ -46,7 +46,7 @@ it('uses revalidate explicitly and accepts queue acknowledgements with null data
  vi.mocked(api.post).mockResolvedValue({data:{success:true,data:null}});
  await expect(service.process('batch',{import_mode:'skip_errors',send_welcome_email:false,ignore_gaps:true})).resolves.toBeNull();
  expect(api.post).toHaveBeenLastCalledWith('/flexi-import/batches/batch/process',{import_mode:'skip_errors',send_welcome_email:false,ignore_gaps:true});
- await service.revalidate('batch');expect(api.post).toHaveBeenLastCalledWith('/flexi-import/batches/batch/revalidate',{});
+ await service.revalidate('batch');expect(api.post).toHaveBeenLastCalledWith('/flexi-import/batches/batch/revalidate');
 });
 it('infers the next row page when pagination metadata is absent',async()=>{
  vi.mocked(api.get).mockResolvedValueOnce({data:{success:true,data:Array.from({length:50},(_,i)=>({row_number:i+3}))}}).mockResolvedValueOnce({data:{success:true,data:[{row_number:53}]}});
@@ -88,4 +88,9 @@ it('omits employee-only options for other scope processing and sends no rollback
  await service.process('batch',{import_mode:'skip_errors',ignore_gaps:false,send_welcome_email:true},'expense_claims');
  expect(api.post).toHaveBeenLastCalledWith('/flexi-import/batches/batch/process',{import_mode:'skip_errors',ignore_gaps:false});
  await service.rollback('batch');expect(api.post).toHaveBeenLastCalledWith('/flexi-import/batches/batch/rollback');
+});
+
+it('normalizes the batch-owned editing fields and preserves the saved column mapping',async()=>{
+ vi.mocked(api.get).mockResolvedValue({data:{success:true,data:{uuid:'batch',status:'validation_complete',can_edit_preview:true,column_mapping:{Title:'name'},preview_fields:[{field_key:'name',label:'Name',type:'text',required:true}]}}});
+ const status=await service.status('batch');expect(status.preview_fields?.[0]).toEqual(expect.objectContaining({key:'name',label:'Name'}));expect(status.column_mapping).toEqual({Title:'name'});
 });

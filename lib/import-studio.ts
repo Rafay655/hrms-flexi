@@ -2,14 +2,14 @@ import {conditionValue,type VisibilityCondition} from "@/lib/onboarding-visibili
 import type { FieldDefinition } from '@/lib/flexi-import';
 import type { ImportRow } from '@/services/employee-import.service';
 export type ImportOperation='create_only'|'update_only'|'create_or_update';
-export type StudioField={key:string;label:string;type:string;required:boolean;editable:boolean;sensitive:boolean;parentKey?:string;sourceKey?:string;description?:string;condition?:VisibilityCondition|null};
+export type StudioField={key:string;label:string;type:string;required:boolean;editable:boolean;sensitive:boolean;parentKey?:string;sourceKey?:string;description?:string;condition?:VisibilityCondition|null;options?:FieldDefinition['options']};
 export type StudioRow={viewId:string;rowNumber:number;status:string;action:string;source:ImportRow};
-const controls=new Set(['text','email','phone','tel','textarea','date','number','integer','decimal','boolean','checkbox','toggle','select','radio','lookup','dependent_lookup']);
-export function studioFields(fields:FieldDefinition[]):StudioField[]{return fields.filter(field=>field.visible!==false).map(field=>({key:field.key,label:field.label,type:field.type,required:field.required,editable:field.editable!==false&&controls.has(field.type),sensitive:field.sensitive===true,parentKey:field.parent_field_key,sourceKey:field.source_key,description:field.description,condition:field.visibility_condition}));}
+const controls=new Set(['text','email','phone','tel','textarea','date','number','integer','decimal','boolean','checkbox','toggle','select','radio','lookup','dependent_lookup','string','json','datetime','datetime-local','time','url','numeric','float']);
+export function studioFields(fields:FieldDefinition[]):StudioField[]{return fields.filter(field=>field.visible!==false).map(field=>({key:field.key,label:field.label,type:field.type,required:field.required,editable:field.editable!==false&&controls.has(field.type),sensitive:field.sensitive===true,parentKey:field.parent_field_key,sourceKey:field.source_key,description:field.description,condition:field.visibility_condition,options:field.options??field.allowed_values}));}
 export function studioRows(rows:ImportRow[]):StudioRow[]{return rows.map(row=>({viewId:`preview-row-${row.row_number}`,rowNumber:row.row_number,status:row.status,action:row.row_action==='new'?'create':row.row_action??'pending',source:row}));}
 export function cellValue(row:ImportRow,field:Pick<StudioField,'key'|'label'>):unknown{const raw=row.raw_data??{};return Object.hasOwn(raw,field.key)?raw[field.key]:raw[field.label];}
 export function friendlyStatus(status:string):string{const labels:Record<string,string>={pending:'Pending',rolling_back:'Reversing employee changes',uploaded:'Uploaded',validating:'Validating',validation_complete:'Ready for review',pending_approval:'Pending approval',approved:'Approved',processing:'Processing',completed:'Completed',failed:'Failed',rejected:'Rejected',rolled_back:'Rolled back',invalid:'Blocking',valid:'Valid',committed:'Committed',skipped:'Skipped'};return labels[status]??'Status unavailable';}
-export const TARGET_IMPORT_FEATURES={templates:true,directEntry:false,allRowEditing:false,recoveryPreview:false} as const;
+export const TARGET_IMPORT_FEATURES={templates:true,directEntry:false,allRowEditing:true,recoveryPreview:false} as const;
 
 export function issueCategory(issue:{code?:string;severity?:string;gap?:boolean}):string{
  if(issue.severity==='warning')return 'Warning';

@@ -16,7 +16,7 @@ it('connects save, pinned upload, correction, revalidation and commit using actu
  const template={template_uuid:'tpl',version:1,name:'Team template',import_type:'employees',form_mode:'detailed',operation:'create_or_update',schema_version:'schema-1',selected_field_keys:['code','name'],fields,download_available:true};
  let status='uploaded',name='',uploadBody:FormData|undefined;
  const urls:string[]=[];
- const batch=()=>({uuid:'batch',status,import_type:'employees',form_mode:'detailed',file_name:'team.xlsx',template_uuid:'tpl',template_version:1,total_rows:1,valid_rows:name?1:0,invalid_rows:name?0:1,requires_approval:false,has_gaps:false,workflow:null,can_edit_preview:status==='validation_complete',processed_rows:status==='completed'?1:0,successful_rows:status==='completed'?1:0,failed_rows:0,skipped_rows:0});
+ const batch=()=>({uuid:'batch',status,preview_fields:fields,column_mapping:{},import_type:'employees',form_mode:'detailed',file_name:'team.xlsx',template_uuid:'tpl',template_version:1,total_rows:1,valid_rows:name?1:0,invalid_rows:name?0:1,requires_approval:false,has_gaps:false,workflow:null,can_edit_preview:status==='validation_complete',processed_rows:status==='completed'?1:0,successful_rows:status==='completed'?1:0,failed_rows:0,skipped_rows:0});
  vi.mocked(api.get).mockImplementation(vi.fn(async(url:string)=>{
   urls.push(url);let data:unknown;
   if(url==='/flexi-import/import-types')data=[{import_type:'employees',title:'Employees',operations:['create_or_update']}];
@@ -50,7 +50,7 @@ it('connects save, pinned upload, correction, revalidation and commit using actu
  await waitFor(()=>expect(screen.getByRole('button',{name:'Upload & validate'})).toBeEnabled());
  fireEvent.click(screen.getByRole('button',{name:'Upload & validate'}));
  await waitFor(()=>expect(navigation.push).toHaveBeenCalledWith('/flexi-import/batches/batch'));
- expect(uploadBody?.get('template_uuid')).toBe('tpl');expect(uploadBody?.get('template_version')).toBe('1');expect(uploadBody?.has('column_mapping')).toBe(false);
+ expect(uploadBody?.get('review_before_approval')).toBe('1');expect(uploadBody?.get('template_uuid')).toBe('tpl');expect(uploadBody?.get('template_version')).toBe('1');expect(uploadBody?.has('column_mapping')).toBe(false);
  view.rerender(wrap(<EmployeeBatchReview uuid="batch" />));
  await screen.findByText('File uploaded. Waiting for the server to start validation.');
  async function poll(next:string){status=next;await act(async()=>{await client.refetchQueries({queryKey:['employee-import','company:user','batch','status']});});}

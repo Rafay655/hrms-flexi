@@ -7,6 +7,7 @@ export type TemplateSelection = { form_mode: FormMode; required_only: boolean };
 export type EmployeeImportBatch = {
   validation_errors?:{row?:number;field?:string;message?:string}[]|null;
   template_uuid?:string|null; template_version?:number|null;
+  preview_fields?: FieldDefinition[]; column_mapping?: Record<string,string>;
   can_edit_preview?: boolean; can_retry_failed?: boolean;
   uuid: string; status: string; import_type?: string; form_mode?: FormMode; file_name?: string;
   total_rows?: number; processed_rows?: number; successful_rows?: number; failed_rows?: number; skipped_rows?: number;
@@ -83,13 +84,13 @@ export const employeeImportService = {
     return importData<{valid:boolean;unmapped_required_fields:string[];unknown_csv_columns:string[]}>(data);
   },
   async upload(file:File,mode:FormMode,mapping?:Record<string,string>,sendWelcomeEmail=false,onProgress?:(percent:number)=>void):Promise<EmployeeImportBatch>{
-    const body=new FormData();body.append('file',file);body.append('import_type','employees');body.append('form_mode',mode);body.append('auto_process','0');body.append('send_welcome_email',sendWelcomeEmail?'1':'0');
+    const body=new FormData();body.append('file',file);body.append('import_type','employees');body.append('form_mode',mode);body.append('auto_process','0');body.append('review_before_approval','1');body.append('send_welcome_email',sendWelcomeEmail?'1':'0');
     if(mapping)for(const [header,key] of Object.entries(mapping))if(key)body.append(`column_mapping[${header}]`,key);
     const {data}=await api.post(`${ROOT}/batches`,body,{headers:{'Content-Type':undefined},...(onProgress?{onUploadProgress:(event:{loaded:number;total?:number})=>{if(event.total)onProgress(Math.min(100,Math.round(event.loaded/event.total*100)));}}:{})});
     const result=importData<EmployeeImportBatch>(data);if(!result?.uuid)throw new Error('The upload did not return a batch UUID.');return result;
   },
   async detail(uuid:string,signal?:AbortSignal):Promise<EmployeeImportBatch>{return importData((await api.get(`${ROOT}/batches/${uuid}`,{signal})).data);},
-  async status(uuid:string,signal?:AbortSignal):Promise<EmployeeImportBatch>{return importData((await api.get(`${ROOT}/batches/${uuid}/status`,{signal})).data);},
+  async status(uuid:string,signal?:AbortSignal):Promise<EmployeeImportBatch>{const batch=importData<EmployeeImportBatch>((await api.get(`${ROOT}/batches/${uuid}/status`,{signal})).data);return {...batch,...(Array.isArray(batch.preview_fields)?{preview_fields:batch.preview_fields.map(field=>normalizeFieldDefinition(field as unknown as Record<string,unknown>))}:{})};},
   async summary(uuid:string,signal?:AbortSignal):Promise<ImportSummary>{return importData((await api.get(`${ROOT}/batches/${uuid}/summary`,{signal})).data);},
   async rows(uuid:string,status:string,page:number,signal?:AbortSignal):Promise<ImportRows>{
     const {data}=await api.get(`${ROOT}/batches/${uuid}/rows`,{params:{...(status?{status}:{}),page},signal});
@@ -108,7 +109,7 @@ export const employeeImportService = {
     if(!decisions.length||decisions.length>500||new Set(identities).size!==identities.length)throw new Error('Select between 1 and 500 distinct gap decisions.');
     return importData((await api.post(`${ROOT}/batches/${uuid}/gaps/resolve`,{decisions})).data);
   },
-  async revalidate(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/revalidate`,{})).data);},
+  async revalidate(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/revalidate`)).data);},
   async process(uuid:string,options:ImportOptions,importType='employees'):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/process`,importType==='employees'?options:{import_mode:options.import_mode,ignore_gaps:options.ignore_gaps})).data);},
   async retryFailed(uuid:string):Promise<RetryFailedResult>{return importData((await api.post(`${ROOT}/batches/${uuid}/retry-failed`)).data);},
   async rollback(uuid:string):Promise<QueuedResult|null>{return importData((await api.post(`${ROOT}/batches/${uuid}/rollback`)).data);},

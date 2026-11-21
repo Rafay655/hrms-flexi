@@ -2,7 +2,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {render,screen,fireEvent,waitFor,cleanup} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {employeeImportService as service} from '@/services/employee-import.service';
-import {PreviewRowEditor,RowCorrectionDialog} from './PreviewRowEditor';
+import {RowCorrectionDialog} from './PreviewRowEditor';
 vi.mock('@/services/employee-import.service',()=>({employeeImportService:{previewFields:vi.fn(),rows:vi.fn(),correctRows:vi.fn()}}));
 vi.mock('./import-lookup-input',()=>({ImportLookupInput:({label,parentId,onSelect}:{label:string;parentId?:string;onSelect:(option:{id:number;label:string})=>void})=><div><span>{label} parent: {parentId??'none'}</span><button type="button" onClick={()=>onSelect({id:167,label:'Chosen parent'})}>Choose {label}</button></div>}));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
@@ -11,15 +11,14 @@ it('edits invalid rows with labels and sends only changed field keys before awai
  vi.mocked(service.rows).mockResolvedValue({data:[{row_number:3,status:'invalid',raw_data:{'Emergency contact':'bad',Department:'Payroll'},validation_errors:[{message:'Phone is invalid'}],processing_error:null}],page:1,hasNext:false});
  vi.mocked(service.correctRows).mockResolvedValue({batch_uuid:'batch',status:'validating'});
  const queued=vi.fn(),client=new QueryClient({defaultOptions:{queries:{retry:false}}});
- render(<QueryClientProvider client={client}><PreviewRowEditor uuid="batch" scope="company:user" mode="detailed" revision={0} onQueued={queued} onRefresh={vi.fn()} /></QueryClientProvider>);
- fireEvent.click(await screen.findByRole('button',{name:'Edit row'}));
+ render(<QueryClientProvider client={client}><RowCorrectionDialog uuid="batch" scope="company:user" mode="detailed" row={{row_number:3,status:'invalid',raw_data:{'Emergency contact':'bad',Department:'Payroll'},validation_errors:[],processing_error:null}} onClose={vi.fn()} onQueued={queued} onRefresh={vi.fn()} /></QueryClientProvider>);
  fireEvent.change(await screen.findByLabelText('Emergency contact'),{target:{value:'+923001234567'}});
  expect(screen.queryByText('field_phone')).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
  await waitFor(()=>expect(service.correctRows).toHaveBeenCalledWith('batch',[{row_number:3,fields:{field_phone:'+923001234567'}}]));
  await waitFor(()=>expect(queued).toHaveBeenCalledWith({batch_uuid:'batch',status:'validating'}));
  expect(service.previewFields).toHaveBeenCalledWith('detailed',expect.any(AbortSignal));
- expect(service.rows).toHaveBeenCalledWith('batch','invalid',1,expect.any(AbortSignal));
+ expect(service.rows).not.toHaveBeenCalled();
  client.clear();
 });
 
@@ -74,4 +73,16 @@ it('omits dependent edits when a controlling toggle hides the field',async()=>{
  expect(screen.queryByLabelText('Child name')).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
  await waitFor(()=>expect(service.correctRows).toHaveBeenCalledWith('batch',[{row_number:3,fields:{children:'0'}}]));client.clear();
+});
+
+it('retains local edits visibly when the batch becomes read-only',async()=>{
+ const fields=[{key:'name',label:'Name',type:'text',required:true}];
+ const row={row_number:2,status:'valid',raw_data:{name:'Original'},validation_errors:[],processing_error:null};
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const props={uuid:'batch',scope:'company:user',mode:'detailed' as const,row,previewFields:fields,onClose:vi.fn(),onQueued:vi.fn(),onRefresh:vi.fn()};
+ const view=render(<QueryClientProvider client={client}><RowCorrectionDialog {...props} /></QueryClientProvider>);
+ fireEvent.change(screen.getByRole('textbox',{name:'Name'}),{target:{value:'Local correction'}});
+ view.rerender(<QueryClientProvider client={client}><RowCorrectionDialog {...props} canEdit={false} /></QueryClientProvider>);
+ expect(screen.getByRole('textbox',{name:'Name'})).toHaveValue('Local correction');expect(screen.getByRole('textbox',{name:'Name'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Save and re-check'})).toBeDisabled();client.clear();
 });

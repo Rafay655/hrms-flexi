@@ -20,7 +20,7 @@ function mount(node:ReactNode){client=new QueryClient({defaultOptions:{queries:{
 function departmentReport():GapReport{return {status:'validation_complete',has_gaps:true,total_gap_values:1,tables:[{source_key:'departments',source_table:'departments',creatable:false,blocked_reason:'Department needs a Division. Add it in Company → Departments under the correct division, then press Re-check.',warning:null,needs_parent:false,extra_fields:[],values:[{source_key:'departments',field:'Department',value:'Payroll Operations',parent_source_key:'divisions',parent_id:7,parent_label:'Administration',suggestion:null,decision:null}]}]};}
 beforeEach(()=>{
  vi.clearAllMocks();auth.permissions=[];auth.roles=[];vi.stubGlobal('ResizeObserver',class{observe(){}unobserve(){}disconnect(){}});
- batch={uuid:'batch',status:'validation_complete',import_type:'employees',file_name:'employees.xlsx',form_mode:'detailed',total_rows:2,successful_rows:2,failed_rows:0,processed_rows:0,has_gaps:false,requires_approval:false,send_welcome_email:false,workflow:null};
+ batch={uuid:'batch',can_edit_preview:true,status:'validation_complete',import_type:'employees',file_name:'employees.xlsx',form_mode:'detailed',total_rows:2,successful_rows:2,failed_rows:0,processed_rows:0,has_gaps:false,requires_approval:false,send_welcome_email:false,workflow:null};
  report={status:'validation_complete',has_gaps:false,total_gap_values:0,tables:[]};summary={status:'validation_complete',total_rows:2,valid_rows:2,invalid_rows:0,new_rows:1,update_rows:1,unchanged_rows:0};
  vi.mocked(service.detail).mockImplementation(async()=>batch);vi.mocked(service.status).mockImplementation(async()=>batch);vi.mocked(service.gaps).mockImplementation(async()=>report);vi.mocked(service.summary).mockImplementation(async()=>summary);
  vi.mocked(service.rows).mockResolvedValue({data:[],page:1,hasNext:false});
@@ -207,4 +207,35 @@ it('shows saved-template validation failures in review and retains the correctio
  expect(screen.getByRole('link',{name:'Upload a corrected file'})).toHaveAttribute('href','/flexi-import/new?template_uuid=saved-template&version=2');
  expect(screen.getByRole('heading',{name:/Spreadsheet validation workspace/})).toBeInTheDocument();
  expect(service.process).not.toHaveBeenCalled();
+});
+
+it('submits an editable approval preview only after every row passes validation',async()=>{
+ batch.import_type='flexi_meta_departments';batch.requires_approval=true;batch.can_edit_preview=true;
+ batch.preview_fields=[{key:'name',label:'Name',type:'text',required:true}];
+ summary.valid_rows=1;summary.invalid_rows=1;
+ vi.mocked(service.process).mockImplementation(async()=>{batch={...batch,status:'pending_approval',can_edit_preview:false};return {batch_uuid:'batch',status:'pending_approval'};});
+ mount(<EmployeeBatchReview uuid="batch" />);
+ fireEvent.click(await screen.findByRole('button',{name:/Approval & commit/}));
+ const submit=await screen.findByRole('button',{name:'Submit for approval'});
+ expect(submit).toBeDisabled();
+ summary={...summary,valid_rows:2,invalid_rows:0};
+ await act(async()=>{await client.invalidateQueries({queryKey:['employee-import','company:user','batch','summary']});});
+ await waitFor(()=>expect(submit).toBeEnabled());fireEvent.click(submit);
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Submit for approval'}));
+ await waitFor(()=>expect(service.process).toHaveBeenCalledWith('batch',expect.objectContaining({import_mode:'all_or_nothing',ignore_gaps:false}),'flexi_meta_departments'));
+ await screen.findByText('Awaiting another approver');
+ expect(screen.queryByRole('button',{name:'Submit for approval'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:/Review & corrections/}));
+ expect(await screen.findByRole('button',{name:'Re-check'})).toBeDisabled();
+});
+
+it('re-checks a non-employee preview without editing cells or uploading again',async()=>{
+ batch.import_type='flexi_meta_departments';batch.preview_fields=[{key:'name',label:'Name',type:'text',required:true}];
+ vi.mocked(service.revalidate).mockImplementation(async()=>{batch={...batch,status:'validating'};return {status:'validating'};});
+ mount(<EmployeeBatchReview uuid="batch" />);
+ const recheck=await screen.findByRole('button',{name:'Re-check'});await waitFor(()=>expect(recheck).toBeEnabled());
+ fireEvent.click(recheck);
+ await waitFor(()=>expect(service.revalidate).toHaveBeenCalledWith('batch'));
+ await screen.findByText(/Checking the spreadsheet… The previous preview/);
+ expect(service.upload).not.toHaveBeenCalled();expect(service.process).not.toHaveBeenCalled();
 });

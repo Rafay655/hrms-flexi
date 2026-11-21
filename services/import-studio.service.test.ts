@@ -20,7 +20,7 @@ it('uploads other scopes review-first without employee email or invented templat
  vi.mocked(api.post).mockResolvedValue({data:{success:true,data:{uuid:'batch',status:'uploaded'}}});
  await service.upload(new File(['csv'],'leave.csv'),'leave_adjustments','detailed',{'Days':'adjustment_days'},vi.fn());
  const body=vi.mocked(api.post).mock.calls[0][1] as FormData;
- expect(body.get('auto_process')).toBe('0');expect(body.get('import_type')).toBe('leave_adjustments');expect(body.has('send_welcome_email')).toBe(false);expect(body.has('template_uuid')).toBe(false);expect(body.get('column_mapping[Days]')).toBe('adjustment_days');
+ expect(body.get('auto_process')).toBe('0');expect(body.get('review_before_approval')).toBe('1');expect(body.get('import_type')).toBe('leave_adjustments');expect(body.has('send_welcome_email')).toBe(false);expect(body.has('template_uuid')).toBe(false);expect(body.get('column_mapping[Days]')).toBe('adjustment_days');
 });
 it('downloads real blobs using the server attachment name',async()=>{
  const blob=new Blob(['PKfile'],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -63,7 +63,7 @@ it('pins both identifiers and omits mapping overrides on saved-version uploads',
  vi.mocked(api.post).mockResolvedValue({data:{success:true,data:{uuid:'batch'}}});
  await service.upload(new File(['csv'],'team.csv'),'employees','detailed',{Name:'wrong-live-key'},vi.fn(),{template_uuid:'tpl',template_version:2,send_welcome_email:true});
  const body=vi.mocked(api.post).mock.calls[0][1] as FormData;
- expect(body.get('template_uuid')).toBe('tpl');expect(body.get('template_version')).toBe('2');expect(body.get('form_mode')).toBe('detailed');expect(body.get('auto_process')).toBe('0');expect(body.get('send_welcome_email')).toBe('1');
+ expect(body.get('template_uuid')).toBe('tpl');expect(body.get('template_version')).toBe('2');expect(body.get('form_mode')).toBe('detailed');expect(body.get('auto_process')).toBe('0');expect(body.get('review_before_approval')).toBe('1');expect(body.get('send_welcome_email')).toBe('1');
  expect([...body.keys()].some(key=>key.startsWith('column_mapping'))).toBe(false);expect(body.has('column_map_id')).toBe(false);
 });
 

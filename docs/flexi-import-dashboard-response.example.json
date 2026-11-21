@@ -1,0 +1,300 @@
+{
+  "success": true,
+  "message": "Flexi Import dashboard retrieved successfully.",
+  "data": {
+    "month": "2026-11",
+    "month_label": "November 2026",
+    "timezone": "Asia/Karachi",
+    "snapshot_at": "2026-11-15T12:00:00+05:00",
+    "is_current_month": false,
+    "kpi": {
+      "batches_created": 48,
+      "successful_rows": 4620,
+      "failed_processing_rows": 80,
+      "processed_rows": 5000,
+      "pending_approvals": 3,
+      "saved_templates": 18
+    },
+    "status_total": 48,
+    "status_breakdown": [
+      {
+        "status": "completed",
+        "label": "Completed",
+        "count": 32
+      },
+      {
+        "status": "validation_complete",
+        "label": "Ready for review",
+        "count": 4
+      },
+      {
+        "status": "pending_approval",
+        "label": "Pending approval",
+        "count": 3
+      },
+      {
+        "status": "processing",
+        "label": "Processing",
+        "count": 2
+      },
+      {
+        "status": "validating",
+        "label": "Validating",
+        "count": 2
+      },
+      {
+        "status": "failed",
+        "label": "Failed",
+        "count": 3
+      },
+      {
+        "status": "rejected",
+        "label": "Rejected",
+        "count": 1
+      },
+      {
+        "status": "rolled_back",
+        "label": "Rolled back",
+        "count": 1
+      }
+    ],
+    "trend": [
+      {
+        "month": "2026-06",
+        "label": "Jun",
+        "batches_created": 18,
+        "completed_batches": 12
+      },
+      {
+        "month": "2026-07",
+        "label": "Jul",
+        "batches_created": 24,
+        "completed_batches": 17
+      },
+      {
+        "month": "2026-08",
+        "label": "Aug",
+        "batches_created": 21,
+        "completed_batches": 15
+      },
+      {
+        "month": "2026-09",
+        "label": "Sep",
+        "batches_created": 35,
+        "completed_batches": 26
+      },
+      {
+        "month": "2026-10",
+        "label": "Oct",
+        "batches_created": 40,
+        "completed_batches": 29
+      },
+      {
+        "month": "2026-11",
+        "label": "Nov",
+        "batches_created": 48,
+        "completed_batches": 32
+      }
+    ],
+    "scope_breakdown": [
+      {
+        "import_type": "employees",
+        "label": "Employees",
+        "count": 14
+      },
+      {
+        "import_type": "flexi_meta",
+        "label": "FlexiMeta",
+        "count": 12
+      },
+      {
+        "import_type": "salary_structures",
+        "label": "Salary revisions",
+        "count": 6
+      },
+      {
+        "import_type": "attendance_records",
+        "label": "Attendance",
+        "count": 5
+      },
+      {
+        "import_type": "leave_adjustments",
+        "label": "Leave adjustments",
+        "count": 4
+      },
+      {
+        "import_type": "loan_opening_balances",
+        "label": "Loan openings",
+        "count": 4
+      },
+      {
+        "import_type": "expense_claims",
+        "label": "Expense claims",
+        "count": 3
+      }
+    ],
+    "row_outcomes": {
+      "successful": 4620,
+      "failed": 80,
+      "skipped": 300,
+      "total": 5000
+    },
+    "needs_attention": [
+      {
+        "key": "invalid_preview",
+        "label": "Validation corrections",
+        "count": 4,
+        "hint": "Batches with invalid rows to review before submission."
+      },
+      {
+        "key": "reference_gaps",
+        "label": "Missing reference data",
+        "count": 2,
+        "hint": "Resolve missing masters, then re-check the preview."
+      },
+      {
+        "key": "pending_approval",
+        "label": "Awaiting approval",
+        "count": 3,
+        "hint": "A separate authorized approver must review these batches."
+      },
+      {
+        "key": "processing_failures",
+        "label": "Processing failures",
+        "count": 3,
+        "hint": "Review errors. Retry is available only for eligible employee batches."
+      }
+    ],
+    "template_library": {
+      "total": 18,
+      "ready": 15,
+      "needs_revision": 3
+    },
+    "active_batches": [
+      {
+        "uuid": "00000000-0000-4000-8000-000000000004",
+        "file_name": "attendance-punches.csv",
+        "import_type": "attendance_records",
+        "import_type_label": "Attendance punches",
+        "status": "processing",
+        "total_rows": 800,
+        "processed_rows": 560,
+        "progress": 70
+      },
+      {
+        "uuid": "00000000-0000-4000-8000-000000000007",
+        "file_name": "employee-updates.xlsx",
+        "import_type": "employees",
+        "import_type_label": "Employee onboarding",
+        "status": "processing",
+        "total_rows": 150,
+        "processed_rows": 60,
+        "progress": 40
+      }
+    ],
+    "recent_batches": [
+      {
+        "uuid": "00000000-0000-4000-8000-000000000001",
+        "file_name": "employee-onboarding.xlsx",
+        "import_type": "employees",
+        "import_type_label": "Employee onboarding",
+        "status": "validation_complete",
+        "total_rows": 114,
+        "processed_rows": 0,
+        "successful_rows": 0,
+        "failed_rows": 0,
+        "skipped_rows": 0,
+        "initiated_by": {
+          "id": "demo-operator",
+          "name": "Demo HR Operator"
+        },
+        "created_at": "2026-11-12T09:30:00+05:00"
+      },
+      {
+        "uuid": "00000000-0000-4000-8000-000000000002",
+        "file_name": "departments.xlsx",
+        "import_type": "flexi_meta_departments",
+        "import_type_label": "FlexiMeta · Departments",
+        "status": "completed",
+        "total_rows": 48,
+        "processed_rows": 48,
+        "successful_rows": 46,
+        "failed_rows": 0,
+        "skipped_rows": 2,
+        "initiated_by": {
+          "id": "demo-admin",
+          "name": "Demo Administrator"
+        },
+        "created_at": "2026-11-11T14:00:00+05:00"
+      },
+      {
+        "uuid": "00000000-0000-4000-8000-000000000003",
+        "file_name": "salary-revisions.xlsx",
+        "import_type": "salary_structures",
+        "import_type_label": "Salary revisions",
+        "status": "pending_approval",
+        "total_rows": 72,
+        "processed_rows": 0,
+        "successful_rows": 0,
+        "failed_rows": 0,
+        "skipped_rows": 0,
+        "initiated_by": {
+          "id": "demo-payroll",
+          "name": "Demo Payroll Operator"
+        },
+        "created_at": "2026-11-10T10:15:00+05:00"
+      },
+      {
+        "uuid": "00000000-0000-4000-8000-000000000004",
+        "file_name": "attendance-punches.csv",
+        "import_type": "attendance_records",
+        "import_type_label": "Attendance punches",
+        "status": "processing",
+        "total_rows": 800,
+        "processed_rows": 560,
+        "successful_rows": 550,
+        "failed_rows": 0,
+        "skipped_rows": 10,
+        "initiated_by": {
+          "id": "demo-operator",
+          "name": "Demo HR Operator"
+        },
+        "created_at": "2026-11-09T11:45:00+05:00"
+      },
+      {
+        "uuid": "00000000-0000-4000-8000-000000000005",
+        "file_name": "leave-adjustments.xlsx",
+        "import_type": "leave_adjustments",
+        "import_type_label": "Leave adjustments",
+        "status": "failed",
+        "total_rows": 90,
+        "processed_rows": 90,
+        "successful_rows": 78,
+        "failed_rows": 12,
+        "skipped_rows": 0,
+        "initiated_by": {
+          "id": "demo-admin",
+          "name": "Demo Administrator"
+        },
+        "created_at": "2026-11-08T15:20:00+05:00"
+      },
+      {
+        "uuid": "00000000-0000-4000-8000-000000000006",
+        "file_name": "expense-drafts.xlsx",
+        "import_type": "expense_claims",
+        "import_type_label": "Expense claims",
+        "status": "completed",
+        "total_rows": 120,
+        "processed_rows": 120,
+        "successful_rows": 116,
+        "failed_rows": 0,
+        "skipped_rows": 4,
+        "initiated_by": {
+          "id": "demo-operator",
+          "name": "Demo HR Operator"
+        },
+        "created_at": "2026-11-07T12:30:00+05:00"
+      }
+    ]
+  }
+}
