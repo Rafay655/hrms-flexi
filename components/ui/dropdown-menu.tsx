@@ -1,5 +1,6 @@
 "use client"
 
+import { Permission } from "@/components/shared/PermissionBoundary"
 import * as React from "react"
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
@@ -63,12 +64,14 @@ function DropdownMenuItem({
   className,
   inset,
   variant = "default",
+  permission,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
+  permission?: string
   inset?: boolean
   variant?: "default" | "destructive"
 }) {
-  return (
+  const element = (
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       data-inset={inset}
@@ -80,6 +83,7 @@ function DropdownMenuItem({
       {...props}
     />
   )
+  return permission ? <Permission name={permission}>{element}</Permission> : element
 }
 
 function DropdownMenuCheckboxItem({

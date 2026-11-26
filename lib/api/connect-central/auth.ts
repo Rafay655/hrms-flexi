@@ -78,7 +78,7 @@ export async function confirm2FA(code: string): Promise<Confirm2FAResponse> {
   return data.data;
 }
 
-/** DELETE /api/v1/connect-central/2fa/disable — verify with an authenticator code */
+/** Disable optional 2FA with the current six-digit authenticator code. */
 export async function disable2FA(code: string): Promise<void> {
   await api.delete("/connect-central/2fa/disable", { data: { code } });
 }

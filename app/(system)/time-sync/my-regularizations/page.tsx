@@ -155,7 +155,7 @@ function Directory({ company, user, timeZone, initialScope }: { initialScope:'my
             <Button variant="outline" size="sm" disabled={list.isFetching} onClick={() => void list.refetch()}>
               <RefreshCw className={`mr-2 h-4 w-4 ${list.isFetching ? 'animate-spin' : ''}`} />Refresh
             </Button>
-            <Button size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" disabled={!profile.data?.data?.employee.uuid} onClick={() => setEditor('new')}>
+            <Button permission="regularization.create" size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" disabled={!profile.data?.data?.employee.uuid} onClick={() => setEditor('new')}>
               <Plus className="mr-2 h-4 w-4" />Create request
             </Button>
           </div>
@@ -294,7 +294,7 @@ function Directory({ company, user, timeZone, initialScope }: { initialScope:'my
                               {/* "My" tab actions (Edit / Cancel) */}
                               {isPending && scope === 'my' && (
                                 <>
-                                  <DropdownMenuItem onSelect={() => setEditor(row)}>
+                                  <DropdownMenuItem permission="regularization.edit" onSelect={() => setEditor(row)}>
                                     <Pencil className="mr-2 h-4 w-4" />Edit
                                   </DropdownMenuItem>
                                   <DropdownMenuItem className="text-destructive" onSelect={() => { setCancel(row); setCancelReason(''); }}>
@@ -306,10 +306,10 @@ function Directory({ company, user, timeZone, initialScope }: { initialScope:'my
                               {/* "Team" tab actions (Approve / Reject) */}
                               {isPending && scope === 'team' && (
                                 <>
-                                  <DropdownMenuItem onSelect={() => approveMutation.mutate(row.id)} disabled={approveMutation.isPending}>
+                                  <DropdownMenuItem permission="regularization.approve" onSelect={() => approveMutation.mutate(row.id)} disabled={approveMutation.isPending}>
                                     <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" />Approve
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onSelect={() => { setRejectRow(row); setRejectReason(''); }}>
+                                  <DropdownMenuItem permission="regularization.reject" className="text-destructive" onSelect={() => { setRejectRow(row); setRejectReason(''); }}>
                                     <XCircle className="mr-2 h-4 w-4" />Reject
                                   </DropdownMenuItem>
                                 </>
@@ -326,7 +326,7 @@ function Directory({ company, user, timeZone, initialScope }: { initialScope:'my
           </div>
         </div>
 
-        <footer className="flex flex-col items-center justify-between gap-4 rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4 text-sm text-gray-600 md:flex-row">
+        <footer data-table-pagination className="flex flex-col items-center justify-between gap-4 rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4 text-sm text-gray-600 md:flex-row">
           <span>Page <strong className="text-gray-900">{page}</strong> of <strong className="text-gray-900">{pages}</strong></span>
           <nav aria-label="Regularization pagination" className="flex flex-wrap items-center justify-center gap-2">
             {[{ label: 'First page', target: 1, icon: ChevronsLeft }, { label: 'Previous page', target: page - 1, icon: ChevronLeft }].map(item => (

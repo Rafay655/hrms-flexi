@@ -1,6 +1,7 @@
 "use client";
 
 import { showApiError } from "@/lib/error-toast";
+import { parseApiError } from "@/lib/api-error";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -849,22 +850,36 @@ function RecoveryCodesSection({
 type Disable2FADialogProps = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onConfirm: (code: string) => void;
+  onConfirm: (code: string) => Promise<void>;
   loading: boolean;
 };
 
 function Disable2FADialog({ open, onOpenChange, onConfirm, loading }: Disable2FADialogProps) {
   const [code, setCode] = useState("");
+  const [failure, setFailure] = useState<string | null>(null);
+  const codeIsValid = /^\d{6}$/.test(code);
 
   const handleOpenChange = (v: boolean) => {
     if (loading) return;
-    if (!v) setCode("");
+    if (!v) {
+      setCode("");
+      setFailure(null);
+    }
     onOpenChange(v);
   };
 
-  const handleConfirm = (e: React.MouseEvent) => {
+  const handleConfirm = async (e: React.MouseEvent) => {
     e.preventDefault();
-    if (/^\d{6}$/.test(code) && !loading) onConfirm(code);
+    if (!codeIsValid || loading) return;
+
+    setFailure(null);
+    try {
+      await onConfirm(code);
+      setCode("");
+    } catch (error) {
+      const parsed = parseApiError(error);
+      setFailure(parsed.fieldErrors.code?.[0] ?? parsed.message);
+    }
   };
 
   return (
@@ -878,8 +893,7 @@ function Disable2FADialog({ open, onOpenChange, onConfirm, loading }: Disable2FA
             <AlertDialogTitle>Disable Two-Factor Authentication</AlertDialogTitle>
           </div>
           <AlertDialogDescription>
-            This removes the extra security layer from your account. Enter your
-            six-digit authenticator code to confirm.
+            Enter the current six-digit code from Google Authenticator to turn off 2FA for your account.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -891,22 +905,22 @@ function Disable2FADialog({ open, onOpenChange, onConfirm, loading }: Disable2FA
             maxLength={6}
             aria-label="Authenticator code"
             disabled={loading}
-            placeholder="123456"
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            onChange={(e) => {
+              setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+              setFailure(null);
+            }}
             className="h-11"
             autoFocus
           />
-          <p className="text-[11px] text-gray-400 text-center mt-2">
-            Enter the six-digit code from your authenticator app
-          </p>
+          {failure && <p role="alert" className="mt-2 text-sm text-red-700">{failure}</p>}
         </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={!/^\d{6}$/.test(code) || loading}
+            disabled={!codeIsValid || loading}
             className="bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500"
           >
             {loading ? (
@@ -965,19 +979,15 @@ export default function AuthenticationPage() {
     onError: (apiFailure) => showApiError(apiFailure, { fallbackMessage: "Failed to regenerate codes. Please try again." }),
   });
 
-  // Updated disable mutation with correct API endpoint
-  const { mutate: doDisable, isPending: disabling } = useMutation({
-    mutationFn: (code: string) => disable2FA(code),
+  const { mutateAsync: doDisable, isPending: disabling } = useMutation({
+    mutationFn: disable2FA,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cc-2fa-status"] });
       qc.removeQueries({ queryKey: ["cc-recovery-codes"] });
       setDisableDialogOpen(false);
       toast.success("Two-factor authentication has been disabled.");
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Failed to disable 2FA. Please check your authenticator code and try again.";
-      showApiError(error, { fallbackMessage: message });
-    },
+
   });
 
   const isEnabled = status?.enabled ?? false;
@@ -1174,7 +1184,7 @@ export default function AuthenticationPage() {
         key={String(disableDialogOpen)}
         open={disableDialogOpen}
         onOpenChange={setDisableDialogOpen}
-        onConfirm={(code) => doDisable(code)}
+        onConfirm={doDisable}
         loading={disabling}
       />
     </div>

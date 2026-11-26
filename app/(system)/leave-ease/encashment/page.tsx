@@ -205,7 +205,7 @@ function Directory({ approvals }: { approvals: boolean }) {
                 />
                 Refresh
               </Button>
-              <Button
+              <Button permission="encashment.create"
                 size="sm"
                 className={navy}
                 disabled={!can("encashment.create")}
@@ -510,7 +510,7 @@ function Directory({ approvals }: { approvals: boolean }) {
                                 </DropdownMenuItem>
                                 {row.status === "pending" &&
                                   can("encashment.approve") && (
-                                    <DropdownMenuItem
+                                    <DropdownMenuItem permission="encashment.approve"
                                       onClick={() =>
                                         setDecision({ row, kind: "approve" })
                                       }
@@ -521,7 +521,7 @@ function Directory({ approvals }: { approvals: boolean }) {
                                   )}
                                 {row.status === "pending" &&
                                   can("encashment.reject") && (
-                                    <DropdownMenuItem
+                                    <DropdownMenuItem permission="encashment.reject"
                                       className="text-red-600"
                                       onClick={() =>
                                         setDecision({ row, kind: "reject" })

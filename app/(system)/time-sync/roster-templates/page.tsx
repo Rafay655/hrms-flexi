@@ -250,8 +250,8 @@ export default function RosterTemplateListingPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onSelect={() => handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onSelect={() => setDeleteUuid(row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                <DropdownMenuItem permission="roster_template.edit" onSelect={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                <DropdownMenuItem permission="roster_template.delete" className="text-destructive" onSelect={() => setDeleteUuid(row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -291,7 +291,7 @@ export default function RosterTemplateListingPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button variant="outline" size="sm" disabled={isFetching} onClick={() => void refetch()}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button>
 
-                <Button
+                <Button permission="roster_template.create"
                   className="h-9 gap-2 rounded-lg bg-brand-900 px-4 text-white hover:bg-brand-800"
                   onClick={handleCreate}
                 >

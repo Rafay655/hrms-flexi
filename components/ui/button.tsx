@@ -1,7 +1,9 @@
+"use client";
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
 
+import { Permission } from "@/components/shared/PermissionBoundary"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -43,14 +45,16 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  permission,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
+    permission?: string
     asChild?: boolean
   }) {
   const Comp = asChild ? Slot.Root : "button"
 
-  return (
+  const element = (
     <Comp
       data-slot="button"
       data-variant={variant}
@@ -59,6 +63,7 @@ function Button({
       {...props}
     />
   )
+  return permission ? <Permission name={permission}>{element}</Permission> : element
 }
 
 export { Button, buttonVariants }

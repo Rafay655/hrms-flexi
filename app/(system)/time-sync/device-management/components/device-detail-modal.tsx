@@ -21,7 +21,7 @@ function Values({ rows }: { rows: [string, ReactNode][] }) {
 export function DeviceDetailModal({ uuid, onClose, onEdit }: { uuid: string; onClose: () => void; onEdit: () => void }) {
   const query = useAttendanceDevice(uuid);
   const device = query.data;
-  return <DeviceModal wide title="Device details" description={device?.friendly_name ?? 'Current attendance device configuration.'} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>Close</Button><Button className={primaryButton} disabled={!device || query.isError} onClick={onEdit}>Edit device</Button></>}>
+  return <DeviceModal wide title="Device details" description={device?.friendly_name ?? 'Current attendance device configuration.'} onClose={onClose} footer={<><Button variant="outline" onClick={onClose}>Close</Button><Button permission="device.edit" className={primaryButton} disabled={!device || query.isError} onClick={onEdit}>Edit device</Button></>}>
     {query.isPending ? <p role="status">Loading device…</p> : query.isError ? <DeviceError error={query.error} retry={() => void query.refetch()} /> : device && <>
       <div className="flex flex-wrap gap-2"><DeviceBadge active={device.is_active}>{device.is_active ? 'Active' : 'Inactive'}</DeviceBadge><DeviceBadge active={device.sync_enabled}>Sync {device.sync_enabled ? 'enabled' : 'disabled'}</DeviceBadge></div>
       <section className="space-y-4"><h3 className="border-b pb-2 text-sm font-semibold text-[#1E1B4B]">Device information</h3><Values rows={[

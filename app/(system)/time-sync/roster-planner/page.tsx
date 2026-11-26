@@ -371,7 +371,7 @@ const RosterListingPage: React.FC = () => {
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => (
-          <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${row.original.employee?.name ?? row.original.employee_id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem onSelect={() => handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem onSelect={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+          <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${row.original.employee?.name ?? row.original.employee_id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem onSelect={() => handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem permission="roster_assignment.edit" onSelect={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem permission="roster_assignment.delete" className="text-destructive" onSelect={() => handleDelete(row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
         ),
       },
     ],
@@ -412,7 +412,7 @@ const RosterListingPage: React.FC = () => {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {selectedIds.length > 0 && (
-                <Button
+                <Button permission="roster_assignment.publish"
                   variant="secondary"
                   onClick={handlePublishSelected}
                   disabled={publishMutation.isPending}
@@ -424,7 +424,7 @@ const RosterListingPage: React.FC = () => {
                 </Button>
               )}
               <Button size="sm" variant="outline" disabled={isFetching} onClick={() => void refetch()}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button>
-              <Button size="sm" className="bg-brand-900 hover:bg-brand-800" onClick={handleCreate} disabled={createMutation.isPending}>
+              <Button permission="roster_assignment.create" size="sm" className="bg-brand-900 hover:bg-brand-800" onClick={handleCreate} disabled={createMutation.isPending}>
                 <PlusIcon className="mr-2 h-4 w-4" /> Add Assignment
               </Button>
             </div>

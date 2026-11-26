@@ -230,8 +230,8 @@ export default function LeaveTypesPage() {
       cell: ({ row }) => (
         <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${row.original.name}`} disabled={detailBusy}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => void handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-          <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(row.original.uuid || row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+          <DropdownMenuItem permission="leave-types.manage" onClick={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+          <DropdownMenuItem permission="leave-types.manage" className="text-red-600" onClick={() => handleDelete(row.original.uuid || row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
         </DropdownMenuContent></DropdownMenu></div>
       ),
     },
@@ -264,7 +264,7 @@ export default function LeaveTypesPage() {
               <CardTitle className="text-2xl font-semibold text-gray-900">Leave Types</CardTitle>
               <p className="text-sm text-gray-500 mt-1">{totalEntries.toLocaleString()} leave types</p>
             </div>
-            <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button><Button size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={handleCreate}><PlusIcon className="mr-2 h-4 w-4" />Create leave type</Button></div>
+            <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button><Button permission="leave-types.manage" size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={handleCreate}><PlusIcon className="mr-2 h-4 w-4" />Create leave type</Button></div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-6">

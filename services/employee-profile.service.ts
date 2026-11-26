@@ -2,6 +2,7 @@
 import { api } from '@/lib/api';
 import type {
   EmployeeProfile,
+  EmployeeProfileCreateDefaults,
   EmployeeProfileListResponse,
   EmployeeProfileQueryParams,
   CreateEmployeeProfilePayload,
@@ -11,6 +12,11 @@ import type {
 } from '@/types/employee-profile.types';
 
 export const employeeProfileApi = {
+  getCreateDefaults: async (employeeUuid:string,signal?:AbortSignal):Promise<EmployeeProfileCreateDefaults> => {
+    const {data}=await api.get<{success:boolean;message?:string;data:EmployeeProfileCreateDefaults}>(`/compliance/employee-profiles/${encodeURIComponent(employeeUuid)}/create-defaults`,{signal});
+    if(!data.success||!data.data)throw data;
+    return data.data;
+  },
   getProfiles: (params?: EmployeeProfileQueryParams) =>
     api.get<{ data: EmployeeProfileListResponse; meta: any }>('/compliance/employee-profiles', { params }),
 

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAppDispatch } from "@/store/hooks";
 import { setActiveModuleId } from "@/store/sidebarSlice";
 import { moduleRoute } from "@/lib/module-navigation";
+import { PermissionBoundary } from "@/components/shared/PermissionBoundary";
 import DashboardHeader from "@/components/ui/DashboardHeader";
 import { Sidebar } from "@/components/ui/Sidebar";
 import { Breadcrumb } from "@/components/shared/Breadcrumb";
@@ -77,14 +78,14 @@ export default function DashboardShell({
       {/* Main content */}
        <RealtimeProvider>
 
-      <main className={`min-w-0 flex-1 overflow-x-hidden min-h-screen transition-[margin-left] duration-300 ease-in-out motion-reduce:transition-none ${desktopOpen ? "md:ml-64" : "md:ml-20"}`}>
+      <main data-table-theme="professional" className={`min-w-0 flex-1 overflow-x-hidden min-h-screen pt-16 transition-[margin-left] duration-300 ease-in-out motion-reduce:transition-none ${desktopOpen ? "md:ml-64" : "md:ml-20"}`}>
         <DashboardHeader
           sidebarOpen={sidebarOpen}
           onMenuClick={() => isDesktop ? setDesktopOpen((open) => !open) : setMobileOpen((open) => !open)}
           />
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
           <Breadcrumb />
-          <HrmsShiftProvider>{children}</HrmsShiftProvider>
+          <PermissionBoundary><HrmsShiftProvider>{children}</HrmsShiftProvider></PermissionBoundary>
         </div>
       </main>
           </RealtimeProvider>

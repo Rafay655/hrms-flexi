@@ -136,6 +136,7 @@ export function FeedPost({ post }: { post: CompanyPost }) {
           {/* body is HTMLPurifier-sanitized server-side (FeedService::sanitizeHtml()) */}
           <div
             className="prose prose-sm mt-1 max-w-none text-sm text-gray-700 [&_p]:my-1"
+            data-table-layout="custom"
             dangerouslySetInnerHTML={{ __html: post.body }}
           />
 

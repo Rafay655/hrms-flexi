@@ -354,7 +354,7 @@ const EmployeeGeofenceListingPage: React.FC = () => {
               <CardTitle className="text-2xl font-bold text-gray-900">Employee Geofences</CardTitle>
               <p className="text-sm text-gray-500 mt-1">{totalEntries.toLocaleString()} geofences</p>
             </div>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
+            <Button permission="employee_geofence.create" onClick={handleCreate} disabled={createMutation.isPending}>
               <PlusIcon className="mr-2 h-4 w-4" /> Add Geofence
             </Button>
           </div>

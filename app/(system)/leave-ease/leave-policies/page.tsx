@@ -320,7 +320,7 @@ export default function LeavePoliciesPage() {
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => (
-          <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${row.original.leave_type?.name || "policy"}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={()=>handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem onClick={()=>handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem className="text-red-600" onClick={()=>handleDelete(row.original.uuid || row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+          <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${row.original.leave_type?.name || "policy"}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={()=>handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem permission="leave-policies.manage" onClick={()=>handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem permission="leave-policies.manage" className="text-red-600" onClick={()=>handleDelete(row.original.uuid || row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
         ),
       },
     ];
@@ -352,7 +352,7 @@ export default function LeavePoliciesPage() {
               <CardTitle className="text-2xl font-semibold text-gray-900">Leave Policies</CardTitle>
               <p className="text-sm text-gray-500 mt-1">{totalEntries.toLocaleString()} policies</p>
             </div>
-            <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={isFetching} onClick={()=>void refetch()}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button><Button size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={handleCreate}><PlusIcon className="mr-2 h-4 w-4" />Create policy</Button></div>
+            <div className="flex items-center gap-2"><Button variant="outline" size="sm" disabled={isFetching} onClick={()=>void refetch()}><RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button><Button permission="leave-policies.manage" size="sm" className="bg-[#1E1B4B] hover:bg-[#2A2675]" onClick={handleCreate}><PlusIcon className="mr-2 h-4 w-4" />Create policy</Button></div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-6">

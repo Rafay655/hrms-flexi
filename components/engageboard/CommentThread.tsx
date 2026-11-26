@@ -113,7 +113,8 @@ function CommentRow({
             <p className="text-xs font-semibold text-brand-900">{nameFor(comment.employee_id)}</p>
             <p
               className="text-sm text-gray-700 [&_span[data-mention-id]]:font-medium [&_span[data-mention-id]]:text-brand-700"
-              dangerouslySetInnerHTML={{ __html: comment.body }}
+              data-table-layout="custom"
+            dangerouslySetInnerHTML={{ __html: comment.body }}
             />
           </div>
           <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">

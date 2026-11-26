@@ -1,4 +1,5 @@
 "use client";
+import {Permission} from "@/components/shared/PermissionBoundary";
 import { useEffect, useState } from "react";
 import {
   ChevronLeft,
@@ -130,7 +131,7 @@ export default function AttendanceDeviceListingPage() {
                 />
                 Refresh
               </Button>
-              <Button
+              <Button permission="device.create"
                 size="sm"
                 className={primaryButton}
                 onClick={() => setModal({ mode: "create" })}
@@ -370,15 +371,15 @@ export default function AttendanceDeviceListingPage() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 View details
                               </DropdownMenuItem>
-                              <DropdownMenuItem
+                              <Permission name="device.edit"><DropdownMenuItem permission="device.edit"
                                 onSelect={() =>
                                   setModal({ mode: "edit", uuid: device.id })
                                 }
                               >
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
+                              </DropdownMenuItem></Permission>
+                              <Permission name="device.test"><DropdownMenuItem permission="device.test"
                                 onSelect={() =>
                                   setModal({
                                     mode: "action",
@@ -389,8 +390,8 @@ export default function AttendanceDeviceListingPage() {
                               >
                                 <Unplug className="mr-2 h-4 w-4" />
                                 Test connection
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
+                              </DropdownMenuItem></Permission>
+                              <Permission name="device.sync"><DropdownMenuItem permission="device.sync"
                                 disabled={!canSyncDevice(device)}
                                 onSelect={() =>
                                   setModal({
@@ -402,8 +403,8 @@ export default function AttendanceDeviceListingPage() {
                               >
                                 <RefreshCw className="mr-2 h-4 w-4" />
                                 Sync now
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
+                              </DropdownMenuItem></Permission>
+                              <Permission name="device.rotate_key"><DropdownMenuItem permission="device.rotate_key"
                                 onSelect={() =>
                                   setModal({
                                     mode: "action",
@@ -414,8 +415,8 @@ export default function AttendanceDeviceListingPage() {
                               >
                                 <KeyRound className="mr-2 h-4 w-4" />
                                 Rotate API key
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
+                              </DropdownMenuItem></Permission>
+                              <Permission name="device.delete"><DropdownMenuItem permission="device.delete"
                                 className="text-destructive"
                                 onSelect={() =>
                                   setModal({
@@ -427,7 +428,7 @@ export default function AttendanceDeviceListingPage() {
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete
-                              </DropdownMenuItem>
+                              </DropdownMenuItem></Permission>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>

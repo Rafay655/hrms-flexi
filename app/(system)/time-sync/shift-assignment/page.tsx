@@ -322,7 +322,7 @@ function ShiftAssignmentListingPage() {
         id: "actions",
         header: () => <div className="text-right">Actions</div>,
         cell: ({ row }) => (
-          <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${row.original.employee?.name ?? row.original.employee_id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem onSelect={() => handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem onSelect={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+          <div className="flex justify-end"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${row.original.employee?.name ?? row.original.employee_id}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-44"><DropdownMenuItem onSelect={() => handleView(row.original)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem permission="shift_assignment.edit" onSelect={() => handleEdit(row.original)}><Pencil className="mr-2 h-4 w-4" />Edit</DropdownMenuItem><DropdownMenuItem permission="shift_assignment.delete" className="text-destructive" onSelect={() => handleDelete(row.original.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
         ),
       },
     ],
@@ -366,7 +366,7 @@ function ShiftAssignmentListingPage() {
 
                 <Button
                   className="h-9 gap-2 rounded-lg bg-brand-900 px-4 text-white hover:bg-brand-800"
-                  onClick={handleCreate}
+                  permission="shift_assignment.create" onClick={handleCreate}
                   disabled={createMutation.isPending}
                 >
                   <PlusIcon className="h-4 w-4" />

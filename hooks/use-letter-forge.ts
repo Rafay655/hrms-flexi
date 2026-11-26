@@ -1,4 +1,5 @@
 "use client";
+import {hasPermission} from "@/lib/access-control";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAppSelector } from "@/store/hooks";
@@ -112,8 +113,7 @@ export function useDeactivateLetterTemplate() {
 
 export function useLetterAccess() {
   const permissions = useAppSelector((state) => state.auth.permissions);
-  const roles = useAppSelector((state) => state.auth.roles);
-  const can = (permission: string) => roles.includes("super_admin") || permissions.includes(permission);
+  const can = (permission: string) => hasPermission(permissions,permission);
 
   return {
     can,

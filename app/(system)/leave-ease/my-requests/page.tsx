@@ -28,7 +28,7 @@ export default function LeaveRequestsPage(){return <Suspense fallback={<AppLoade
 function LeaveRequestsRoute(){
  const params=useSearchParams();const initialScope=params.get('scope')==='team'?'team':'my';
  const company=useAppSelector(state=>state.auth.company);const user=useAppSelector(state=>state.auth.user);
- const canRevoke=!!user&&[...user.roles,user.user_type].some(role=>['super_admin','admin','hr_manager'].includes(role))&&(user.permissions.includes('leave-request.revoke')||user.permissions.includes('*')); 
+ const canRevoke=!!user&&(user.permissions.includes('leave-request.revoke')||user.permissions.includes('*'));
  return <Directory key={`${company?.id}-${user?.id}-${initialScope}`} initialScope={initialScope} company={company?.id} user={user?.id} timeZone={company?.timezone||'Asia/Karachi'} canRevoke={canRevoke} />;
 }
 function Directory({company,user,timeZone,canRevoke,initialScope}:{initialScope:'my'|'team';company?:string;user?:string;timeZone:string;canRevoke:boolean}){

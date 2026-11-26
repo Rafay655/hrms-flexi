@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./table-theme.css";
 
 
 @custom-variant dark (&:is(.dark *));
@@ -132,7 +133,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-league-spartan, sans-serif);
+  --font-sidebar: var(--font-poppins, sans-serif);
   --font-mono: var(--font-geist-mono);
 
   --color-sidebar-ring: var(--sidebar-ring);
@@ -208,7 +210,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: "League Spartan", var(--font-sans), sans-serif;
+    font-family: var(--font-league-spartan, "League Spartan"), sans-serif;
   }
 }
 

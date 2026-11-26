@@ -86,7 +86,7 @@ export default function CompanySwitcher() {
         <button
           type="button"
           title="Switch active company"
-          className="hidden md:flex items-center gap-2 h-10 max-w-[200px] rounded-full border border-slate-200 bg-white px-3 text-sm text-slate-600 shadow-sm hover:text-[#1E1B4B]"
+          className="hidden md:flex items-center gap-2 h-9 max-w-[180px] rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 text-[12px] text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#322E53] focus-visible:outline-2 focus-visible:outline-indigo-600"
         >
           <Building2 className="h-4 w-4 shrink-0" />
           <span className="truncate">
@@ -96,11 +96,12 @@ export default function CompanySwitcher() {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-64 bg-white">
-        <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">
+      <DropdownMenuContent align="end" sideOffset={8} className="font-sidebar w-72 max-w-[calc(100vw-24px)] rounded-none border-slate-200/80 bg-white p-1.5 shadow-lg shadow-slate-900/10">
+        <div className="px-2.5 py-2 text-[11px] font-medium text-slate-500">
           Active company
         </div>
         <DropdownMenuSeparator />
+        <div className="max-h-72 overflow-y-auto">
         {companies.length === 0 ? (
           <DropdownMenuItem disabled>
             {isLoading ? "Loading…" : "No companies found"}
@@ -110,15 +111,16 @@ export default function CompanySwitcher() {
             <DropdownMenuItem
               key={c.uuid}
               onClick={() => switchTo(c.uuid)}
-              className="flex items-center justify-between"
+              className={`my-0.5 flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-none px-2.5 text-[12px] focus:bg-[#322E53]/5 ${c.uuid === activeId ? "bg-[#322E53]/[0.06] font-medium text-[#322E53]" : "text-slate-600"}`}
             >
               <span className="truncate">{c.name}</span>
               {c.uuid === activeId && (
-                <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                <Check className="h-4 w-4 shrink-0 text-[#322E53]" />
               )}
             </DropdownMenuItem>
           ))
         )}
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

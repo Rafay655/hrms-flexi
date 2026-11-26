@@ -2508,18 +2508,6 @@ export const modules: ModuleItem[] = [
   },
 ];
 
-/**
- * TD1 — single source of truth for a module's landing route.
- *
- * The module's first Menu item (`Menu[0].pathname`) IS the landing for almost
- * every module, so the top-bar / sidebar tiles derive their target from the
- * registry itself — no separate id→route map to keep in sync.
- *
- * Only the handful of modules whose first Menu item is NOT their root (or that
- * intentionally land on a legacy slug) are listed here. Registering a new module
- * in `modules` with a sensible first Menu item is enough — it will navigate with
- * no extra wiring.
- */
 const MODULE_LANDING_OVERRIDES: Record<number, string> = {
   7: "/leave-ease",
   9: "/connect-central", // Menu[0] is /connect-central/security; tile lands on the module root
@@ -2528,24 +2516,12 @@ const MODULE_LANDING_OVERRIDES: Record<number, string> = {
   23: "/notify-pro", // Menu[0] is a sub-route; tile lands on the module root
 };
 
-/**
- * Resolve the landing route for a module id. Falls back to the module's first
- * Menu item pathname. Returns undefined for unknown modules / module with no
- * navigable Menu item.
- */
 export function getModuleLandingPath(id: number): string | undefined {
   const mod = modules.find((m) => m.id === id);
   if (!mod) return undefined;
   return MODULE_LANDING_OVERRIDES[id] ?? mod.Menu?.[0]?.pathname;
 }
 
-/**
- * Resolve which module owns a given pathname, by its first path segment.
- *
- * Lets the single global sidebar stay in sync with the URL no matter how the user
- * navigated (top-bar grid, sidebar link, direct URL, or post-login redirect).
- * Returns null for paths outside any registered module (e.g. /auth/login).
- */
 export function getModuleIdForPath(pathname: string): number | null {
   const seg = pathname.split("/").filter(Boolean)[0];
   if (!seg) return null;

@@ -2,6 +2,9 @@
 
 import { showApiError } from "@/lib/error-toast";
 import React, { useEffect, useMemo, useState } from 'react';
+import {useQueryClient} from '@tanstack/react-query';
+import {useAppSelector} from '@/store/hooks';
+import {CreateProfileModal} from './_components/create-profile-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,7 +60,7 @@ import { cn } from '@/lib/utils';
 import type { EmployeeProfile, ProfileHistory, CreateEmployeeProfilePayload } from '@/types/employee-profile.types';
 import {
   useEmployeeProfiles,
-  useCreateEmployeeProfile,
+  EMPLOYEE_PROFILES_QUERY_KEY,
   useUpdateEmployeeProfile,
   useTransferProvince,
   useEmployeeProfileHistory,
@@ -140,6 +143,9 @@ const CheckboxField = ({
 
 // ── Main Component ────────────────────────────────────
 export default function EmployeeProfilesPage() {
+  const queryClient=useQueryClient();
+  const companyScope=useAppSelector(state=>`${state.auth.company?.id}:${state.auth.user?.id}`);
+  const [createEmployee,setCreateEmployee]=useState<{value:string;label:string}|null>(null);
   // ── Query params ────────────────────────────────────
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
@@ -162,7 +168,7 @@ export default function EmployeeProfilesPage() {
   const branches = branchesData?.data?.data || [];
 
   const employees = useEmployees({ per_page: 1000, detailed: 0 });
-  const employeeList = Array.isArray(employees) ? employees : employees?.data || [];
+  const employeeList = employees.data ?? [];
 
   // Label resolvers for the Select triggers below. We don't rely on
   // Radix/shadcn's built-in auto-resolution (it can fail to show the label
@@ -189,9 +195,6 @@ export default function EmployeeProfilesPage() {
   const getBranchLabel = (id: string | number | null | undefined) =>
     findLabel(branches, id, ['id', 'branch_id'], ['name', 'branch_name']);
 
-  const getEmployeeLabel = (uuid: string | null | undefined) =>
-    findLabel(employeeList, uuid, ['uuid', 'id', 'employee_uuid'], ['name', 'employee_name', 'full_name']);
-
   // ── Fetch profiles ──────────────────────────────────
   const { data, isLoading, error, refetch } = useEmployeeProfiles({
     page,
@@ -209,7 +212,6 @@ export default function EmployeeProfilesPage() {
   const nonFilerCount = meta?.non_filer_count ?? 0;
 
   // ── Mutations ───────────────────────────────────────
-  const createProfile = useCreateEmployeeProfile();
   const updateProfile = useUpdateEmployeeProfile();
   const transferProvince = useTransferProvince();
 
@@ -265,22 +267,8 @@ export default function EmployeeProfilesPage() {
     setFilters((prev) => ({ ...prev, [key]: value === 'all' ? '' : value }));
   };
 
-  const handleCreate = () => {
-    setFormData({
-      employee_uuid: '',
-      state_id: undefined,
-      eobi_applicable: true,
-      social_security_applicable: true,
-      provident_fund_applicable: false,
-      gratuity_applicable: false,
-      is_filer: false,
-      filer_status: 'non_filer',
-      effective_from: '',
-      cnic: '',
-      ntn: '',
-      eobi_number: '',
-      ss_number: '',
-    });
+  const handleCreate = (profile?:EmployeeProfile) => {
+    setCreateEmployee(profile?{value:profile.employee_uuid,label:profile.employee_name}:null);
     setIsCreateModalOpen(true);
   };
 
@@ -336,21 +324,6 @@ export default function EmployeeProfilesPage() {
       refetch();
     } catch (err: any) {
       showApiError(err, { fallbackMessage: err?.response?.data?.message || 'Failed to deactivate profile.' });
-    }
-  };
-
-  const handleSaveCreate = async () => {
-    if (!formData.employee_uuid) {
-      toast.error('Please select an employee.');
-      return;
-    }
-    try {
-      await createProfile.mutateAsync(formData as CreateEmployeeProfilePayload);
-      toast.success('Profile created.');
-      setIsCreateModalOpen(false);
-      refetch();
-    } catch (err: any) {
-      showApiError(err, { fallbackMessage: err?.response?.data?.message || 'Failed to create profile.' });
     }
   };
 
@@ -496,7 +469,7 @@ export default function EmployeeProfilesPage() {
                       </DropdownMenuItem>
                     </>
                   ) : (
-                    <DropdownMenuItem onClick={() => handleEdit(profile)}>
+                    <DropdownMenuItem onClick={() => handleCreate(profile)}>
                       <Pencil className="mr-2 h-3.5 w-3.5" /> Create Profile
                     </DropdownMenuItem>
                   )}
@@ -559,8 +532,7 @@ export default function EmployeeProfilesPage() {
             <div className="flex items-center gap-2">
               <Button
                 className="bg-[#1E1B4B] hover:bg-[#2A2675] gap-2"
-                onClick={handleCreate}
-                disabled={createProfile.isPending}
+                onClick={() => handleCreate()}
               >
                 <Plus className="h-4 w-4" />
                 New Profile
@@ -808,156 +780,7 @@ export default function EmployeeProfilesPage() {
         </CardContent>
       </Card>
 
-      {/* ── Create Modal ────────────────────────────────── */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create Employee Statutory Profile</DialogTitle>
-            <DialogDescription>Enter employee statutory details.</DialogDescription>
-          </DialogHeader>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-            <Field label="Employee" required>
-              <Select
-                value={formData.employee_uuid || ''}
-                onValueChange={(val) => setFormData((prev) => ({ ...prev, employee_uuid: val }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select employee">
-                    {formData.employee_uuid ? getEmployeeLabel(formData.employee_uuid) : undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {employeeList.map((emp: any) => (
-                    <SelectItem key={emp.uuid} value={emp.uuid}>
-                      {emp.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-
-            <Field label="Province">
-              <Select
-                value={formData.state_id?.toString() || ''}
-                onValueChange={(val) => setFormData((prev) => ({ ...prev, state_id: parseInt(val) }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select province">
-                    {formData.state_id ? getStateLabel(formData.state_id) : undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {states.map((s) => (
-                    <SelectItem key={s.id} value={s.id.toString()}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-
-            <Field label="CNIC (13 digits)">
-              <Input
-                value={formData.cnic || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, cnic: e.target.value }))}
-                maxLength={13}
-                placeholder="3520212345678"
-              />
-            </Field>
-
-            <Field label="NTN">
-              <Input
-                value={formData.ntn || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, ntn: e.target.value }))}
-                placeholder="1234567-8"
-              />
-            </Field>
-
-            <Field label="EOBI Number">
-              <Input
-                value={formData.eobi_number || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, eobi_number: e.target.value }))}
-                placeholder="Optional"
-              />
-            </Field>
-
-            <Field label="Social Security Number">
-              <Input
-                value={formData.ss_number || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, ss_number: e.target.value }))}
-                placeholder="Optional"
-              />
-            </Field>
-
-            <Field label="Effective From">
-              <Input
-                type="date"
-                value={formData.effective_from || ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, effective_from: e.target.value }))}
-              />
-            </Field>
-
-            <Field label="Filer Status">
-              <Select
-                value={formData.filer_status || 'non_filer'}
-                onValueChange={(val) => setFormData((prev) => ({ ...prev, filer_status: val as any }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active_filer">Active Filer</SelectItem>
-                  <SelectItem value="non_filer">Non-Filer</SelectItem>
-                  <SelectItem value="unknown">Unknown</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-
-            {/* Checkboxes — own full-width row, evenly spaced, same height */}
-            <div className="col-span-1 sm:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              <CheckboxField
-                id="is_filer_create"
-                label="Is Filer"
-                checked={formData.is_filer}
-                onCheckedChange={(c) => setFormData((prev) => ({ ...prev, is_filer: c }))}
-              />
-              <CheckboxField
-                id="eobi_applicable_create"
-                label="EOBI Applicable"
-                checked={formData.eobi_applicable}
-                onCheckedChange={(c) => setFormData((prev) => ({ ...prev, eobi_applicable: c }))}
-              />
-              <CheckboxField
-                id="ss_applicable_create"
-                label="SS Applicable"
-                checked={formData.social_security_applicable}
-                onCheckedChange={(c) => setFormData((prev) => ({ ...prev, social_security_applicable: c }))}
-              />
-              <CheckboxField
-                id="pf_applicable_create"
-                label="PF Applicable"
-                checked={formData.provident_fund_applicable}
-                onCheckedChange={(c) => setFormData((prev) => ({ ...prev, provident_fund_applicable: c }))}
-              />
-              <CheckboxField
-                id="gratuity_applicable_create"
-                label="Gratuity Applicable"
-                checked={formData.gratuity_applicable}
-                onCheckedChange={(c) => setFormData((prev) => ({ ...prev, gratuity_applicable: c }))}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveCreate} disabled={createProfile.isPending}>
-              {createProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {isCreateModalOpen&&<CreateProfileModal key={companyScope} initialEmployee={createEmployee} employees={employeeList.map(employee=>({value:employee.uuid??String(employee.id),label:employee.name}))} states={states.map(state=>({value:String(state.id),label:state.name}))} onClose={()=>{setIsCreateModalOpen(false);setCreateEmployee(null);}} onCreated={()=>{setIsCreateModalOpen(false);setCreateEmployee(null);void queryClient.invalidateQueries({queryKey:[EMPLOYEE_PROFILES_QUERY_KEY]});}} />}
 
       {/* ── Edit Modal ──────────────────────────────────── */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>

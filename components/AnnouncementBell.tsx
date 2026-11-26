@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import {
   Bell,
   BellDot,
@@ -112,11 +112,11 @@ export default function NotificationBell() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900">
+              <p className="text-[13px] font-semibold text-slate-900">
                 {data?.title || "New notification"}
               </p>
               {data?.body && (
-                <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-5 text-slate-500">
                   {data.body}
                 </p>
               )}
@@ -176,12 +176,12 @@ export default function NotificationBell() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="relative hidden h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:text-[#1E1B4B] md:flex"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#322E53] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             aria-label="Notifications"
           >
             <BellIcon className="h-4 w-4" />
             {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 px-0.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white">
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
@@ -190,11 +190,12 @@ export default function NotificationBell() {
 
         <DropdownMenuContent
           align="end"
-          className="w-[380px] max-w-[92vw] rounded-2xl border border-slate-100 bg-white p-0 shadow-xl"
+          sideOffset={8}
+          className="font-sidebar w-[380px] max-w-[calc(100vw-24px)] overflow-hidden rounded-none border border-slate-200/80 bg-white p-0 shadow-lg shadow-slate-900/10"
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-[13px] font-semibold text-slate-900">
               Notifications
             </h3>
             {notifications.length > 0 && (
@@ -209,7 +210,7 @@ export default function NotificationBell() {
           </div>
 
           {/* Content */}
-          <div className="max-h-[400px] overflow-y-auto">
+          <div className="max-h-[min(400px,60dvh)] overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
@@ -245,19 +246,17 @@ export default function NotificationBell() {
                         handleNotificationClick(notification.uuid)
                       }
                       className={cn(
-                        "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50",
-                        !notification.is_read && "bg-slate-50/50"
+                        "flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#322E53]/[0.04] focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[#322E53]",
+                        !notification.is_read && "bg-[#322E53]/[0.025]"
                       )}
                     >
-                      {!notification.is_read && (
-                        <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                      )}
+                      <span aria-hidden="true" className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${notification.is_read ? "bg-transparent" : "bg-[#322E53]"}`} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-800">
+                        <p className="line-clamp-2 text-[12px] font-medium leading-5 text-slate-800">
                           {notification.title}
                         </p>
                         {notification.body && (
-                          <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                          <p className="mt-0.5 line-clamp-2 text-[11px] leading-5 text-slate-500">
                             {notification.body}
                           </p>
                         )}

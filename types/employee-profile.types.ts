@@ -133,3 +133,9 @@ export interface ProfileHistory {
   transferred_by: string | null;
   transferred_at: string;
 }
+export interface EmployeeProfileCreateDefaults {
+  employee_uuid: string;
+  cnic: string | null;
+  state_id: number | null;
+  state: {id:number;name:string;code:string} | null;
+}

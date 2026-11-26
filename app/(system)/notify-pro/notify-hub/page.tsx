@@ -1154,7 +1154,8 @@ const TemplateViewModal: React.FC<TemplateViewModalProps> = ({ uuid, onClose }) 
                 <h4 className="text-xs font-medium text-slate-500">Body HTML</h4>
                 <div
                   className="prose prose-sm mt-1 max-w-none rounded-lg border border-slate-100 bg-white p-3"
-                  dangerouslySetInnerHTML={{ __html: template.body_html }}
+                  data-table-layout="custom"
+            dangerouslySetInnerHTML={{ __html: template.body_html }}
                 />
               </div>
             )}

@@ -275,9 +275,9 @@ export default function LetterTemplatesPage() {
           </div>
 
           {/* pagination */}
-          <div className="flex flex-col items-center justify-between gap-4 rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4 md:flex-row">
+          <div data-table-pagination className="flex flex-col items-center justify-between gap-4 rounded-b-lg border-t border-gray-200 bg-gray-50 px-6 py-4 md:flex-row">
             <p className="text-sm text-gray-600">Page <strong className="text-gray-900">{currentPage}</strong> of <strong className="text-gray-900">{totalPages}</strong></p>
-            <div className="flex flex-wrap items-center justify-center gap-2">
+            <nav aria-label="Letter templates pagination" className="flex flex-wrap items-center justify-center gap-2">
               <Button variant="outline" size="sm" aria-label="First page" disabled={paginationBusy || textFiltersPending || currentPage <= 1} onClick={() => setFilters((p) => ({ ...p, page: 1 }))}><ChevronsLeft className="h-4 w-4" /></Button>
               <Button variant="outline" size="sm" aria-label="Previous page" disabled={paginationBusy || textFiltersPending || currentPage <= 1} onClick={() => setFilters((p) => ({ ...p, page: currentPage - 1 }))}><ChevronLeft className="h-4 w-4" /></Button>
               {pageNumbers.map((page) => (
@@ -285,7 +285,7 @@ export default function LetterTemplatesPage() {
               ))}
               <Button variant="outline" size="sm" aria-label="Next page" disabled={paginationBusy || textFiltersPending || currentPage >= totalPages} onClick={() => setFilters((p) => ({ ...p, page: currentPage + 1 }))}><ChevronRight className="h-4 w-4" /></Button>
               <Button variant="outline" size="sm" aria-label="Last page" disabled={paginationBusy || textFiltersPending || currentPage >= totalPages} onClick={() => setFilters((p) => ({ ...p, page: totalPages }))}><ChevronsRight className="h-4 w-4" /></Button>
-            </div>
+            </nav>
             <p className="text-sm text-gray-600">{meta?.from ?? 0} – {meta?.to ?? 0} of {totalEntries.toLocaleString()} entries</p>
           </div>
         </CardContent>

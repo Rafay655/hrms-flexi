@@ -305,7 +305,7 @@ export function DataTable<T extends { id: string | number }>({
           {/* ── Table / Loading / Empty ───────────────────── */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table data-ui-table="professional" className="w-full text-sm">
                 <thead className="bg-brand-50 border-b border-gray-200">
                   <tr>
                     {columns.map((col) => (
@@ -425,7 +425,7 @@ export function DataTable<T extends { id: string | number }>({
 
           {/* ── Pagination ────────────────────────────────── */}
           {totalEntries > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+            <div data-table-pagination className="mt-4 rounded-b-lg">
               <p className="text-xs text-brand-700">
                 Page{" "}
                 <span className="font-semibold text-brand-900">
@@ -436,10 +436,11 @@ export function DataTable<T extends { id: string | number }>({
                   {totalPages}
                 </span>
               </p>
-              <div className="flex items-center gap-1">
+              <nav aria-label="Table pagination" data-table-pagination-controls className="flex items-center gap-1">
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label="First page"
                   onClick={() => setPage(1)}
                   disabled={currentPage === 1}
                   className="h-8 w-8 p-0 border-gray-200"
@@ -449,6 +450,7 @@ export function DataTable<T extends { id: string | number }>({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label="Previous page"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                   className="h-8 w-8 p-0 border-gray-200"
@@ -458,6 +460,7 @@ export function DataTable<T extends { id: string | number }>({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label="Next page"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 p-0 border-gray-200"
@@ -467,13 +470,15 @@ export function DataTable<T extends { id: string | number }>({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label="Last page"
                   onClick={() => setPage(totalPages)}
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 p-0 border-gray-200"
                 >
                   <ChevronsRight className="h-4 w-4" />
                 </Button>
-              </div>
+              </nav>
+              <p>{startIdx + 1}–{endIdx} of {totalEntries.toLocaleString()} entries</p>
             </div>
           )}
         </CardContent>

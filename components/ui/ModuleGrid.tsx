@@ -1,177 +1,48 @@
 "use client";
 
-/**
- * ModuleGrid — branded module switcher panel used inside the top-bar dropdowns
- * (HRMS Modules + Admin Center) in DashboardHeader.
- *
- * Visual design from the FlexiHrmsModuleGrid reference: a purple gradient header
- * with the Flexi HRMS lockup + gold accent rule, a 2/4-column grid of icon-chip
- * tiles (resting / hover-lift / active = ink fill + gold ring), and a footer
- * showing the module count and the active module label.
- *
- * Data comes from the app's `modules` registry (lib/sidebarData); icons are
- * lucide-react names resolved at render time. Selecting a tile calls onSelect
- * with the module id (DashboardHeader maps it to a route + active-module state).
- */
-
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import type { ModuleItem } from "@/lib/sidebarData";
 
-/* Flexi HRMS brand palette (product-only, never mixed with corporate blue) */
-const INK = "#322E53"; // primary purple
-const INK_SOFT = "#49426E"; // secondary purple
-const GOLD = "#EEC293"; // warm accent -> active marker
-const CORAL = "#F3AB9D"; // warm accent -> reserved, header gradient only
-const CHIP = "#F4F3F8"; // resting icon chip
-const CHIP_HOVER = "#ECE9F5";
-
 const ICONS = Icons as unknown as Record<string, React.ComponentType<LucideProps>>;
 
-function ModuleTile({
-  module,
-  active,
-  onSelect,
-}: {
-  module: ModuleItem;
-  active: boolean;
-  onSelect: (id: number) => void;
-}) {
-  const [hover, setHover] = useState(false);
-  const Icon = ICONS[module.icon as string] ?? Icons.Square;
-  const filled = active;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(module.id)}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      className="group flex flex-col items-center gap-2.5 rounded-2xl px-2 py-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2"
-      style={
-        {
-          backgroundColor: hover && !filled ? "rgba(50,46,83,0.04)" : "transparent",
-          "--tw-ring-color": GOLD,
-        } as React.CSSProperties
-      }
-      aria-pressed={active}
-      title={module.name}
-    >
-      <span
-        className="relative flex items-center justify-center rounded-full transition-all duration-200"
-        style={{
-          width: 60,
-          height: 60,
-          backgroundColor: filled ? INK : hover ? CHIP_HOVER : CHIP,
-          boxShadow: filled
-            ? "0 10px 22px -8px rgba(50,46,83,0.6)"
-            : hover
-            ? "0 6px 14px -8px rgba(50,46,83,0.3)"
-            : "none",
-          transform: hover && !filled ? "translateY(-2px)" : "translateY(0)",
-          outline: filled ? "2px solid " + GOLD : "none",
-          outlineOffset: filled ? 3 : 0,
-        }}
-      >
-        <Icon size={24} strokeWidth={1.8} color={filled ? "#FFFFFF" : INK_SOFT} />
-      </span>
-      <span
-        className="text-center text-[12.5px] leading-tight"
-        style={{ color: filled ? INK : "#5A5670", fontWeight: filled ? 600 : 500 }}
-      >
-        {module.name}
-      </span>
-    </button>
-  );
-}
-
 export interface ModuleGridPanelProps {
-  /** Sub-label under the "Flexi HRMS" lockup, e.g. "Modules" or "Admin Center". */
   title: string;
   modules: ModuleItem[];
   activeId: number | null;
   onSelect: (id: number) => void;
 }
 
-export default function ModuleGridPanel({
-  title,
-  modules,
-  activeId,
-  onSelect,
-}: ModuleGridPanelProps) {
-  const activeLabel = modules.find((m) => m.id === activeId)?.name;
-
+export default function ModuleGridPanel({ title, modules, activeId, onSelect }: ModuleGridPanelProps) {
+  const [search, setSearch] = useState("");
+  const filtered = modules.filter((module) => module.name.toLowerCase().includes(search.trim().toLowerCase()));
   return (
-    <div className="flex max-h-[80vh] flex-col bg-white">
-      {/* Branded header shell (pinned) */}
-      <div
-        className="relative shrink-0 px-7 pb-6 pt-5"
-        style={{
-          background:
-            "linear-gradient(135deg, " + INK + " 0%, " + INK_SOFT + " 78%, #5B4F7E 100%)",
-        }}
-      >
-        {/* reserved coral touch: faint corner glow */}
-        <div
-          className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full opacity-25 blur-2xl"
-          style={{ background: "radial-gradient(circle, " + CORAL + ", transparent 70%)" }}
-        />
-        <div className="relative flex items-center gap-3">
-          <span
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{
-              backgroundColor: "rgba(255,255,255,0.12)",
-              border: "1px solid " + GOLD + "55",
-            }}
-          >
-            <Icons.LayoutGrid size={20} color={GOLD} strokeWidth={2} />
-          </span>
-          <div className="leading-tight">
-            <div className="text-[17px] font-bold tracking-tight text-white">
-              Flexi <span style={{ color: GOLD, fontWeight: 700 }}>HRMS</span>
-            </div>
-            <div className="text-[12px]" style={{ color: "rgba(255,255,255,0.62)" }}>
-              {title}
-            </div>
-          </div>
-        </div>
-        {/* gold accent rule */}
-        <div
-          className="mt-5 h-[3px] w-16 rounded-full"
-          style={{ background: "linear-gradient(to right, " + GOLD + ", " + CORAL + ")" }}
-        />
-      </div>
-
-      {/* Module grid (scrolls when the module list overflows the panel) */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-        <div className="grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-4">
-          {modules.map((m) => (
-            <ModuleTile
-              key={m.id}
-              module={m}
-              active={activeId === m.id}
-              onSelect={onSelect}
-            />
-          ))}
+    <div className="font-sidebar flex max-h-[min(640px,80dvh)] flex-col bg-white">
+      <div className="shrink-0 border-b border-slate-100 px-4 pt-4 pb-3">
+        <h2 className="text-[13px] font-semibold text-[#322E53]">{title}</h2>
+        <p className="mt-1 text-[11px] text-slate-500">{title === "Admin Center" ? "Manage your workspace and organization." : "Switch to another workspace module."}</p>
+        <div className="mt-3 flex h-9 items-center gap-2 rounded-none border border-slate-200 bg-slate-50/60 px-2.5 focus-within:border-[#322E53]/40 focus-within:ring-2 focus-within:ring-[#322E53]/5">
+          <Icons.Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <input aria-label={`Search ${title.toLowerCase()}`} placeholder="Search modules…" value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[12px] text-slate-800 outline-none placeholder:text-slate-400" />
+          {search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="rounded p-1 text-slate-400 hover:text-slate-700"><Icons.X className="h-3 w-3" /></button>}
         </div>
       </div>
-
-      {/* Branded footer line (pinned) */}
-      <div className="flex shrink-0 items-center justify-between border-t border-[#EFEDF4] bg-white px-6 py-3.5">
-        <span
-          className="flex items-center gap-2 text-[12px] font-medium"
-          style={{ color: "#7A768C" }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-          {modules.length} modules
-        </span>
-        {activeLabel && (
-          <span className="text-[12px] font-semibold" style={{ color: INK_SOFT }}>
-            {activeLabel}
-          </span>
-        )}
+      <div className="min-h-0 overflow-y-auto p-2">
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+          {filtered.map((module) => {
+            const Icon = ICONS[module.icon as string] ?? Icons.Square;
+            const active = activeId === module.id;
+            return <button key={module.id} type="button" onClick={() => onSelect(module.id)} aria-pressed={active} className={`flex min-h-14 items-center gap-2.5 rounded-none px-2.5 py-2 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-[#322E53] ${active ? "bg-[#322E53]/[0.07] text-[#322E53]" : "text-slate-600 hover:bg-slate-50 hover:text-[#322E53]"}`}>
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-none ${active ? "bg-[#322E53] text-white" : "bg-slate-100/80 text-[#322E53]/70"}`}><Icon className="h-4 w-4" strokeWidth={1.7} /></span>
+              <span className="flex-1 text-[12px] font-medium leading-5">{module.name}</span>
+              {active && <Icons.Check className="h-3.5 w-3.5 shrink-0" />}
+            </button>;
+          })}
+        </div>
+        {filtered.length === 0 && <p className="px-4 py-10 text-center text-[12px] text-slate-500">No modules found. Try another name.</p>}
       </div>
+      <div className="shrink-0 border-t border-slate-100 px-4 py-2.5 text-[10px] text-slate-400">{filtered.length} of {modules.length} modules</div>
     </div>
   );
 }
