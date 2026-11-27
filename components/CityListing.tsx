@@ -57,7 +57,7 @@ import {
 import toast from "react-hot-toast";
 
 import { useCountries } from "@/hooks/useCountries";
-import { useStates } from "@/hooks/useStates";
+import { useStateOptions } from "@/hooks/useStates";
 import {
   useCities,
   useCreateCity,
@@ -94,9 +94,7 @@ const CityListingPage: React.FC = () => {
   const { data: countriesData, isLoading: isLoadingCountries } = useCountries({ per_page: 1000 });
   const countries = countriesData?.data ?? [];
 
-  // Fetch all states for dropdown (all, up to 1000) - will be filtered by country filter
-  const { data: statesData, isLoading: isLoadingStates } = useStates({ per_page: 1000 });
-  const allStates = statesData?.data ?? [];
+  const filterStates = useStateOptions(countryFilter === "all" ? undefined : Number(countryFilter));
 
   // Country options for searchable select
   const countryOptions: Option[] = useMemo(
@@ -149,11 +147,6 @@ const CityListingPage: React.FC = () => {
     setPage(1);
   }, [perPage, debouncedSearch, countryFilter, stateFilter]);
 
-  // Reset state filter when country filter changes
-  useEffect(() => {
-    setStateFilter("all");
-  }, [countryFilter]);
-
   // Show error toast if fetch fails
   useEffect(() => {
     if (error) {
@@ -161,11 +154,8 @@ const CityListingPage: React.FC = () => {
     }
   }, [error]);
 
-  // Filtered states based on selected country filter (for the filter dropdown)
-  const filteredStatesForFilter = useMemo(() => {
-    if (countryFilter === "all") return allStates;
-    return allStates.filter((s) => s.country_id === Number(countryFilter));
-  }, [allStates, countryFilter]);
+  const formStates = useStateOptions(formData.country_id ? Number(formData.country_id) : undefined, isModalOpen);
+  const filteredStatesForFilter = useMemo(() => filterStates.data ?? [], [filterStates.data]);
 
   const stateOptionsForFilter: Option[] = useMemo(
     () =>
@@ -176,11 +166,12 @@ const CityListingPage: React.FC = () => {
     [filteredStatesForFilter]
   );
 
-  // Filtered states based on selected country (for the form)
-  const filteredStatesForForm = useMemo(() => {
-    if (!formData.country_id) return [];
-    return allStates.filter((s) => s.country_id === Number(formData.country_id));
-  }, [allStates, formData.country_id]);
+  const filteredStatesForForm = useMemo(() => formStates.data ?? [], [formStates.data]);
+  useEffect(() => {
+    const stateError = filterStates.error || formStates.error;
+    if (stateError) showApiError(stateError, {fallbackMessage: "Unable to load state options. Please try again."});
+  }, [filterStates.error, formStates.error]);
+
 
   const stateOptionsForForm: Option[] = useMemo(
     () =>
@@ -201,7 +192,7 @@ const CityListingPage: React.FC = () => {
   // Helper to get selected state's code
   const getStateCode = (stateId: number | ""): string => {
     if (!stateId) return "";
-    const state = allStates.find((s) => s.id === Number(stateId));
+    const state = filteredStatesForForm.find((s) => String(s.id) === String(stateId));
     return state?.code || "";
   };
 
@@ -354,7 +345,7 @@ const CityListingPage: React.FC = () => {
         id: "state",
         header: "STATE",
         cell: ({ row }) => {
-          const state = allStates.find((s) => s.id === row.original.state_id);
+          const state = row.original.state ?? filteredStatesForFilter.find((s) => String(s.id) === String(row.original.state_id));
           return <div className="text-gray-700">{state?.name ?? "—"}</div>;
         },
       },
@@ -362,7 +353,7 @@ const CityListingPage: React.FC = () => {
         id: "country",
         header: "COUNTRY",
         cell: ({ row }) => {
-          const country = countries.find((c) => c.id === row.original.country_id);
+          const country = row.original.country ?? countries.find((c) => String(c.id) === String(row.original.country_id));
           return <div className="text-gray-700">{country?.name ?? "—"}</div>;
         },
       },
@@ -406,7 +397,7 @@ const CityListingPage: React.FC = () => {
         },
       },
     ],
-    [countries, allStates]
+    [countries, filteredStatesForFilter]
   );
 
   // Add serial number to rows for display
@@ -483,7 +474,7 @@ const CityListingPage: React.FC = () => {
               <SearchableSelect
                 options={countryOptions}
                 value={countryFilter}
-                onChange={setCountryFilter}
+                onChange={value => { setCountryFilter(value); setStateFilter("all"); setPage(1); }}
                 placeholder="All Countries"
                 searchPlaceholder="Search countries..."
                 emptyText="No countries found."
@@ -513,8 +504,8 @@ const CityListingPage: React.FC = () => {
                 allValue="all"
                 icon={SearchIcon}
                 widthClass="w-full"
-                disabled={countryFilter === "all"}
-                isLoading={isLoadingStates}
+                disabled={countryFilter === "all" || filterStates.isFetching || !!filterStates.error}
+                isLoading={filterStates.isFetching}
                 multiple={false}
               />
             </div>
@@ -574,7 +565,7 @@ const CityListingPage: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCountryFilter("all")}
+                  onClick={() => { setCountryFilter("all"); setStateFilter("all"); setPage(1); }}
                   className="h-8 text-xs"
                 >
                   <X className="h-3 w-3 mr-1" />
@@ -852,8 +843,8 @@ const CityListingPage: React.FC = () => {
                   groupLabel="States"
                   allowAll={false}
                   widthClass="w-full"
-                  disabled={modalMode === "view" || !formData.country_id}
-                  isLoading={isLoadingStates}
+                  disabled={modalMode === "view" || !formData.country_id || formStates.isFetching || !!formStates.error}
+                  isLoading={formStates.isFetching}
                   multiple={false}
                 />
               </div>

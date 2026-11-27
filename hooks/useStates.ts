@@ -1,3 +1,4 @@
+import {useAppSelector} from "@/store/hooks";
 import { showApiError } from "@/lib/error-toast";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stateService } from '@/services/state.service';
@@ -69,5 +70,16 @@ export function useDeleteState() {
       const message = error.response?.data?.message || 'Failed to delete state';
       showApiError(error, { fallbackMessage: message });
     },
+  });
+}
+// Country-specific dropdowns must not reuse the previous country's options.
+export function useStateOptions(countryId: number | undefined, enabled = true) {
+  const company = useAppSelector(state => state.auth.company?.id);
+  const user = useAppSelector(state => state.auth.user?.id);
+  return useQuery({
+    queryKey: [...stateKeys.lists(), 'options', company, user, countryId],
+    queryFn: ({signal}) => stateService.getOptions(countryId!, signal),
+    enabled: enabled && countryId !== undefined,
+    staleTime: 5 * 60 * 1000,
   });
 }
