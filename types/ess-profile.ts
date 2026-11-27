@@ -1,0 +1,8 @@
+export type EssField={field_key:string;label:string;type:string;value:string|number|boolean|null;display_value:string|null;sensitive:boolean;can_request_change:boolean;required?:boolean;pending_request_uuid:string|null;validation?:{max_length?:number}|null};
+export type EssSection={id:string;title:string;description?:string;fields:EssField[]};
+export type EssRequest={uuid:string;field_key:string;field_label:string;previous_display_value:string|null;requested_display_value:string|null;reason:string;status:string;submitted_at:string;decided_at:string|null;decision_note:string|null;can_cancel:boolean;employee?:{uuid:string;name:string;employee_code?:string}};
+export type EssDocument={uuid:string|null;requirement_key?:string;name:string;category:string;status:string;uploaded_at:string|null;can_view:boolean;can_replace?:boolean};
+type Named={name:string}|null;
+export type EssProfile={employee:{uuid:string;employee_code:string;name:string;official_email:string|null;avatar_url:string|null;employment_status:string;joining_date:string|null;designation:Named;department:Named;branch:Named;reporting_manager:Named;employment_type:Named};sections:EssSection[];completion:{percentage:number;completed:number;total:number;missing_fields:{field_key:string;label:string;section_id:string;can_request_change:boolean}[]};documents_summary:{verified:number;under_review:number;missing:number};capabilities:{can_view_documents:boolean;can_request_change:boolean;can_upload_documents:boolean}};
+export type EssMeta={current_page:number;last_page:number;per_page:number;total:number};
+export type EssList<T>={rows:T[];meta:EssMeta};

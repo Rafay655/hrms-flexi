@@ -3,6 +3,7 @@ export function hasPermission(grants: readonly string[], permission: string): bo
   return grants.includes(permission) || grants.includes('*') || grants.some(grant => grant.endsWith('.*') && permission.startsWith(grant.slice(0, -1)));
 }
 export const routePermissions: Record<string, readonly string[]> = {
+ '/people-hub/profile-change-requests':['employees.edit'],
  '/connect-central/security':['view-audit-security'],
  '/connect-central/sessions':['view-company-sessions'],
  '/connect-central/sessions/company':['view-company-sessions'],
@@ -49,6 +50,7 @@ export const routePermissions: Record<string, readonly string[]> = {
 };
 export function canVisit(path: string, grants: readonly string[]): boolean {
  const clean = path.split('?')[0];
+ if(clean==='/people-hub/ess-profile'||clean.startsWith('/people-hub/ess-profile/')) return true;
  const match = Object.keys(routePermissions).sort((a,b)=>b.length-a.length).find(route=>clean===route || clean.startsWith(route+'/'));
  return !match || routePermissions[match].some(permission=>hasPermission(grants,permission));
 }

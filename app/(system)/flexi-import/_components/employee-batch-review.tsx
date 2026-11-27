@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import Link from 'next/link';
-import { useMutation,useQuery,useQueryClient } from '@tanstack/react-query';
+import { useIsMutating,useMutation,useQuery,useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { RefreshCw,ArrowLeft,RotateCcw,Download,CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ import { showApiError } from '@/lib/error-toast';
 import { ReferenceGaps } from './reference-gaps';
 import { ImportWorkflow } from './import-workflow';
 import { ImportRows } from './import-rows';
+import { api } from '@/lib/api';
+import {rowCorrectionMutationKey,type SavedRowCorrection} from './PreviewRowEditor';
 import { ImportErrorFeedback } from './import-error-feedback';
 import { StudioFrame, StudioStages, type StudioStage } from './studio-frame';
 import {ImportAudit} from './import-audit';
@@ -43,6 +45,7 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  const [operation,setOperation]=useState<{action:Action;at:number}|null>(null),[resolvedAt,setResolvedAt]=useState(0),[revalidatedAt,setRevalidatedAt]=useState(0);
  const [draftOptions,setDraftOptions]=useState<ImportOptions|null>(null),[confirmation,setConfirmation]=useState<'process'|'rollback'|'approve'|'reject'|'retry'|null>(null),[comments,setComments]=useState('');
  const [selectedStage,setSelectedStage]=useState<StudioStage|null>(null);
+ const [rowJump,setRowJump]=useState<{rowNumber:number}|null>(null);
  const [revision,setRevision]=useState(0);
  const [skipAcknowledged,setSkipAcknowledged]=useState(false);
  const detail=useQuery({queryKey:[...root,'detail'],queryFn:({signal})=>service.detail(uuid,signal),retry:false,refetchInterval:query=>{
@@ -52,13 +55,14 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  }});
  const status=useQuery({queryKey:statusKey,queryFn:async({signal})=>{
   const previous=client.getQueryData<ImportProgressSnapshot>(statusKey);
-  const incoming=await service.status(uuid,signal);
+  const {data:response}=await api.get(`/flexi-import/batches/${uuid}/status`,{signal});
+  const incoming=response.data as Awaited<ReturnType<typeof service.status>>&{has_unvalidated_corrections?:boolean};
   const cachedDetail=client.getQueryData<EmployeeImportBatch>([...root,'detail']);
   if(previous&&previous.status!==incoming.status||cachedDetail&&cachedDetail.status!==incoming.status){
    void client.invalidateQueries({predicate:query=>root.every((part,index)=>query.queryKey[index]===part)&&query.queryKey[root.length]!=='status'});
    void client.invalidateQueries({queryKey:['import-studio',scope,uuid,'audit']});
   }
-  return observeImportProgress(previous,incoming);
+  return {...observeImportProgress(previous,incoming),has_unvalidated_corrections:incoming.has_unvalidated_corrections===true};
  },retry:false,refetchIntervalInBackground:false,refetchInterval:query=>importPollInterval(query.state.data?.status??detail.data?.status,query.state.error,query.state.errorUpdateCount,waitForOperation(operation,query.state.data?.status,query.state.dataUpdatedAt),query.state.data?.unchangedChecks??0)});
  const batch={...detail.data,...status.data} as EmployeeImportBatch;
  const waiting=waitForOperation(operation,batch.status,status.dataUpdatedAt);
@@ -74,12 +78,24 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  const options=draftOptions??{import_mode:summary.data?.import_mode==='all_or_nothing'?'all_or_nothing':'skip_errors',send_welcome_email:batch.send_welcome_email??summary.data?.send_welcome_email??false,ignore_gaps:false};
  const valid=Number(summary.data?.valid_rows??batch.valid_rows??batch.successful_rows??0),invalid=Number(summary.data?.invalid_rows??batch.invalid_rows??batch.failed_rows??0);
  const unresolved=batch.has_gaps===true||gaps.data?.has_gaps===true||gaps.data?.tables.some(table=>table.values.some(value=>!value.decision))===true;
- const needsRevalidation=resolvedAt>revalidatedAt||(operation?.action==='revalidate'&&waiting);
+ const pendingCorrections=status.data?.has_unvalidated_corrections===true;
+ const correctionKey=rowCorrectionMutationKey(scope,uuid);
+ const savingCorrection=useIsMutating({mutationKey:correctionKey})>0;
+ const needsRevalidation=pendingCorrections||resolvedAt>revalidatedAt||(operation?.action==='revalidate'&&waiting);
  function refresh(){void client.invalidateQueries({queryKey:root});void client.invalidateQueries({queryKey:['import-studio',scope,uuid,'audit']});void client.invalidateQueries({queryKey:['flexi-import']});setRevision(value=>value+1);}
  function queued(action:Action,result:QueuedResult|null){
   const at=status.dataUpdatedAt;setOperation({action,at});if(action==='revalidate')setRevalidatedAt(resolvedAt);
   if(result?.status)client.setQueryData(statusKey,(previous:EmployeeImportBatch|undefined)=>({...previous,uuid,status:result.status!}));
   setConfirmation(null);setSelectedStage(action==='revalidate'?'staging':result?.status==='pending_approval'?'approval':'recovery');refresh();
+ }
+ function correctionSaved(result:SavedRowCorrection){
+  if(result.status==='validating'){
+   queued('revalidate',result);
+   return;
+  }
+  client.setQueryData<typeof status.data>(statusKey,previous=>previous&&{...previous,has_unvalidated_corrections:true});
+  toast.success('Correction saved.');
+  refresh();
  }
  function failure(error:unknown){showApiError(error);refresh();}
  const revalidate=useMutation({mutationFn:()=>service.revalidate(uuid),retry:false,onSuccess:result=>{toast.success('Checking the spreadsheet…');queued('revalidate',result);},onError:failure});
@@ -89,10 +105,11 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  const approve=useMutation({mutationFn:()=>service.approve(uuid,comments.trim()),retry:false,onSuccess:result=>{toast.success('Approval submitted.');queued('approve',result);},onError:failure});
  const reject=useMutation({mutationFn:()=>service.reject(uuid,comments.trim()),retry:false,onSuccess:result=>{toast.success('Rejection submitted.');queued('reject',result);},onError:failure});
  const download=useMutation({mutationFn:()=>flexiImportService.downloadErrorReport(uuid),onSuccess:blob=>downloadImportFile(blob,`import-${uuid}-errors.csv`),onError:(error:unknown)=>showApiError(error)});
- const busy=[revalidate,process,rollback,approve,reject,retryFailed].some(mutation=>mutation.isPending);
+ const batchActionBusy=[revalidate,process,rollback,approve,reject,retryFailed].some(mutation=>mutation.isPending);
+ const busy=savingCorrection||batchActionBusy;
  const canDirectProcess=status.data?.can_edit_preview===true&&canConfirmImport({...batch,requires_approval:approvalBound},gaps.data??(!employeeScope&&!batch.has_gaps?{status:batch.status,has_gaps:false,total_gap_values:0,tables:[]}:undefined),options)&&!needsRevalidation&&!waiting&&!gaps.isFetching&&!gaps.error&&!status.isFetching&&!status.error&&!detail.error&&!summary.isFetching&&!summary.error&&!busy&&(options.import_mode==='skip_errors'||invalid===0)&&valid>0;
- const canEditPreview=reviewing&&status.data?.can_edit_preview===true&&!waiting&&!busy&&!status.error;
- const canSubmit=canEditPreview&&approvalBound&&valid>0&&invalid===0&&!unresolved&&!needsRevalidation&&!gaps.isFetching&&!gaps.error&&!status.isFetching&&!detail.error&&!summary.isFetching&&!summary.error;
+ const canEditPreview=reviewing&&status.data?.can_edit_preview===true&&!waiting&&!batchActionBusy&&!status.error;
+ const canSubmit=canEditPreview&&!busy&&approvalBound&&valid>0&&invalid===0&&!unresolved&&!needsRevalidation&&!gaps.isFetching&&!gaps.error&&!status.isFetching&&!detail.error&&!summary.isFetching&&!summary.error;
  const canProcess=approvalBound?canSubmit:canDirectProcess;
 
  const retryEligible=!!failedRows.data&&hasRetryableImportFailures(batch,failedRows.data.data);
@@ -112,7 +129,7 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  const processingResults=['completed','processing','rolled_back'].includes(batch.status)||batch.status==='failed'&&(batch.processed_rows??0)>0||retryActive;
  const guidance=fileStructureFailed?{title:'File validation failed',body:'Review the file-level errors below. Upload the matching saved-version workbook, or use a standard import for a standard workbook.',next:undefined,action:undefined}:importGuidance(batch.status,invalid,valid,approvalBound);
  const canReview=!failedBeforeProcessing&&hasPreview&&!waiting&&!summary.isFetching&&!summary.error&&!busy;
- const confirmationHint=status.error||detail.error?'Refresh the batch state before confirming.':summary.isFetching?'The server summary is refreshing.':waiting?'Wait for validation to finish.':needsRevalidation?'Revalidate the latest corrections or reference decisions.':valid<=0?'There are no valid rows to import.':unresolved&&!options.ignore_gaps?'Resolve missing reference values, or explicitly choose to skip affected rows.':invalid>0&&(approvalBound||options.import_mode==='all_or_nothing')?approvalBound?`Fix all ${invalid} invalid rows before submitting for approval.`:`Fix all ${invalid} invalid rows, or choose Save valid rows only.`:'';
+ const confirmationHint=status.error||detail.error?'Refresh the batch state before confirming.':summary.isFetching?'The server summary is refreshing.':waiting?'Wait for validation to finish.':needsRevalidation?'Re-check the batch before confirming your saved changes.':valid<=0?'There are no valid rows to import.':unresolved&&!options.ignore_gaps?'Resolve missing reference values, or explicitly choose to skip affected rows.':invalid>0&&(approvalBound||options.import_mode==='all_or_nothing')?approvalBound?`Fix all ${invalid} invalid rows before submitting for approval.`:`Fix all ${invalid} invalid rows, or choose Save valid rows only.`:'';
  const progress=Math.min(100,Math.max(0,Number(batch.progress??batch.progress_percentage??0)));
  if(detail.isPending)return <AppLoader label="Loading employee import…" />;
  if(detail.error&&!detail.data)return <ApiErrorState error={detail.error} onRetry={()=>void detail.refetch()} />;
@@ -126,26 +143,27 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  {(batch.error_message||batch.rejection_reason)&&<div role="alert" className="rounded-lg border border-brand-400/40 bg-brand-400/10 p-4 text-sm text-destructive">{batch.error_message??batch.rejection_reason}</div>}
  {batchValidationErrors.length>0&&<div role="alert" className="space-y-2 rounded-xl border border-brand-400/40 bg-brand-400/10 p-4"><h2 className="font-semibold text-brand-900">Validation needs attention</h2><ul className="space-y-1 text-sm">{batchValidationErrors.slice(0,20).map((error,index)=><li key={index}>{error.row&&error.row>0?`Row ${error.row}: `:'File: '}{error.message}</li>)}</ul>{batchValidationErrors.length>20&&<p className="text-xs text-muted-foreground">Download the error report to see all validation findings.</p>}</div>}
  {failedBeforeProcessing&&<div role="alert" className="space-y-3 rounded-lg border border-brand-400/40 bg-brand-400/10 p-4"><p className="text-sm text-foreground">This batch failed before any processed rows were reported. Review the validation or template errors below. It has not been treated as a completed import.</p><Button variant="outline" size="sm" asChild><Link href={batch.template_uuid&&batch.template_version?`/flexi-import/new?template_uuid=${encodeURIComponent(batch.template_uuid)}&version=${batch.template_version}`:'/flexi-import/new'}>Upload a corrected file</Link></Button></div>}
+  {pendingCorrections&&reviewing&&!waiting&&<p role="status" className="rounded-lg border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">Saved corrections need a re-check. Row results and counts reflect the previous validation.</p>}
  {waiting&&<p role="status" className="rounded-lg border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">{operation?.action==='rollback'?'Rollback was queued. Waiting for the import worker to finish.':operation?.action==='retry'?'Retry is queued or in progress. Only failed processing rows are being retried; committed and validation-invalid rows remain unchanged.':operation?.action==='revalidate'?'Checking the spreadsheet… The previous preview cannot be confirmed yet.':'Request accepted. Waiting for the server to advance this batch.'}</p>}
  <div hidden={studioStage!=='template'} className="space-y-4"><ImportSection number={1} title="Template and uploaded file" description="This batch is already uploaded. Its file and saved template version cannot be replaced here."><dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">File</dt><dd className="mt-1 break-all text-sm font-medium">{batch.file_name??'Uploaded file'}</dd></div><div><dt className="text-xs text-muted-foreground">Template</dt><dd className="mt-1 text-sm">{batch.template_version?`Saved version ${batch.template_version}`:'Standard generated template or custom mapped file'}</dd></div></dl><Button variant="outline" asChild><Link href="/flexi-import/new">Start another import</Link></Button></ImportSection></div>
  <div hidden={studioStage!=='staging'} className="space-y-5">
  <div id="import-data" className="scroll-mt-40" />
  {hasPreview&&<ImportSection number={2} title="Spreadsheet validation workspace" description={employeeScope?"Employee matching and proposed changes come from the server. Blank cells preserve existing values on update.":"Review server validation and the records this scope will create."} actions={<Button size="sm" variant="outline" disabled={download.isPending} onClick={()=>download.mutate()}><Download className="mr-2 h-4 w-4" />Error report</Button>}>
   {fileStructureFailed?<p className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">{batch.total_rows??'—'} source rows were detected, but row validation could not finish because the file structure does not match the selected template. Upload the correct file before reviewing row results.</p>:summary.isPending?<AppLoader label="Loading validation summary…" />:summary.error?<ApiErrorState error={summary.error} onRetry={()=>void summary.refetch()} />:<><div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><ImportStat label="Staged rows" value={batch.total_rows??summary.data?.total_rows??0} /><ImportStat label="Blocking rows" value={invalid} /><ImportStat label="Warnings" value={summary.data?.warning_rows??'Not reported'} /><ImportStat label="Ready rows" value={valid} /></div><div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">{[['New',summary.data?.new_rows],['Update',summary.data?.update_rows],['Unchanged',summary.data?.unchanged_rows],['Missing master values',gaps.data?.total_gap_values]].map(([label,value])=><span key={String(label)} className="rounded-full border border-border bg-muted/20 px-3 py-1">{label}: <strong className="font-semibold text-brand-800">{value??'—'}</strong></span>)}</div><p className="text-xs text-muted-foreground">{valid.toLocaleString()} valid rows · {invalid.toLocaleString()} invalid rows · {batch.total_rows??summary.data?.total_rows??0} total</p>{!!Object.keys(summary.data?.errors_by_field??{}).length&&<details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-xs font-medium text-brand-800">Validation errors by field</summary><ul className="mt-3 space-y-2 text-xs text-destructive">{Object.entries(summary.data?.errors_by_field??{}).map(([label,value])=><li key={label}><strong>{label}</strong>: {typeof value==='number'?`${value} rows`:displayImportValue(value)}</li>)}</ul></details>}</>}
-  {!fileStructureFailed&&<ImportRows uuid={uuid} scope={scope} revision={revision} mode={batch.form_mode??'detailed'} importType={batch.import_type??'employees'} templateUuid={batch.template_uuid} templateVersion={batch.template_version} canEdit={canEditPreview} previewFields={status.data?.preview_fields} columnMapping={status.data?.column_mapping??batch.column_mapping} totalRows={batch.total_rows} onRecheck={()=>revalidate.mutate()} rechecking={revalidate.isPending||waiting||status.isFetching} onQueued={result=>{toast.success('Checking the spreadsheet…');queued('revalidate',result);}} onRefresh={refresh} />}
+  {!fileStructureFailed&&<ImportRows jumpTarget={rowJump} onJumpHandled={()=>setRowJump(null)} uuid={uuid} scope={scope} revision={revision} mode={batch.form_mode??'detailed'} importType={batch.import_type??'employees'} templateUuid={batch.template_uuid} templateVersion={batch.template_version} canEdit={canEditPreview} previewFields={status.data?.preview_fields} columnMapping={status.data?.column_mapping??batch.column_mapping} totalRows={batch.total_rows} onRecheck={()=>{if(!client.isMutating({mutationKey:correctionKey}))revalidate.mutate();}} rechecking={revalidate.isPending||waiting||status.isFetching||savingCorrection} hasDraftCorrections={pendingCorrections} onQueued={correctionSaved} onRefresh={refresh} />}
   <div className="rounded-lg border border-brand-800/10 bg-brand-100/50 px-4 py-3 text-xs leading-5 text-muted-foreground">Blank update cells keep existing values. Use <strong className="text-brand-800">{'{clear}'}</strong> only to clear an optional field. Conflicting employee identities are blocked; identifiers such as Device Badge ID stay text.</div>
  </ImportSection>}
  <div id="import-references" className="scroll-mt-40" />
  {reviewing&&(employeeScope||batch.has_gaps===true)&&<ImportSection number={4} title="Complete missing reference data" description="Resolve values across their own source tables, then rebuild the preview.">
-  {gaps.isPending?<AppLoader label="Loading missing references…" />:gaps.error?<ApiErrorState error={gaps.error} onRetry={()=>void gaps.refetch()} />:gaps.data&&<ReferenceGaps uuid={uuid} report={gaps.data} disabled={busy||waiting||status.isFetching} onResolved={response=>{setResolvedAt(value=>value+1);if(response.failed.length)toast.error(`${response.decided} decisions applied, ${response.failed.length} failed.`);else {toast.success(`${response.decided} decisions applied. Revalidation queued.`);revalidate.mutate();}void client.invalidateQueries({queryKey:[...root,'gaps']});}} onRefresh={()=>void client.invalidateQueries({queryKey:[...root,'gaps']})} />}
-  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><p className="max-w-lg text-xs leading-5 text-muted-foreground">After applying decisions or saving in setup, press Re-check. New parent values can reveal further child gaps.</p><Button className={importPrimary} disabled={!canEditPreview||status.isFetching} onClick={()=>revalidate.mutate()}>Re-check / revalidate file</Button></div><ImportErrorFeedback error={revalidate.error} />
+  {gaps.isPending?<AppLoader label="Loading missing references…" />:gaps.error?<ApiErrorState error={gaps.error} onRetry={()=>void gaps.refetch()} />:gaps.data&&<ReferenceGaps onJumpToRow={fileStructureFailed?undefined:rowNumber=>setRowJump({rowNumber})} uuid={uuid} report={gaps.data} disabled={busy||waiting||status.isFetching} onResolved={response=>{setResolvedAt(value=>value+1);if(response.failed.length)toast.error(`${response.decided} decisions applied, ${response.failed.length} failed.`);else toast.success(`${response.decided} decisions saved.`);void client.invalidateQueries({queryKey:[...root,'gaps']});}} onRefresh={()=>void client.invalidateQueries({queryKey:[...root,'gaps']})} />}
+  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><p className="max-w-lg text-xs leading-5 text-muted-foreground">After saving decisions, use Re-check batch in the spreadsheet toolbar. New parent values can reveal further child gaps.</p></div><ImportErrorFeedback error={revalidate.error} />
  </ImportSection>}
  <div className="flex justify-end"><Button className={importPrimary} disabled={!canReview} onClick={()=>setSelectedStage('approval')}>Review import impact →</Button></div></div>
  <div hidden={studioStage!=='approval'} className="space-y-5">
  <div id="import-confirmation" className="scroll-mt-40" />
  {reviewing&&!approvalBound&&<ImportSection number={3} title="Review, approval and commit" description="Choose how to handle invalid rows and whether to email newly created accounts.">
   <fieldset disabled={busy||waiting||!!batch.confirmed_at} className="grid gap-5 sm:grid-cols-2"><div className="space-y-2"><legend className="mb-2 text-sm font-medium text-foreground">If rows still have errors</legend>{[{value:'skip_errors' as const,title:'Save valid rows only',description:'Invalid rows are skipped and included in the error report.'},{value:'all_or_nothing' as const,title:'Require every row to be valid',description:'Nothing is imported until all rows pass validation.'}].map(item=><label key={item.value} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${options.import_mode===item.value?'border-brand-800/30 bg-brand-100':'border-border'}`}><input type="radio" name="employee-processing-policy" checked={options.import_mode===item.value} onChange={()=>setDraftOptions({...options,import_mode:item.value,ignore_gaps:item.value==='all_or_nothing'?false:options.ignore_gaps})} className="mt-1 accent-brand-800" /><span><span className="block text-sm font-medium">{item.title}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.description}</span></span></label>)}</div><div className="space-y-3">{employeeScope&&<><Label>Notifications</Label><label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4"><Checkbox checked={options.send_welcome_email} onCheckedChange={value=>setDraftOptions({...options,send_welcome_email:value===true})} /><span><span className="block text-sm font-medium">Share welcome credentials by email</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">New accounts only. Updating an employee does not reset or resend credentials.</span></span></label></>}{unresolved&&<label className="flex cursor-pointer items-start gap-3 rounded-lg border border-brand-400/50 bg-brand-400/10 p-4"><Checkbox checked={options.ignore_gaps} disabled={options.import_mode!=='skip_errors'} onCheckedChange={value=>setDraftOptions({...options,ignore_gaps:value===true})} /><span><span className="block text-sm font-medium">Skip employees with unresolved missing data</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">This explicitly skips affected employee rows. Those employees will not be imported. Available only with Save valid rows only.</span></span></label>}</div></fieldset>
-  {needsRevalidation&&<p className="text-xs text-destructive">Revalidate your saved reference decisions before confirming.</p>}{unresolved&&!options.ignore_gaps&&<p className="text-xs text-muted-foreground">Resolve missing data, or explicitly choose to skip affected employee rows.</p>}
+  {needsRevalidation&&<p className="text-xs text-destructive">Re-check the batch before confirming your saved changes.</p>}{unresolved&&!options.ignore_gaps&&<p className="text-xs text-muted-foreground">Resolve missing data, or explicitly choose to skip affected employee rows.</p>}
   {confirmationHint&&<p role="status" className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">{confirmationHint}</p>}
   <div className="flex justify-end border-t border-border pt-4"><Button className={importPrimary} disabled={!canProcess} onClick={()=>{setSkipAcknowledged(false);setConfirmation('process');}}>Review & confirm import</Button></div>
  </ImportSection>}

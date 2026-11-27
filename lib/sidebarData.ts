@@ -440,6 +440,7 @@ export const modules: ModuleItem[] = [
         title: "Employee Directory",
         pathname: "/people-hub/employees",
       },
+      {id: 40399, icon: "ClipboardCheck", title: "Profile Change Requests", pathname: "/people-hub/profile-change-requests"},
 
       {
         id: 20300,

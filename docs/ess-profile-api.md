@@ -1,3 +1,23 @@
+> Current UI mode: ESS Profile is now an in-memory demo accessible to all signed-in users, without ESS permission checks. It uses a local avatar and sample LeaveEase, TimeSync, PayEdge, Loan Hub and Expense Hub summaries. No employee profile API is called by this demo page. The real API service and HR review queue remain available for later integration. The contract below describes that backend integration, not the current demo runtime.
+
+# ESS profile integration status — 27 November 2026
+
+The confirmed employee endpoints are now connected at `/people-hub/ess-profile`. Access requires both `ess.access` and `ess.profile.view-own`; correction and cancellation also require `ess.profile.edit-own`. Login permissions are read from Redux, independent of role names.
+
+The HR review queue is connected at `/people-hub/profile-change-requests` with `employees.edit`. Backend authorization must reject the submitter and the affected employee from deciding, and revalidate policy/original values transactionally.
+
+Profile, history and document queries are scoped by signed-in user and selected company, use zero inactive cache retention, and are not stored in browser storage. Downloads use authenticated binary requests and attachment filenames. Upload is not offered. Sensitive fields use server display_value and never reveal raw values. The backend must send `Cache-Control: private, no-store`.
+
+Correction errors stay in the modal. A 409 refreshes profile/history and blocks retry from the stale dialog. The same reconciliation behavior is applied to HR decisions. No official field is optimistically modified.
+
+The workspace summary endpoint in section 6 below is still a **proposal**, not part of the confirmed handoff. Financial/attendance/leave sample figures have been removed and these cards show unavailable until a summary API is confirmed.
+
+Deployment remains a backend task: run `2026_11_27_130000_create_employee_profile_change_requests.php`, the additive `EssPermissionSeeder`, and refresh the route cache using the commands in the backend handoff. No migrations or seeding were executed by this frontend change.
+
+The rest of this document preserves the earlier design proposal. Where it differs, the backend handoff above takes precedence: exact permissions are `ess.access`, `ess.profile.view-own`, `ess.profile.edit-own`; document upload is unavailable; HR review uses the separate confirmed endpoints.
+
+---
+
 # Employee self-service profile — backend API contract
 
 Frontend route: `/people-hub/ess-profile`
