@@ -14,7 +14,7 @@ function mount(template:SavedImporter){const client=new QueryClient({defaultOpti
 it('uploads using the selected immutable version without the unpinned employee path',async()=>{
  vi.mocked(importStudioService.upload).mockResolvedValue({uuid:'batch',status:'uploaded'});
  const client=mount(saved);
- expect(screen.getByRole('radio',{name:/Quick onboarding/})).toBeDisabled();
+ expect(screen.queryByRole('radio',{name:/Quick onboarding/})).not.toBeInTheDocument();expect(screen.getByText(/detailed/i)).toBeInTheDocument();
  fireEvent.change(screen.getByLabelText('Employee spreadsheet'),{target:{files:[new File(['code\n001'],'team.csv')]}});
  await waitFor(()=>expect(screen.getByRole('button',{name:'Upload & validate'})).toBeEnabled());
  fireEvent.click(screen.getByRole('button',{name:'Upload & validate'}));
@@ -23,7 +23,7 @@ it('uploads using the selected immutable version without the unpinned employee p
 });
 it('blocks old saved versions with no field snapshot',()=>{
  const client=mount({...saved,download_available:false,fields:undefined});
- expect(screen.getByRole('alert')).toHaveTextContent('needs to be saved as a new version');
+ expect(screen.getByRole('alert')).toHaveTextContent('no exportable field snapshot');
  expect(screen.getByRole('button',{name:'Download XLSX template'})).toBeDisabled();
  expect(screen.getByRole('button',{name:'Upload & validate'})).toBeDisabled();client.clear();
 });
@@ -33,6 +33,6 @@ it('blocks a standard all-fields CSV before sending it as a saved-version upload
  fireEvent.change(screen.getByLabelText('Employee spreadsheet'),{target:{files:[new File(['Employee Code,Full Name\n000123,Rafay'],'all.csv')]}});
  await screen.findByText(/does not match saved template version 2/);
  expect(screen.getByRole('button',{name:'Upload & validate'})).toBeDisabled();
- expect(screen.getByRole('button',{name:'Use standard import instead'})).toBeEnabled();
+ expect(screen.getByRole('button',{name:'Templates'})).toBeEnabled();
  expect(importStudioService.upload).not.toHaveBeenCalled();client.clear();
 });

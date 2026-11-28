@@ -12,7 +12,7 @@ const ROOT='/flexi-import';
 function list<T>(value:T[]|{data:T[]}):T[]{if(Array.isArray(value))return value;if(Array.isArray(value?.data))return value.data;throw new Error('Unexpected Studio list response.');}
 export function attachmentName(header:unknown,fallback:string){if(typeof header!=='string')return fallback;const encoded=header.match(/filename\*=UTF-8''([^;]+)/i);if(encoded){try{return decodeURIComponent(encoded[1]).replace(/[\\/]/g,'_');}catch{return fallback;}}return header.match(/filename="?([^";]+)"?/i)?.[1]?.replace(/[\\/]/g,'_')??fallback;}
 export type TemplateFilters={q?:string;import_type?:string;owner_id?:string;status?:string;version?:number;page?:number;per_page?:number};
-export type TemplatePage={data:SavedImporter[];current_page:number;last_page:number;total:number};
+export type TemplatePage={data:SavedImporter[];current_page:number;last_page:number;total:number;per_page?:number};
 function savedTemplate(raw:SavedImporter):SavedImporter{return {...raw,fields:Array.isArray(raw.fields)?raw.fields.map(field=>normalizeFieldDefinition(field as unknown as Record<string,unknown>)).filter(field=>field.visible!==false):undefined};}
 export function savedTemplateAvailable(template:SavedImporter){return template.download_available===true&&!!template.fields?.length;}
 export const importStudioService={

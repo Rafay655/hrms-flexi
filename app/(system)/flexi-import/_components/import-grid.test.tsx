@@ -50,7 +50,7 @@ it('edits a valid FlexiMeta row using status fields and saved column mapping',as
  expect(screen.getByRole('button',{name:'Next page'})).toBeEnabled();
  fireEvent.click(screen.getAllByRole('button',{name:'Edit row'})[0]);
  const name=await screen.findByRole('textbox',{name:'Name'});expect(name).toHaveValue('Finance');
- fireEvent.change(name,{target:{value:'Finance Operations'}});fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
+ fireEvent.change(name,{target:{value:'Finance Operations'}});fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
  await waitFor(()=>expect(service.correctRows).toHaveBeenCalledWith('batch',[{row_number:2,fields:{name:'Finance Operations'}}]));
  expect(service.previewFields).not.toHaveBeenCalled();expect(importStudioService.template).not.toHaveBeenCalled();
  await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());expect(queued).toHaveBeenCalledWith({status:'validating'});
@@ -72,3 +72,14 @@ it('keeps earlier headers aligned when a later server page adds a column',async(
  const headers=screen.getAllByRole('columnheader');expect(headers[1]).toHaveTextContent('B');expect(headers[2]).toHaveTextContent('A');expect(headers[3]).toHaveTextContent('C');
  expect(screen.getByRole('button',{name:'Next page'})).toBeDisabled();
 });
+
+// The deployed preview uses raw HTTP for page-size/row-jump and deferred edits.
+// Bridge those HTTP calls to the service fixtures used by this legacy suite.
+vi.mock('@/lib/api',()=>({api:{
+ get:vi.fn(async(url:string,config?:{params?:{status?:string;page?:number;row_number?:number;per_page?:number};signal?:AbortSignal})=>{
+  const uuid=url.split('/').at(-2)!;const params=config?.params;
+  const result=await service.rows(uuid,params?.status??'',params?.page??1,config?.signal);
+  return {data:{success:true,data:result.data,...(params?.row_number!==undefined?{meta:{current_page:1,last_page:1,total:result.data.length,per_page:params.per_page??50}}:{})}};
+ }),
+ patch:vi.fn(async(url:string,body:{changes:{row_number:number;fields:Record<string,string|null>}[]})=>({data:{success:true,data:await service.correctRows(url.split('/').at(-2)!,body.changes)}}))
+}}));

@@ -5,7 +5,7 @@
  * FlexiImport — primary module navigation sidebar.
  *
  * 4 top-level nav items (flat):
- *   Dashboard · New Import · Import History · Column Templates
+ *   Dashboard · Import History
  *
  * Visual identity mirrors SFNav exactly:
  *   Background  : var(--brand-800)  #322E53  Flexi dark purple
@@ -22,9 +22,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
-  Upload,
   History,
-  FileText,
   FileInput,
   type LucideIcon,
 } from "lucide-react";
@@ -51,25 +49,11 @@ const NAV_ITEMS: NavItem[] = [
     exact: true,
   },
   {
-    id: "new-import",
-    label: "New Import",
-    href: "/flexi-import/new",
-    icon: Upload,
-    description: "Start a new bulk import",
-  },
-  {
     id: "batches",
     label: "Import History",
     href: "/flexi-import/batches",
     icon: History,
     description: "All import batches and their status",
-  },
-  {
-    id: "templates",
-    label: "Column Templates",
-    href: "/flexi-import/column-maps",
-    icon: FileText,
-    description: "Saved column mapping templates",
   },
 ];
 

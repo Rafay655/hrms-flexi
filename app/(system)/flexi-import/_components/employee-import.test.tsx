@@ -31,7 +31,7 @@ beforeEach(()=>{
 });
 afterEach(()=>{cleanup();client.clear();vi.unstubAllGlobals();});
 it('uses default-off credentials and explicit process options with a null acknowledgement',async()=>{
- mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/Approval & commit/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});await waitFor(()=>expect(button).toBeEnabled());
+ mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/^(Confirm import|Approval)$/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});await waitFor(()=>expect(button).toBeEnabled());
  expect(screen.getByRole('checkbox',{name:/Share welcome credentials/})).not.toBeChecked();fireEvent.click(button);expect(service.process).not.toHaveBeenCalled();fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Confirm import'}));
  await waitFor(()=>expect(service.process).toHaveBeenCalledWith('batch',{import_mode:'skip_errors',send_welcome_email:false,ignore_gaps:false}));
 });
@@ -40,11 +40,11 @@ it('renders the provided blocked department and parent label without offering cr
  expect(screen.getByText(/Department needs a Division/)).toBeInTheDocument();expect(screen.getByText(/Administration/)).toBeInTheDocument();expect(screen.getByRole('link',{name:'Open setup'})).toHaveAttribute('href','/flexi-meta/departments');expect(screen.queryByRole('option',{name:/Create/})).not.toBeInTheDocument();
 });
 it('permits ignoring gaps only after an explicit skip-affected-rows acknowledgement',async()=>{
- report=departmentReport();batch.has_gaps=true;mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/Approval & commit/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});expect(button).toBeDisabled();
+ report=departmentReport();batch.has_gaps=true;mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/^(Confirm import|Approval)$/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});expect(button).toBeDisabled();
  fireEvent.click(screen.getByRole('checkbox',{name:/Skip employees with unresolved/}));await waitFor(()=>expect(button).toBeEnabled());fireEvent.click(button);expect(within(screen.getByRole('dialog')).getByText(/This does not import every employee/)).toBeInTheDocument();
 });
 it('requires all rows valid when the strict policy is selected',async()=>{
- batch.failed_rows=1;summary.invalid_rows=1;mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/Approval & commit/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});fireEvent.click(screen.getByRole('radio',{name:/Require every row/}));expect(button).toBeDisabled();
+ batch.failed_rows=1;summary.invalid_rows=1;mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/^(Confirm import|Approval)$/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});fireEvent.click(screen.getByRole('radio',{name:/Require every row/}));expect(button).toBeDisabled();
 });
 it('does not offer process or legacy bypasses for a workflow-owned approval batch',async()=>{
  batch.status='pending_approval';batch.requires_approval=true;batch.send_welcome_email=true;batch.workflow={owned:true,owner:'system_flex',state:'running',instance_id:7,task:null,chain:[]};
@@ -73,10 +73,10 @@ it('warns before changing a selected form after a file is chosen',()=>{
  const change=vi.fn();mount(<EmployeeUpload selection={{form_mode:'quick',required_only:false}} onSelectionChange={change} onBack={vi.fn()} />);fireEvent.change(screen.getByLabelText('Employee spreadsheet'),{target:{files:[new File(['file'],'employees.xlsx')]}});fireEvent.click(screen.getByRole('radio',{name:/Detailed onboarding/}));expect(change).not.toHaveBeenCalled();fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Return to template selection'}));expect(change).toHaveBeenCalledWith({form_mode:'detailed',required_only:false});
 });
 it('requires both rollback flags',async()=>{
- batch.status='completed';batch.is_rollbackable=true;batch.rollback_window_open=false;mount(<EmployeeBatchReview uuid="batch" />);await screen.findByRole('heading',{name:'Universal Import Workspace'});expect(screen.queryByRole('button',{name:'Rollback'})).not.toBeInTheDocument();
+ batch.status='completed';batch.is_rollbackable=true;batch.rollback_window_open=false;mount(<EmployeeBatchReview uuid="batch" />);await screen.findByRole('heading',{name:'Import review'});expect(screen.queryByRole('button',{name:'Rollback'})).not.toBeInTheDocument();
 });
 it('preserves confirmation and validation feedback on process failures',async()=>{
- vi.mocked(service.process).mockRejectedValue({response:{status:422,data:{success:false,error:{message:'Invalid rows changed.',field_errors:{import_mode:['Revalidate first.']}}}}});mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/Approval & commit/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});await waitFor(()=>expect(button).toBeEnabled());fireEvent.click(button);fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Confirm import'}));await within(screen.getByRole('dialog')).findByText('Invalid rows changed.');expect(screen.getByText('Spreadsheet validation workspace')).toBeInTheDocument();
+ vi.mocked(service.process).mockRejectedValue({response:{status:422,data:{success:false,error:{message:'Invalid rows changed.',field_errors:{import_mode:['Revalidate first.']}}}}});mount(<EmployeeBatchReview uuid="batch" />);fireEvent.click(await screen.findByRole('button',{name:/^(Confirm import|Approval)$/}));const button=await screen.findByRole('button',{name:'Review & confirm import'});await waitFor(()=>expect(button).toBeEnabled());fireEvent.click(button);fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Confirm import'}));await within(screen.getByRole('dialog')).findByText('Invalid rows changed.');expect(screen.getByText('Spreadsheet validation workspace')).toBeInTheDocument();
 });
 
 it('shows a queued message instead of an endless spinner before validation starts',async()=>{
@@ -109,7 +109,7 @@ it('supports the live banks/divisions/shifts payload without field labels',async
  ]};
  mount(<ReferenceGaps uuid="batch" report={raw} disabled={false} onResolved={vi.fn()} onRefresh={vi.fn()} />);
  expect(screen.getByRole('heading',{name:'Banks'})).toBeInTheDocument();expect(screen.getByRole('heading',{name:'Divisions'})).toBeInTheDocument();
- expect(screen.getAllByText('2 affected rows')).toHaveLength(3);expect(screen.getAllByText('Row sample: 1, 2')).toHaveLength(3);
+ expect(screen.getAllByText('2 affected rows')).toHaveLength(3);expect(screen.getAllByText('Row samples:')).toHaveLength(3);
  expect(screen.getByText('98% match')).toBeInTheDocument();expect(screen.getByRole('option',{name:'Create “HBL”'})).toBeInTheDocument();
  expect(screen.getByRole('link',{name:'Open setup'})).toHaveAttribute('href','/time-sync/shift-templates');
  fireEvent.change(screen.getByRole('combobox',{name:'Resolution for Information Technlogy'}),{target:{value:'use_existing'}});
@@ -150,20 +150,20 @@ it('switches the four-stage prototype workspace without changing batch data',asy
  mount(<EmployeeBatchReview uuid="batch" />);
  const staging=await screen.findByRole('heading',{name:/Spreadsheet validation workspace/});
  await waitFor(()=>expect(staging).toBeVisible());
- fireEvent.click(screen.getByRole('button',{name:/Approval & commit/}));
+ fireEvent.click(screen.getByRole('button',{name:/^(Confirm import|Approval)$/}));
  expect(staging).not.toBeVisible();
  await waitFor(()=>expect(screen.getByRole('heading',{name:/Review, approval and commit/})).toBeVisible());
  fireEvent.click(screen.getByRole('button',{name:/Results & history/}));
- await waitFor(()=>expect(screen.getByRole('heading',{name:/Audit and recovery/})).toBeVisible());
+ await waitFor(()=>expect(screen.getByRole('heading',{name:/Import audit trail/})).toBeVisible());
  expect(service.process).not.toHaveBeenCalled();expect(service.rollback).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:/Review & corrections/}));
+ fireEvent.click(screen.getByRole('button',{name:/Review data/}));
  await waitFor(()=>expect(staging).toBeVisible());
 });
 
 it('never exposes manual processing overrides for loan imports',async()=>{
  batch.import_type='loan_opening_balances';batch.requires_approval=false;batch.can_edit_preview=true;
  mount(<EmployeeBatchReview uuid="batch" />);
- fireEvent.click(await screen.findByRole('button',{name:/Approval & commit/}));
+ fireEvent.click(await screen.findByRole('button',{name:/^(Confirm import|Approval)$/}));
  expect(screen.getByText(/Loan opening balances require all-or-nothing/)).toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'Review & confirm import'})).not.toBeInTheDocument();
  expect(screen.queryByRole('radio',{name:/Save valid rows only/})).not.toBeInTheDocument();
@@ -172,7 +172,7 @@ it('never exposes manual processing overrides for loan imports',async()=>{
 it('does not offer generic financial rollback even if obsolete eligibility flags are present',async()=>{
  batch.import_type='expense_claims';batch.status='completed';batch.is_rollbackable=true;batch.rollback_window_open=true;
  mount(<EmployeeBatchReview uuid="batch" />);
- await screen.findByRole('heading',{name:'Universal Import Workspace'});
+ await screen.findByRole('heading',{name:'Import review'});
  expect(screen.queryByRole('button',{name:'Rollback'})).not.toBeInTheDocument();
 });
 
@@ -192,19 +192,19 @@ it('refreshes existing preview rows on an external approved-to-completed transit
  let server={...batch,status:'approved'};
  vi.mocked(service.status).mockImplementation(async()=>({...server}));vi.mocked(service.detail).mockImplementation(async()=>({...server}));
  vi.mocked(service.rows).mockImplementation(async()=>({data:[{row_number:3,raw_data:{'Employee ID':'000123'},status:server.status==='completed'?'committed':'valid',validation_errors:[],processing_error:null}],page:1,hasNext:false}));
- mount(<EmployeeBatchReview uuid="batch" />);await screen.findByRole('heading',{name:'Universal Import Workspace'});
+ mount(<EmployeeBatchReview uuid="batch" />);await screen.findByRole('heading',{name:'Import review'});
  await waitFor(()=>expect(service.rows).toHaveBeenCalled());
  server={...server,status:'completed'};
  await act(async()=>{await client.refetchQueries({queryKey:['employee-import','company:user','batch','status']});});
- await waitFor(()=>expect(client.getQueryData<{data:{status:string}[]}>(['employee-import','company:user','batch','rows',0,'',1])?.data[0].status).toBe('committed'));
+ await waitFor(()=>expect(client.getQueriesData<{data:{status:string}[]}>({queryKey:['employee-import','company:user','batch','rows']}).find(([,value])=>value?.data[0]?.status==='committed')?.[1]?.data[0].status).toBe('committed'));
 });
 
 it('shows saved-template validation failures in review and retains the correction upload context',async()=>{
  batch.status='failed';batch.template_uuid='saved-template';batch.template_version=2;batch.processed_rows=0;batch.validation_errors=[{row:0,field:'file',message:'The file columns must match the selected template version.'}];summary.invalid_rows=1;summary.valid_rows=0;
  mount(<EmployeeBatchReview uuid="batch" />);
  await screen.findByText('File: The file columns must match the selected template version.');
- expect(screen.getByRole('button',{name:/Review & corrections/})).toHaveAttribute('aria-current','step');
- expect(screen.getByRole('link',{name:'Upload a corrected file'})).toHaveAttribute('href','/flexi-import/new?template_uuid=saved-template&version=2');
+ expect(screen.getByRole('button',{name:/Review data/})).toHaveAttribute('aria-current','page');
+ expect(screen.getByRole('link',{name:'Use this version'})).toHaveAttribute('href','/flexi-import/new?template_uuid=saved-template&version=2');
  expect(screen.getByRole('heading',{name:/Spreadsheet validation workspace/})).toBeInTheDocument();
  expect(service.process).not.toHaveBeenCalled();
 });
@@ -215,7 +215,7 @@ it('submits an editable approval preview only after every row passes validation'
  summary.valid_rows=1;summary.invalid_rows=1;
  vi.mocked(service.process).mockImplementation(async()=>{batch={...batch,status:'pending_approval',can_edit_preview:false};return {batch_uuid:'batch',status:'pending_approval'};});
  mount(<EmployeeBatchReview uuid="batch" />);
- fireEvent.click(await screen.findByRole('button',{name:/Approval & commit/}));
+ fireEvent.click(await screen.findByRole('button',{name:/^(Confirm import|Approval)$/}));
  const submit=await screen.findByRole('button',{name:'Submit for approval'});
  expect(submit).toBeDisabled();
  summary={...summary,valid_rows:2,invalid_rows:0};
@@ -225,17 +225,28 @@ it('submits an editable approval preview only after every row passes validation'
  await waitFor(()=>expect(service.process).toHaveBeenCalledWith('batch',expect.objectContaining({import_mode:'all_or_nothing',ignore_gaps:false}),'flexi_meta_departments'));
  await screen.findByText('Awaiting another approver');
  expect(screen.queryByRole('button',{name:'Submit for approval'})).not.toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:/Review & corrections/}));
- expect(await screen.findByRole('button',{name:'Re-check'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:/Review data/}));
+ expect(await screen.findByRole('button',{name:'Re-check batch'})).toBeDisabled();
 });
 
 it('re-checks a non-employee preview without editing cells or uploading again',async()=>{
  batch.import_type='flexi_meta_departments';batch.preview_fields=[{key:'name',label:'Name',type:'text',required:true}];
  vi.mocked(service.revalidate).mockImplementation(async()=>{batch={...batch,status:'validating'};return {status:'validating'};});
  mount(<EmployeeBatchReview uuid="batch" />);
- const recheck=await screen.findByRole('button',{name:'Re-check'});await waitFor(()=>expect(recheck).toBeEnabled());
+ const recheck=await screen.findByRole('button',{name:'Re-check batch'});await waitFor(()=>expect(recheck).toBeEnabled());
  fireEvent.click(recheck);
  await waitFor(()=>expect(service.revalidate).toHaveBeenCalledWith('batch'));
  await screen.findByText(/Checking the spreadsheet… The previous preview/);
  expect(service.upload).not.toHaveBeenCalled();expect(service.process).not.toHaveBeenCalled();
 });
+
+// The deployed preview uses raw HTTP for page-size/row-jump and deferred edits.
+// Bridge those HTTP calls to the service fixtures used by this legacy suite.
+vi.mock('@/lib/api',()=>({api:{
+ get:vi.fn(async(url:string,config?:{params?:{status?:string;page?:number;row_number?:number;per_page?:number};signal?:AbortSignal})=>{
+  const uuid=url.split('/').at(-2)!;const params=config?.params;
+  const result=await service.rows(uuid,params?.status??'',params?.page??1,config?.signal);
+  return {data:{success:true,data:result.data,...(params?.row_number!==undefined?{meta:{current_page:1,last_page:1,total:result.data.length,per_page:params.per_page??50}}:{})}};
+ }),
+ patch:vi.fn(async(url:string,body:{changes:{row_number:number;fields:Record<string,string|null>}[]})=>({data:{success:true,data:await service.correctRows(url.split('/').at(-2)!,body.changes)}}))
+}}));

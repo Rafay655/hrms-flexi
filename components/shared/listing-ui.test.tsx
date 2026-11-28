@@ -1,0 +1,7 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {render,screen,fireEvent,cleanup} from '@testing-library/react';
+import {ListingTable,ListingPagination} from './listing-ui';
+afterEach(cleanup);
+it('keeps zero values aligned with the configured columns',()=>{render(<ListingTable columns={[{key:'name',label:'Name',render:(row:{id:string;count:number})=>row.id},{key:'count',label:'Fields',render:row=>row.count}]} rows={[{id:'Template',count:0}]} rowKey={row=>row.id} empty="No rows"/>);expect(screen.getByRole('cell',{name:'0'})).toBeInTheDocument();expect(screen.getAllByRole('columnheader')).toHaveLength(2);});
+it('keeps a scroll region and headers for an empty list',()=>{const {container}=render(<ListingTable columns={[{key:'name',label:'Name',render:()=>''}]} rows={[]} rowKey={()=>''} empty="No templates"/>);expect(screen.getByText('No templates')).toBeInTheDocument();expect(container.querySelector('table')?.parentElement?.className).toContain('65vh');});
+it('navigates server pages and disables the last-page controls',()=>{const change=vi.fn();render(<ListingPagination page={3} pages={3} total={45} count={5} size={20} onPage={change} onSize={vi.fn()}/>);expect(screen.getByText('41–45 of 45')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Next page'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Previous page'}));expect(change).toHaveBeenCalledWith(2);});

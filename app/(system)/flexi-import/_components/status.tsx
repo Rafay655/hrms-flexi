@@ -67,10 +67,12 @@ export function statusMeta(status: string): StatusMeta {
 export function StatusBadge({
   status,
   size = "sm",
+  truncate = false,
   className,
 }: {
   status: string;
   size?: "sm" | "md";
+  truncate?: boolean;
   className?: string;
 }) {
   const meta = statusMeta(status);
@@ -88,7 +90,7 @@ export function StatusBadge({
         style={{ backgroundColor: meta.color }}
         aria-hidden="true"
       />
-      {meta.label}
+      <span className={truncate ? "min-w-0 truncate" : undefined}>{meta.label}</span>
     </span>
   );
 }

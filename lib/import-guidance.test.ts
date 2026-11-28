@@ -11,3 +11,5 @@ it('does not imply that completion means all rows succeeded',()=>{
  expect(importGuidance('completed',2,3).body).toContain('does not mean every row succeeded');
  expect(importGuidance('approved',0,3)).toMatchObject({next:'recovery',action:'Track results'});
 });
+
+it('does not offer direct partial commit guidance for approval-bound invalid rows',()=>{const guidance=importGuidance('validation_complete',2,3,true);expect(guidance.next).toBe('staging');expect(guidance.body).toContain('server offers');});

@@ -32,6 +32,7 @@ type CommonProps = {
   allValue?: string;
   icon?: React.ComponentType<{ className?: string }>;
   className?: string;
+  contentClassName?: string;
   widthClass?: string;
   disabled?: boolean;
   isLoading?: boolean; // Adding loading state
@@ -67,6 +68,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = (props) => {
     allValue = DEFAULT_ALL_VALUE,
     icon: Icon = Globe,
     className,
+    contentClassName,
     widthClass = "w-56",
     disabled = false,
     isLoading = false, // Default to false if not passed
@@ -158,7 +160,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = (props) => {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className={cn(widthClass, "p-0 bg-white")} align="start" style={{ zIndex: 200000, width: widthClass.split(" ").includes("w-full") ? "var(--radix-popover-trigger-width)" : undefined, maxWidth: "calc(100vw - 2rem)" }}>
+      <PopoverContent className={cn(widthClass, "p-0 bg-white", contentClassName)} align="start" style={{ zIndex: 200000, width: widthClass.split(" ").includes("w-full") ? "var(--radix-popover-trigger-width)" : undefined, maxWidth: "calc(100vw - 2rem)" }}>
         <Command shouldFilter>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>

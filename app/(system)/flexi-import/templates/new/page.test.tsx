@@ -34,3 +34,26 @@ it('enables exact-version export for a saved field snapshot',async()=>{
  await waitFor(()=>expect(service.downloadSaved).toHaveBeenCalledWith('template',1));
  expect(service.template).toHaveBeenCalledWith('template',expect.any(AbortSignal),1);client.clear();
 });
+
+it('keeps a seventy-field schema searchable without dropping hidden selections',async()=>{
+ const fields=Array.from({length:70},(_,index)=>({key:`field-${index}`,label:`Profile Field ${index+1}`,type:'text',required:index===0}));
+ vi.mocked(service.scopes).mockResolvedValue([{import_type:'employees',title:'Employees',operations:['create_or_update']}]);
+ vi.mocked(service.schema).mockResolvedValue({import_type:'employees',schema_version:'s70',fields});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});const view=render(<QueryClientProvider client={client}><TemplateDesigner/></QueryClientProvider>);
+ await screen.findByRole('checkbox',{name:'Select Profile Field 70'});
+ expect(screen.getByText('70 / 70 selected')).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Search field labels'),{target:{value:'Field 70'}});
+ expect(screen.getAllByRole('checkbox')).toHaveLength(1);expect(screen.getByText('70 / 70 selected')).toBeInTheDocument();
+ expect(view.container.querySelector('.overscroll-contain')?.className).toContain('46vh');
+ fireEvent.click(screen.getByRole('button',{name:'Required only'}));expect(screen.getByText('1 / 70 selected')).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Clear field search'}));expect(screen.getByRole('checkbox',{name:'Select Profile Field 1'})).toBeDisabled();client.clear();
+});
+
+it('provides drag handles for selected columns, including required ones',async()=>{
+ vi.mocked(service.scopes).mockResolvedValue([{import_type:'employees',title:'Employees',operations:['create_or_update']}]);
+ vi.mocked(service.schema).mockResolvedValue({import_type:'employees',schema_version:'drag',fields:[{key:'code',label:'Employee Code',type:'text',required:true},{key:'notes',label:'Notes',type:'text',required:false}]});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});render(<QueryClientProvider client={client}><TemplateDesigner/></QueryClientProvider>);
+ expect(await screen.findByRole('button',{name:'Reorder Employee Code'})).toBeEnabled();expect(screen.getByRole('button',{name:'Reorder Notes'})).toBeEnabled();
+ expect(screen.queryByRole('button',{name:'Move Notes up'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('checkbox',{name:'Select Notes'}));expect(screen.queryByRole('button',{name:'Reorder Notes'})).not.toBeInTheDocument();expect(screen.getByRole('checkbox',{name:'Select Employee Code'})).toBeDisabled();client.clear();
+});

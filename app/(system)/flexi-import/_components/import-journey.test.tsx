@@ -57,8 +57,8 @@ it('connects save, pinned upload, correction, revalidation and commit using actu
  await poll('validation_complete');
  fireEvent.click(await screen.findByRole('button',{name:'Edit row'}));
  fireEvent.change(await screen.findByLabelText('Employee Name'),{target:{value:'Rafay'}});
- fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
- await waitFor(()=>expect(api.patch).toHaveBeenCalledWith('/flexi-import/batches/batch/rows',{changes:[{row_number:3,fields:{name:'Rafay'}}]}));
+ fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
+ await waitFor(()=>expect(api.patch).toHaveBeenCalledWith('/flexi-import/batches/batch/rows',{revalidate:false,changes:[{row_number:3,fields:{name:'Rafay'}}]}));
  await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
  await poll('validation_complete');
  const review=await screen.findByRole('button',{name:'Review import impact →'});await waitFor(()=>expect(review).toBeEnabled());fireEvent.click(review);

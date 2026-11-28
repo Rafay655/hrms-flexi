@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Modal } from '@/components/shared/directory-ui';
+import {BatchModal as Modal} from './batch-workspace-ui';
 import { AppLoader } from '@/components/ui/app-loader';
 import { ApiErrorState } from '@/components/ui/api-error-state';
 import { workflowTaskService,type WorkflowDecision } from '@/services/workflow-task.service';

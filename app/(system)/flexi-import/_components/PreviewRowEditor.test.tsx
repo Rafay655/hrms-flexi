@@ -14,10 +14,10 @@ it('edits invalid rows with labels and sends only changed field keys before awai
  render(<QueryClientProvider client={client}><RowCorrectionDialog uuid="batch" scope="company:user" mode="detailed" row={{row_number:3,status:'invalid',raw_data:{'Emergency contact':'bad',Department:'Payroll'},validation_errors:[],processing_error:null}} onClose={vi.fn()} onQueued={queued} onRefresh={vi.fn()} /></QueryClientProvider>);
  fireEvent.change(await screen.findByLabelText('Emergency contact'),{target:{value:'+923001234567'}});
  expect(screen.queryByText('field_phone')).not.toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
+ fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
  await waitFor(()=>expect(service.correctRows).toHaveBeenCalledWith('batch',[{row_number:3,fields:{field_phone:'+923001234567'}}]));
  await waitFor(()=>expect(queued).toHaveBeenCalledWith({batch_uuid:'batch',status:'validating'}));
- expect(service.previewFields).toHaveBeenCalledWith('detailed',expect.any(AbortSignal));
+ expect(service.previewFields).toHaveBeenCalledWith('detailed',expect.any(AbortSignal),'employees');
  expect(service.rows).not.toHaveBeenCalled();
  client.clear();
 });
@@ -30,12 +30,12 @@ it('retains corrections after a 409 and requires comparison before reapplying',a
  const refresh=vi.fn(),queued=vi.fn(),client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  render(<QueryClientProvider client={client}><RowCorrectionDialog uuid="batch" scope="company:user" mode="quick" row={item} onClose={vi.fn()} onQueued={queued} onRefresh={refresh} /></QueryClientProvider>);
  fireEvent.change(await screen.findByLabelText('Contact'),{target:{value:'my correction'}});
- fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
+ fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
  await screen.findByText(/Your local edits are retained/);
  expect(screen.getByLabelText('Contact')).toHaveValue('my correction');
- expect(screen.getByRole('button',{name:'Save and re-check'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Save correction'})).toBeDisabled();
  fireEvent.click(await screen.findByRole('checkbox',{name:/I reviewed these changes/}));
- fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
+ fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
  await waitFor(()=>expect(service.correctRows).toHaveBeenCalledTimes(2));
  expect(service.correctRows).toHaveBeenLastCalledWith('batch',[{row_number:3,fields:{field_phone:'my correction'}}]);
  expect(refresh).toHaveBeenCalled();client.clear();
@@ -45,12 +45,12 @@ it('requires explicit optional-clear confirmation and supports local undo',async
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  render(<QueryClientProvider client={client}><RowCorrectionDialog uuid="batch" scope="company:user" mode="quick" row={{row_number:3,status:'invalid',raw_data:{Notes:'keep'},validation_errors:[],processing_error:null}} onClose={vi.fn()} onQueued={vi.fn()} onRefresh={vi.fn()} /></QueryClientProvider>);
  fireEvent.change(await screen.findByLabelText('Notes'),{target:{value:'{clear}'}});
- expect(screen.getByRole('button',{name:'Save and re-check'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Save correction'})).toBeDisabled();
  fireEvent.click(screen.getByRole('checkbox',{name:/I understand these optional/}));
- expect(screen.getByRole('button',{name:'Save and re-check'})).toBeEnabled();
+ expect(screen.getByRole('button',{name:'Save correction'})).toBeEnabled();
  fireEvent.click(screen.getByRole('button',{name:'Undo local edit'}));
  expect(screen.getByLabelText('Notes')).toHaveValue('keep');
- expect(screen.getByRole('button',{name:'Save and re-check'})).toBeDisabled();client.clear();
+ expect(screen.getByRole('button',{name:'Save correction'})).toBeDisabled();client.clear();
 });
 
 it('restores lookup dependencies with local undo and redo',async()=>{
@@ -71,7 +71,7 @@ it('omits dependent edits when a controlling toggle hides the field',async()=>{
  fireEvent.change(await screen.findByLabelText('Child name'),{target:{value:'Retained locally'}});
  fireEvent.click(screen.getByRole('checkbox',{name:'Has Children'}));
  expect(screen.queryByLabelText('Child name')).not.toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'Save and re-check'}));
+ fireEvent.click(screen.getByRole('button',{name:'Save correction'}));
  await waitFor(()=>expect(service.correctRows).toHaveBeenCalledWith('batch',[{row_number:3,fields:{children:'0'}}]));client.clear();
 });
 
@@ -84,5 +84,16 @@ it('retains local edits visibly when the batch becomes read-only',async()=>{
  fireEvent.change(screen.getByRole('textbox',{name:'Name'}),{target:{value:'Local correction'}});
  view.rerender(<QueryClientProvider client={client}><RowCorrectionDialog {...props} canEdit={false} /></QueryClientProvider>);
  expect(screen.getByRole('textbox',{name:'Name'})).toHaveValue('Local correction');expect(screen.getByRole('textbox',{name:'Name'})).toBeDisabled();
- expect(screen.getByRole('button',{name:'Save and re-check'})).toBeDisabled();client.clear();
+ expect(screen.getByRole('button',{name:'Save correction'})).toBeDisabled();client.clear();
 });
+
+// The deployed preview uses raw HTTP for page-size/row-jump and deferred edits.
+// Bridge those HTTP calls to the service fixtures used by this legacy suite.
+vi.mock('@/lib/api',()=>({api:{
+ get:vi.fn(async(url:string,config?:{params?:{status?:string;page?:number;row_number?:number;per_page?:number};signal?:AbortSignal})=>{
+  const uuid=url.split('/').at(-2)!;const params=config?.params;
+  const result=await service.rows(uuid,params?.status??'',params?.page??1,config?.signal);
+  return {data:{success:true,data:result.data,...(params?.row_number!==undefined?{meta:{current_page:1,last_page:1,total:result.data.length,per_page:params.per_page??50}}:{})}};
+ }),
+ patch:vi.fn(async(url:string,body:{changes:{row_number:number;fields:Record<string,string|null>}[]})=>({data:{success:true,data:await service.correctRows(url.split('/').at(-2)!,body.changes)}}))
+}}));

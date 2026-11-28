@@ -317,22 +317,10 @@ export const modules: ModuleItem[] = [
         pathname: "/flexi-import/templates",
       },
       {
-        id: 250200,
-        icon: "FilePlus2",
-        title: "New Import",
-        pathname: "/flexi-import/new",
-      },
-      {
         id: 250300,
         icon: "Layers",
         title: "Batches",
         pathname: "/flexi-import/batches",
-      },
-      {
-        id: 250400,
-        icon: "Columns3",
-        title: "Column Maps",
-        pathname: "/flexi-import/column-maps",
       },
     ],
   },

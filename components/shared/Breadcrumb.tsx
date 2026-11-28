@@ -5,6 +5,7 @@ import { ChevronRight, Home } from "lucide-react";
 
 const SEGMENT_LABELS: Record<string, string> = {
   "flexi-hq": "Flexi HQ",
+  "table-preview": "Table Preview",
   "people-hub": "People Hub",
   "time-sync": "Time Sync",
   "pay-edge": "PayEdge",
@@ -91,12 +92,14 @@ export function Breadcrumb() {
     isId: /^\d+$/.test(seg) || /^\[/.test(seg),
   }));
 
-  if (crumbs.length <= 1) return null;
+  const isTablePreview = pathname === "/table-preview";
+  if (crumbs.length <= 1 && !isTablePreview) return null;
 
   return (
-    <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
+    <nav aria-label="Breadcrumb" className={`flex flex-wrap items-center gap-1 text-muted-foreground mb-3 ${isTablePreview ? "font-sidebar text-[13px]" : "text-xs"}`}>
       <Link
-        href="/"
+        href={isTablePreview ? "/flexi-hq" : "/"}
+        aria-label="Home"
         className="hover:text-brand-800 transition-colors"
       >
         <Home className="h-3 w-3" />
@@ -105,7 +108,7 @@ export function Breadcrumb() {
         <span key={i} className="flex items-center gap-1">
           <ChevronRight className="h-3 w-3 opacity-50" />
           {crumb.isLast ? (
-            <span className="text-brand-800 font-medium">{crumb.label}</span>
+            <span aria-current="page" className="text-brand-800 font-medium">{crumb.label}</span>
           ) : (
             <Link
               href={crumb.href}

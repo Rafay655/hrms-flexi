@@ -1,4 +1,5 @@
 "use client";
+import {SavedVersionUpload} from './saved-version-upload';
 import { useRef,useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation,useQuery } from '@tanstack/react-query';
@@ -68,8 +69,9 @@ export function EmployeeUpload({selection,onSelectionChange,onBack,importType='e
   setReading(true);try{const columns=await importWorkbookHeaders(value);if(version!==readVersion.current)return;setFile(value);setHeaders(columns);setMapping({...autoMatchColumns(columns,fields.data??[]),...Object.fromEntries(Object.entries(savedMapping??{}).filter(([header,key])=>columns.includes(header)&&fields.data?.some(field=>field.key===key)))});}catch(error){if(version===readVersion.current)showApiError(error);}finally{if(version===readVersion.current)setReading(false);}
  }
  const busy=upload.isPending||reading;
- return <Frame title={title} description="Upload a generated workbook or map a custom file. Review server validation before committing." actions={<Button size="sm" variant="outline" disabled={busy} onClick={onBack}><ArrowLeft className="mr-2 h-4 w-4" />Import types</Button>}>
-  <StudioStages active="template" />{savedTemplateName&&<p className="rounded-xl border bg-card p-3 text-sm text-muted-foreground">Using {savedTemplateName} · version {savedTemplate?.version}. Download and fill this exact version’s selected columns. Its mode and mapping are frozen for upload.</p>}
+ if(savedTemplate)return <SavedVersionUpload template={savedTemplate} file={file} kind={fileKind} onKind={kind=>{setFileKind(kind);setFileIssue(null);setFile(null);setHeaders([]);setMapping({});upload.reset();}} onFile={value=>{void chooseFile(value);}} onBack={onBack} onDownload={()=>template.mutate({format:'xlsx',type:'create'})} onUpload={()=>{if(!busy)upload.mutate();}} welcome={welcome} onWelcome={setWelcome} reading={reading} uploading={upload.isPending} downloading={template.isPending} progress={uploadProgress} issue={fileIssue} ready={snapshotReady} uploadError={upload.error} downloadError={template.error} duplicateUuid={duplicateUuid}/>;
+ return <Frame title={title} description="Upload a generated workbook or map a custom file. Review server validation before committing." actions={<Button size="sm" variant="outline" disabled={busy} onClick={onBack}><ArrowLeft className="mr-2 h-4 w-4" />{savedTemplate?'Templates':'Import types'}</Button>}>
+  <StudioStages active="template" />{savedTemplateName&&<p className="rounded-xl border bg-card p-3 text-sm text-muted-foreground">Using {savedTemplateName}. Download and fill this exact version’s selected columns. Its mode and mapping are frozen for upload.</p>}
   {!snapshotReady&&<p role="alert" className="rounded-lg border border-brand-400/40 p-3 text-sm text-destructive">This older template needs to be saved as a new version before it can be used. Open the template designer to continue.</p>}
   <ImportSection number={1} title="Choose your template" description="Your onboarding form and field selection are independent.">
    <div className="grid gap-5 sm:grid-cols-2">
