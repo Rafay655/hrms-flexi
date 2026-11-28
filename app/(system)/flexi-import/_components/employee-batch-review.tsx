@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { RefreshCw,ArrowLeft,RotateCcw,Download,CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AppLoader } from '@/components/ui/app-loader';
@@ -46,6 +47,7 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  const [draftOptions,setDraftOptions]=useState<ImportOptions|null>(null),[confirmation,setConfirmation]=useState<'process'|'rollback'|'approve'|'reject'|'retry'|null>(null),[comments,setComments]=useState('');
  const [selectedStage,setSelectedStage]=useState<StudioStage|null>(null);
  const [confirmSplit,setConfirmSplit]=useState(false);
+ const [replacement,setReplacement]=useState<{version:string;file:File|null}|null>(null);
  const [rowJump,setRowJump]=useState<{rowNumber:number}|null>(null);
  const [revision,setRevision]=useState(0);
  const [skipAcknowledged,setSkipAcknowledged]=useState(false);
@@ -57,13 +59,13 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  const status=useQuery({queryKey:statusKey,queryFn:async({signal})=>{
   const previous=client.getQueryData<ImportProgressSnapshot>(statusKey);
   const {data:response}=await api.get(`/flexi-import/batches/${uuid}/status`,{signal});
-  const incoming=response.data as Awaited<ReturnType<typeof service.status>>&{has_unvalidated_corrections?:boolean;can_submit_valid_rows?:boolean;split_child_uuid?:string|null;split_child_status?:string|null};
+  const incoming=response.data as Awaited<ReturnType<typeof service.status>>&{has_unvalidated_corrections?:boolean;can_submit_valid_rows?:boolean;split_child_uuid?:string|null;split_child_status?:string|null;can_replace_file?:boolean;source_file_version?:string|null};
   const cachedDetail=client.getQueryData<EmployeeImportBatch>([...root,'detail']);
   if(previous&&previous.status!==incoming.status||cachedDetail&&cachedDetail.status!==incoming.status){
    void client.invalidateQueries({predicate:query=>root.every((part,index)=>query.queryKey[index]===part)&&query.queryKey[root.length]!=='status'});
    void client.invalidateQueries({queryKey:['import-studio',scope,uuid,'audit']});
   }
-  return {...observeImportProgress(previous,incoming),has_unvalidated_corrections:incoming.has_unvalidated_corrections===true,can_submit_valid_rows:incoming.can_submit_valid_rows===true,split_child_uuid:incoming.split_child_uuid,split_child_status:incoming.split_child_status};
+  return {...observeImportProgress(previous,incoming),has_unvalidated_corrections:incoming.has_unvalidated_corrections===true,can_submit_valid_rows:incoming.can_submit_valid_rows===true,split_child_uuid:incoming.split_child_uuid,split_child_status:incoming.split_child_status,can_replace_file:incoming.can_replace_file===true,source_file_version:incoming.source_file_version};
  },retry:false,refetchIntervalInBackground:false,refetchInterval:query=>importPollInterval(query.state.data?.status??detail.data?.status,query.state.error,query.state.errorUpdateCount,waitForOperation(operation,query.state.data?.status,query.state.dataUpdatedAt),query.state.data?.unchangedChecks??0)});
  const batch={...detail.data,...status.data} as EmployeeImportBatch;
  const waiting=waitForOperation(operation,batch.status,status.dataUpdatedAt);
@@ -126,10 +128,30 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
   onSuccess:()=>{toast.success('Valid rows queued for validation and approval.');setConfirmSplit(false);refresh();},
   onError:failure,
  });
+ const replaceFile=useMutation({
+  mutationFn:async(selected:{version:string;file:File})=>{
+   const body=new FormData();
+   body.append('file',selected.file);
+   body.append('source_file_version',selected.version);
+   const {data:response}=await api.post(`/flexi-import/batches/${uuid}/replace-file`,body,{headers:{'Content-Type':'multipart/form-data'}});
+   return response.data as QueuedResult;
+  },
+  retry:false,
+  onSuccess:result=>{setReplacement(null);toast.success('Corrected file uploaded to the same batch.');queued('revalidate',result);},
+  onError:failure,
+ });
+ const replaceVersion=status.data?.source_file_version;
  const childUuid=status.data?.split_child_uuid??split.data?.batch_uuid;
- const batchActionBusy=[revalidate,process,rollback,approve,reject,retryFailed,split].some(mutation=>mutation.isPending);
+ const batchActionBusy=[revalidate,process,rollback,approve,reject,retryFailed,split,replaceFile].some(mutation=>mutation.isPending);
  const busy=savingCorrection||batchActionBusy;
  const canDirectProcess=status.data?.can_edit_preview===true&&canConfirmImport({...batch,requires_approval:approvalBound},gaps.data??(!employeeScope&&!batch.has_gaps?{status:batch.status,has_gaps:false,total_gap_values:0,tables:[]}:undefined),options)&&!needsRevalidation&&!waiting&&!gaps.isFetching&&!gaps.error&&!status.isFetching&&!status.error&&!detail.error&&!summary.isFetching&&!summary.error&&!busy&&(options.import_mode==='skip_errors'||invalid===0)&&valid>0;
+ const canReplace=status.data?.can_replace_file===true&&!!replaceVersion&&!childUuid&&!busy&&!waiting&&!status.isFetching&&!status.error;
+ function openReplacement(){
+  if(canReplace&&replaceVersion){
+   replaceFile.reset();
+   setReplacement({version:replaceVersion,file:null});
+  }
+ }
  const canEditPreview=!childUuid&&reviewing&&status.data?.can_edit_preview===true&&!waiting&&!batchActionBusy&&!status.error;
  const canSplit=canEditPreview&&!busy&&!childUuid&&status.data?.can_submit_valid_rows===true&&!needsRevalidation
   &&valid>0&&invalid>0&&!status.isFetching&&!detail.error&&!summary.isFetching&&!summary.error;
@@ -157,7 +179,7 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  const progress=Math.min(100,Math.max(0,Number(batch.progress??batch.progress_percentage??0)));
  if(detail.isPending)return <AppLoader label="Loading employee import…" />;
  if(detail.error&&!detail.data)return <ApiErrorState error={detail.error} onRetry={()=>void detail.refetch()} />;
- return <StudioFrame title="Universal Import Workspace" description={`${batch.file_name??uuid} · ${employeeScope?(batch.form_mode==='detailed'?'Detailed onboarding':'Quick onboarding'):(batch.import_type??'Import').replaceAll('_',' ')}`} actions={<><Button size="sm" variant="outline" asChild><Link href="/flexi-import/batches"><ArrowLeft className="mr-2 h-4 w-4" />History</Link></Button><Button size="sm" variant="outline" disabled={busy||status.isFetching} onClick={refresh}><RefreshCw className={`mr-2 h-4 w-4 ${status.isFetching?'animate-spin':''}`} />Refresh</Button></>}>
+ return <StudioFrame title="Universal Import Workspace" description={`${batch.file_name??uuid} · ${employeeScope?(batch.form_mode==='detailed'?'Detailed onboarding':'Quick onboarding'):(batch.import_type??'Import').replaceAll('_',' ')}`} actions={<><Button size="sm" variant="outline" asChild><Link href="/flexi-import/batches"><ArrowLeft className="mr-2 h-4 w-4" />History</Link></Button>{status.data?.can_replace_file&&<Button size="sm" variant="outline" disabled={!canReplace} onClick={openReplacement}>Upload corrected file</Button>}<Button size="sm" variant="outline" disabled={busy||status.isFetching} onClick={refresh}><RefreshCw className={`mr-2 h-4 w-4 ${status.isFetching?'animate-spin':''}`} />Refresh</Button></>}>
  <StudioStages active={studioStage} batch onChange={setSelectedStage} /><span className="sr-only">Employee Import Review · Import stage {activeStep} of 6</span>
  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-800/10 bg-brand-100 px-4 py-3"><div className="space-y-2"><StatusBadge status={batch.status} size="md" /><p className="break-all text-xs text-muted-foreground">Batch {uuid}</p>{batch.template_uuid&&batch.template_version&&<Link className="block text-xs font-medium text-brand-800 underline" href={`/flexi-import/templates/new?template_uuid=${encodeURIComponent(batch.template_uuid)}&version=${batch.template_version}`}>Pinned template · version {batch.template_version}</Link>}<p className="text-xs text-muted-foreground">Last checked: {status.dataUpdatedAt?new Date(status.dataUpdatedAt).toLocaleTimeString():'Waiting for server'}</p></div>{status.isFetching&&<AppLoader variant="inline" label="Refreshing status…" />}</div>
  <section aria-live="polite" className="flex flex-col justify-between gap-3 rounded-xl border border-brand-800/10 bg-card p-4 sm:flex-row sm:items-center"><div><h2 className="font-semibold text-brand-900">{guidance.title}</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{guidance.body}</p></div>{guidance.next&&guidance.next!==studioStage&&<Button className={importPrimary} disabled={guidance.next==='approval'&&!canReview} onClick={()=>setSelectedStage(guidance.next!)}>{guidance.action}</Button>}</section>
@@ -166,10 +188,10 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
  {status.error&&<ApiErrorState error={status.error} onRetry={()=>void status.refetch()} />}
  {(batch.error_message||batch.rejection_reason)&&<div role="alert" className="rounded-lg border border-brand-400/40 bg-brand-400/10 p-4 text-sm text-destructive">{batch.error_message??batch.rejection_reason}</div>}
  {batchValidationErrors.length>0&&<div role="alert" className="space-y-2 rounded-xl border border-brand-400/40 bg-brand-400/10 p-4"><h2 className="font-semibold text-brand-900">Validation needs attention</h2><ul className="space-y-1 text-sm">{batchValidationErrors.slice(0,20).map((error,index)=><li key={index}>{error.row&&error.row>0?`Row ${error.row}: `:'File: '}{error.message}</li>)}</ul>{batchValidationErrors.length>20&&<p className="text-xs text-muted-foreground">Download the correction workbook to see all validation findings.</p>}</div>}
- {failedBeforeProcessing&&<div role="alert" className="space-y-3 rounded-lg border border-brand-400/40 bg-brand-400/10 p-4"><p className="text-sm text-foreground">This batch failed before any processed rows were reported. Review the validation or template errors below. It has not been treated as a completed import.</p><Button variant="outline" size="sm" asChild><Link href={batch.template_uuid&&batch.template_version?`/flexi-import/new?template_uuid=${encodeURIComponent(batch.template_uuid)}&version=${batch.template_version}`:'/flexi-import/new'}>Upload a corrected file</Link></Button></div>}
+ {failedBeforeProcessing&&<div role="alert" className="space-y-3 rounded-lg border border-brand-400/40 bg-brand-400/10 p-4"><p className="text-sm text-foreground">This batch failed before any processed rows were reported. Review the validation or template errors below. It has not been treated as a completed import.</p>{status.data?.can_replace_file?<Button variant="outline" size="sm" disabled={!canReplace} onClick={openReplacement}>Upload corrected file to this batch</Button>:<Button variant="outline" size="sm" asChild><Link href={batch.template_uuid&&batch.template_version?`/flexi-import/new?template_uuid=${encodeURIComponent(batch.template_uuid)}&version=${batch.template_version}`:'/flexi-import/new'}>Start a new import</Link></Button>}</div>}
   {pendingCorrections&&reviewing&&!waiting&&<p role="status" className="rounded-lg border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">Saved corrections need a re-check. Row results and counts reflect the previous validation.</p>}
  {waiting&&<p role="status" className="rounded-lg border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">{operation?.action==='rollback'?'Rollback was queued. Waiting for the import worker to finish.':operation?.action==='retry'?'Retry is queued or in progress. Only failed processing rows are being retried; committed and validation-invalid rows remain unchanged.':operation?.action==='revalidate'?'Checking the spreadsheet… The previous preview cannot be confirmed yet.':'Request accepted. Waiting for the server to advance this batch.'}</p>}
- <div hidden={studioStage!=='template'} className="space-y-4"><ImportSection number={1} title="Template and uploaded file" description="This batch is already uploaded. Its file and saved template version cannot be replaced here."><dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">File</dt><dd className="mt-1 break-all text-sm font-medium">{batch.file_name??'Uploaded file'}</dd></div><div><dt className="text-xs text-muted-foreground">Template</dt><dd className="mt-1 text-sm">{batch.template_version?`Saved version ${batch.template_version}`:'Standard generated template or custom mapped file'}</dd></div></dl><Button variant="outline" asChild><Link href="/flexi-import/new">Start another import</Link></Button></ImportSection></div>
+ <div hidden={studioStage!=='template'} className="space-y-4"><ImportSection number={1} title="Template and uploaded file" description="The saved template version stays with this batch."><dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">File</dt><dd className="mt-1 break-all text-sm font-medium">{batch.file_name??'Uploaded file'}</dd></div><div><dt className="text-xs text-muted-foreground">Template</dt><dd className="mt-1 text-sm">{batch.template_version?`Saved version ${batch.template_version}`:'Standard generated template or custom mapped file'}</dd></div></dl><Button variant="outline" asChild><Link href="/flexi-import/new">Start another import</Link></Button>{status.data?.can_replace_file&&<Button className="ml-2" variant="outline" disabled={!canReplace} onClick={openReplacement}>Upload corrected file</Button>}</ImportSection></div>
  <div hidden={studioStage!=='staging'} className="space-y-5">
  <div id="import-data" className="scroll-mt-40" />
  {hasPreview&&<ImportSection number={2} title="Spreadsheet validation workspace" description={employeeScope?"Employee matching and proposed changes come from the server. Blank cells preserve existing values on update.":"Review server validation and the records this scope will create."} actions={<Button size="sm" variant="outline" disabled={download.isPending} onClick={()=>download.mutate()}><Download className="mr-2 h-4 w-4" />{employeeScope?'Correction workbook':'Error report'}</Button>}>
@@ -222,6 +244,18 @@ export function EmployeeBatchReview({uuid}:{uuid:string}){
 <h2 className="text-lg font-semibold text-brand-900">Audit and recovery</h2>
  <ImportAudit uuid={uuid} scope={scope} active={studioStage==='recovery'} /><section id="import-recovery" className="space-y-3 rounded-xl border border-border bg-card p-4"><h2 className="font-semibold">History and corrections</h2><p className="text-xs leading-6 text-muted-foreground">{employeeScope?'Eligible employee rollback and failed-row retry actions appear above when the server permits them.':'Financial, leave and attendance corrections must be made in the owning module.'}</p><Button size="sm" variant="outline" asChild><Link href="/flexi-import/batches">Open import history</Link></Button></section>
  </div>
+ {replacement&&<Modal title="Upload corrected file to this batch" description="The corrected workbook replaces the current input. The batch ID, template version and original file history are retained." busy={replaceFile.isPending} onClose={()=>setReplacement(null)} footer={<>
+  <Button variant="outline" disabled={replaceFile.isPending} onClick={()=>setReplacement(null)}>Cancel</Button>
+  <Button className={importPrimary} disabled={!canReplace||!replacement.file||replacement.version!==replaceVersion} onClick={()=>{if(replacement.file)replaceFile.mutate({version:replacement.version,file:replacement.file});}}>{replaceFile.isPending?'Uploading…':'Upload and re-check'}</Button>
+ </>}>
+  <div className="space-y-3">
+   <Label htmlFor="batch-replacement-file">Corrected CSV or XLSX</Label>
+   <Input id="batch-replacement-file" type="file" accept=".csv,.xlsx" disabled={replaceFile.isPending} onChange={event=>{const file=event.currentTarget.files?.[0]??null;setReplacement(previous=>previous&&{...previous,file});}} />
+   <p className="text-sm text-muted-foreground">{valid>0?'Include the complete workbook, including the rows that already passed validation.':'The corrected workbook can be used when all rows were invalid.'}</p>
+   {pendingCorrections&&<p className="text-sm text-brand-800">Include any saved browser edits you want to keep in the workbook you upload.</p>}
+   <ImportErrorFeedback error={replaceFile.error} />
+  </div>
+ </Modal>}
  {confirmSplit&&!childUuid&&<Modal title="Submit valid rows for approval?" description="The selected rows will be checked again before the new batch enters approval." busy={split.isPending} onClose={()=>setConfirmSplit(false)} footer={<><Button variant="outline" disabled={split.isPending} onClick={()=>setConfirmSplit(false)}>Cancel</Button><Button className={importPrimary} disabled={!canSplit} onClick={()=>split.mutate()}>{split.isPending?'Creating batch…':'Create approval batch'}</Button></>}>
   <p className="text-sm">{valid.toLocaleString()} valid rows will move to the new approval batch. {invalid.toLocaleString()} invalid rows will remain available in this batch’s correction workbook.</p>
   <ImportErrorFeedback error={split.error} />
