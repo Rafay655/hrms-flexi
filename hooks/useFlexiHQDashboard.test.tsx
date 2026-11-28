@@ -1,0 +1,24 @@
+import { afterEach, expect, it, vi } from "vitest";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { useFlexiHQDashboard } from "./useFlexiHQDashboard";
+import { getFlexiHqDashboard, type FlexiHqDashboardData } from "@/services/flexi-hq-dashboard.service";
+const session = vi.hoisted(() => ({ company: "company-a", user: "user-a" }));
+vi.mock("@/store/hooks", () => ({ useAppSelector: (select: (state: unknown) => unknown) => select({ auth: { company: { id: session.company }, user: { id: session.user } } }) }));
+vi.mock("@/services/flexi-hq-dashboard.service", () => ({ getFlexiHqDashboard: vi.fn() }));
+afterEach(() => { cleanup(); vi.resetAllMocks(); session.company = "company-a"; session.user = "user-a"; });
+const sample: FlexiHqDashboardData = { stats: { total_companies: 1, active_branches: 0, total_departments: 0, total_positions: 0, total_divisions: 0 }, org_snapshot: [], branch_distribution: [], headcount_by_grade: [], forms: { total_fields: 0, breakdown: [] }, workflows: { active: 0, items: [] }, attention: [] };
+it("clears previous company data while the next scoped request loads", async () => {
+  vi.mocked(getFlexiHqDashboard).mockResolvedValueOnce(sample).mockImplementationOnce(() => new Promise(() => {}));
+  const client = new QueryClient();
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const hook = renderHook(() => useFlexiHQDashboard(), { wrapper });
+  await waitFor(() => expect(hook.result.current.data).toEqual(sample));
+  expect(client.getQueryData(["flexi-hq", "dashboard", "user-a", "company-a"])).toEqual(sample);
+  session.company = "company-b";
+  hook.rerender();
+  expect(hook.result.current.data).toBeUndefined();
+  await waitFor(() => expect(getFlexiHqDashboard).toHaveBeenCalledTimes(2));
+  hook.unmount(); client.clear();
+});

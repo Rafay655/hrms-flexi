@@ -10,7 +10,7 @@ export const essProfileService={
  submit:async(payload:{field_key:string;requested_value:string|null;reason:string})=>{const {data}=await api.post(BASE+'/change-requests',payload);return checked<EssRequest>(data);},
  cancel:async(uuid:string,reason?:string)=>{const {data}=await api.post(BASE+'/change-requests/'+encodeURIComponent(uuid)+'/cancel',reason?{reason}:{});return checked<EssRequest>(data);},
  documents:async(params:{page:number;per_page:number},signal?:AbortSignal)=>{const {data}=await api.get(BASE+'/documents',{params,signal});return list<EssDocument>(data);},
- download:async(uuid:string)=>{const response=await api.get(BASE+'/documents/'+encodeURIComponent(uuid)+'/download',{responseType:'blob'});return {blob:response.data as Blob,filename:attachmentFilename(response.headers['content-disposition'])};},
+ download:async(uuid:string,name?:string)=>{const response=await api.get(BASE+'/documents/'+encodeURIComponent(uuid)+'/download',{responseType:'blob'});return {blob:response.data as Blob,filename:attachmentFilename(response.headers['content-disposition'] ?? (name ? `filename="${name}"` : undefined))};},
  review:async(params:{page:number;per_page:number;status?:string},signal?:AbortSignal)=>{const {data}=await api.get('/people-hub/profile-change-requests',{params,signal});return list<EssRequest>(data);},
  decide:async(uuid:string,payload:{decision:'approved'|'rejected';decision_note:string})=>{const {data}=await api.post('/people-hub/profile-change-requests/'+encodeURIComponent(uuid)+'/decision',payload);return checked<EssRequest>(data);},
 };

@@ -1,620 +1,69 @@
-// app/flexi-hq/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, type ReactNode } from "react";
+import Link from "next/link";
+import { Building2, MapPin, Layers, Briefcase, GitBranch, Plus, Network, SlidersHorizontal, Workflow, ArrowRight, Search, CircleAlert, ClipboardList, ShieldCheck } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TAB_LIST_CLS, TAB_TRIGGER_CLS } from "@/lib/ui-constants";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Building2, MapPin, Layers, Briefcase, GitBranch,
-  PlusCircle, Network, DollarSign, BookOpen, ShieldCheck,
-  BarChart3, PieChart, TrendingUp,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { motion } from "framer-motion";
-import {
-  Tooltip as UiTooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend,
-} from "recharts";
+import { Input } from "@/components/ui/input";
 import { useFlexiHQDashboard } from "@/hooks/useFlexiHQDashboard";
+import { AppLoader } from "@/components/ui/app-loader";
+import { parseApiError } from "@/lib/api-error";
 
-
-interface ApiStats {
-  total_companies: number;
-  active_branches: number;
-  total_departments: number;
-  total_positions: number;
-  total_divisions: number;
+const colors = ["#322E53", "#5c5490", "#EEC293", "#F3AB9D", "#49426E"];
+const axis = { fontSize: 11, fill: "#49426E" };
+const tooltipStyle = { borderRadius: 10, border: "1px solid #5c549040", fontSize: 12 };
+const number = (value: number | null | undefined) => typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("en-US") : "—";
+function Panel({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return <Card className="h-full min-w-0"><CardHeader><CardTitle className="text-base font-semibold text-brand-900">{title}</CardTitle><CardDescription className="text-xs">{description}</CardDescription></CardHeader><CardContent>{children}</CardContent></Card>;
 }
-
-interface Division   { id: number; name: string; code: string }
-interface Department { id: number; name: string; code: string; division_id: number }
-interface Designation{ id: number; title: string; code: string; department_id: number }
-interface Branch     { id: number; name: string; branch_type: "head_office" | "branch" }
-
-interface OrgSnapshot {
-  company: { id: number; company_name: string; company_code: string; logo_path: string };
-  divisions_count:  number;
-  dept_count:       number;
-  desig_count:      number;
-  branches_count:   number;
-  divisions:        Division[];
-  departments:      Department[];
-  designations:     Designation[];
-  branches:         Branch[];
-}
-
-interface GradeHeadcount {
-  grade_id:   number;
-  grade_name: string;
-  grade_code: string;
-  level:      string;
-  headcount:  number;
-}
-
-interface BranchDistribution {
-  type:  string;
-  label: string;
-  count: number;
-}
-
-interface DashboardData {
-  stats:                ApiStats;
-  org_snapshot:         OrgSnapshot[];
-  headcount_by_grade:   GradeHeadcount[];
-  branch_distribution:  BranchDistribution[];
-}
-
-/* -------------------------------------------------------------------------- */
-/*                          CHART COLORS                                      */
-/* -------------------------------------------------------------------------- */
-
-const CHART = {
-  navy:  "#322E53",
-  mid:   "#49426E",
-  gold:  "#EEC293",
-  rose:  "#F3AB9D",
-  sage:  "#7A8C6E",
-  sand:  "#E3BA8E",
-};
-
-const PIE_COLORS = [CHART.navy, CHART.gold, CHART.rose, CHART.mid, CHART.sage];
-
-const tooltipStyle = {
-  fontSize: 12,
-  borderRadius: 10,
-  border: `1px solid ${CHART.sand}`,
-};
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show:   { opacity: 1, transition: { staggerChildren: 0.07 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  show:   { opacity: 1, y: 0  },
-};
-
-/* -------------------------------------------------------------------------- */
-/*                       HELPER: initials                                     */
-/* -------------------------------------------------------------------------- */
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
-/* -------------------------------------------------------------------------- */
-/*                       STAT CARD CONFIG                                     */
-/* -------------------------------------------------------------------------- */
-
-function buildStatCards(stats: ApiStats) {
-  return [
-    {
-      title:   "Companies",
-      value:   stats.total_companies,
-      icon:    Building2,
-      href:    "/flexi-hq/companies",
-      cardBg:  "bg-gradient-to-br from-[#322E53] to-[#49426E]",
-      textColor: "text-white",
-      iconColor: "text-white",
-    },
-    {
-      title:   "Active Branches",
-      value:   stats.active_branches,
-      icon:    MapPin,
-      href:    "/flexi-hq/branches",
-      cardBg:  "bg-gradient-to-br from-[#49426E] to-[#5c5490]",
-      textColor: "text-white",
-      iconColor: "text-white",
-    },
-    {
-      title:   "Departments",
-      value:   stats.total_departments,
-      icon:    Layers,
-      href:    "/flexi-hq/departments",
-      cardBg:  "bg-[#322E53]",
-      textColor: "text-white",
-      iconColor: "text-[#EEC293]",
-      ringGlow: "shadow-[0_8px_24px_rgba(238,194,147,0.2)]",
-    },
-    {
-      title:   "Positions",
-      value:   stats.total_positions,
-      icon:    Briefcase,
-      href:    "/flexi-hq/positions",
-      cardBg:  "bg-gradient-to-br from-[#EEC293] to-[#e8b57a]",
-      textColor: "text-[#322E53]",
-      iconColor: "text-[#322E53]",
-    },
-    {
-      title:   "Divisions",
-      value:   stats.total_divisions,
-      icon:    GitBranch,
-      href:    "/flexi-hq/divisions",
-      cardBg:  "bg-gradient-to-br from-[#5c5490] to-[#49426E]",
-      textColor: "text-white",
-      iconColor: "text-white",
-    },
-  ];
-}
-
-/* -------------------------------------------------------------------------- */
-/*                           COMPONENT                                        */
-/* -------------------------------------------------------------------------- */
+function Empty({ children }: { children: ReactNode }) { return <p className="flex min-h-48 items-center justify-center text-center text-sm text-muted-foreground">{children}</p>; }
 
 export default function FlexiHQDashboard() {
-  const router = useRouter();
- 
-const { data, isLoading, error, refetch } = useFlexiHQDashboard();
-
-  /* ---- derived chart data (computed once data is ready) ---- */
-  const deptChartData =
-    data
-      ? (() => {
-          const primary = data.org_snapshot.find((s) => s.divisions_count > 0);
-          if (!primary) return [];
-          const divMap = Object.fromEntries(primary.divisions.map((d) => [d.id, d.name]));
-          const counts: Record<string, number> = {};
-          primary.departments.forEach((d) => {
-            const div = divMap[d.division_id] ?? "Other";
-            counts[div] = (counts[div] ?? 0) + 1;
-          });
-          return Object.entries(counts).map(([division, count]) => ({ division, count }));
-        })()
-      : [];
-
-  const posChartData =
-    data
-      ? (() => {
-          const primary = data.org_snapshot.find((s) => s.desig_count > 0);
-          if (!primary) return [];
-          const deptMap = Object.fromEntries(primary.departments.map((d) => [d.id, d.name]));
-          const counts: Record<string, number> = {};
-          primary.designations.forEach((d) => {
-            const dept = deptMap[d.department_id] ?? "Other";
-            counts[dept] = (counts[dept] ?? 0) + 1;
-          });
-          return Object.entries(counts).map(([department, count]) => ({ department, count }));
-        })()
-      : [];
-
-  /* ---- error state ---- */
-  if (error && !data) {
-  return (
-    <div className="flex min-h-[400px] items-center justify-center">
-      <div className="text-center">
-        <p className="text-sm text-destructive">{error}</p>
-        <Button className="mt-4" onClick={refetch}>Retry</Button>
-      </div>
+  const query = useFlexiHQDashboard();
+  const [search, setSearch] = useState("");
+  if (query.isError) {
+    const issue = parseApiError(query.error);
+    const guidance = issue.status === 422 ? "Please select your company again from the header." : issue.status === 403 ? "Dashboard access requires an authorized company context. Check your company selection or contact your administrator." : null;
+    return <div role="alert" className="space-y-3 border bg-white p-6 font-sidebar"><h1 className="text-lg font-semibold text-brand-900">Flexi HQ dashboard unavailable</h1><p className="text-sm text-muted-foreground">{issue.message}</p>{guidance && <p className="text-sm text-brand-800">{guidance}</p>}<Button variant="outline" onClick={() => void query.refetch()}>Try again</Button></div>;
+  }
+  if (!query.data) return query.fetchStatus === "idle" ? <p className="border bg-white p-6 font-sidebar text-sm">Select an authorized company to view its dashboard.</p> : <AppLoader label="Loading Flexi HQ dashboard…" />;
+  const data = query.data;
+  const missingSections = [
+    !data.attention && "attention",
+    !data.forms && "forms",
+    !data.workflows && "workflows",
+  ].filter(Boolean);
+  const snapshots = data.org_snapshot ?? [];
+  const grades = data.headcount_by_grade ?? [];
+  const distribution = data.branch_distribution ?? [];
+  const branchTotal = distribution.reduce((sum, item) => sum + item.count, 0);
+  const headcount = grades.reduce((sum, item) => sum + item.headcount, 0);
+  const companies = snapshots.filter(item => `${item.company.company_name} ${item.company.company_code}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const structure = snapshots.map(item => ({ name: item.company.company_name, divisions: item.divisions_count, departments: item.dept_count, positions: item.desig_count }));
+  const stats = [
+    { title: "Companies", value: data.stats.total_companies, note: "Company records", icon: Building2, bg: "from-[#322E53] to-[#49426E]", light: false },
+    { title: "Active branches", value: data.stats.active_branches, note: "Active locations", icon: MapPin, bg: "from-[#49426E] to-[#5c5490]", light: false },
+    { title: "Departments", value: data.stats.total_departments, note: "Organisational departments", icon: Layers, bg: "from-[#EEC293] to-[#e8b57a]", light: true },
+    { title: "Positions", value: data.stats.total_positions, note: "Configured positions", icon: Briefcase, bg: "from-[#F3AB9D] to-[#ef9083]", light: true },
+    { title: "Divisions", value: data.stats.total_divisions, note: "Business divisions", icon: GitBranch, bg: "from-[#5c5490] to-[#49426E]", light: false },
+    { title: "Active workflows", value: data.workflows?.active, note: "Active workflow definitions", icon: Workflow, bg: "from-[#322E53] to-[#5c5490]", light: false },
+  ];
+  return <div className="flex min-h-screen flex-col gap-6 bg-white p-4 font-sidebar text-sm md:p-8">
+    <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h1 className="text-2xl font-semibold tracking-tight text-brand-900">Flexi HQ</h1><p className="mt-1 text-[13px] text-muted-foreground">Your companies, organisation structure and workforce foundation.</p></div><div className="flex items-center gap-2"><Button asChild className="bg-brand-800 text-white hover:bg-brand-900"><Link href="/flexi-hq/companies/new"><Plus className="size-4" />New company</Link></Button></div></header>
+    {(missingSections.length > 0 || typeof data.workflows?.active !== "number") && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">{missingSections.length > 0 ? `The dashboard response is missing: ${missingSections.join(", ")}.` : "The dashboard response does not include the active workflow count."} Available metrics are shown below. Verify the API host and deployed dashboard controller for the selected company.</div>}
+    <p className="rounded-lg border border-brand-300 bg-brand-100/40 px-4 py-3 text-xs text-brand-800">Current company overview · Organisation structure, onboarding configuration and approval workflows.</p>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">{stats.map(stat => <Card key={stat.title} className={`gap-0 border-0 bg-gradient-to-br ${stat.bg} py-0 shadow-lg`}><div className={`p-5 ${stat.light ? "text-[#322E53]" : "text-white"}`}><stat.icon className="mb-4 size-5 opacity-85" /><p className={`font-semibold tabular-nums ${typeof stat.value === "number" && Number.isFinite(stat.value) ? "text-3xl" : "text-sm leading-9"}`}>{number(stat.value)}</p><p className="mt-1 text-[13px] font-medium">{stat.title}</p><p className="mt-2 text-[11px] opacity-80">{stat.note}</p></div></Card>)}</div>
+    <nav aria-label="Flexi HQ shortcuts" className="flex flex-wrap gap-2">{[{ href: "/flexi-hq/companies", label: "Manage companies", icon: Building2 }, { href: "/flexi-hq/org-chart", label: "Organisation chart", icon: Network }, { href: "/flexi-hq/form-builder", label: "Form builder", icon: SlidersHorizontal }, { href: "/flexi-hq/workflows", label: "Workflows", icon: Workflow }].map(item => <Button key={item.href} variant="outline" asChild className="border-brand-700 text-brand-800 hover:bg-brand-100"><Link href={item.href}><item.icon className="size-3.5" />{item.label}</Link></Button>)}</nav>
+    <div className="grid gap-6 lg:grid-cols-3"><div className="min-w-0 lg:col-span-2"><Panel title="Organisation structure" description="Divisions, departments and positions by company.">{structure.length ? <><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={structure} margin={{ top: 12, right: 8, left: -24, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#5c549020" /><XAxis dataKey="name" tick={axis} axisLine={false} tickLine={false} tickFormatter={name => name.length > 18 ? name.slice(0, 18) + "…" : name} /><YAxis tick={axis} axisLine={false} tickLine={false} allowDecimals={false} /><Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#322E5305" }} /><Bar dataKey="divisions" name="Divisions" fill={colors[0]} maxBarSize={28} /><Bar dataKey="departments" name="Departments" fill={colors[1]} maxBarSize={28} /><Bar dataKey="positions" name="Positions" fill={colors[2]} maxBarSize={28} /></BarChart></ResponsiveContainer></div><div className="mt-3 flex flex-wrap justify-center gap-4 text-xs text-brand-700">{["Divisions", "Departments", "Positions"].map((name, i) => <span key={name} className="flex items-center gap-1.5"><span className="size-2" style={{ background: colors[i] }} />{name}</span>)}</div></> : <Empty>No organisation structure available.</Empty>}</Panel></div>
+    <Panel title="Branch distribution" description="Locations grouped by branch type.">{branchTotal > 0 ? <><div className="relative h-52"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={distribution} dataKey="count" nameKey="label" innerRadius={60} outerRadius={82} paddingAngle={3}>{distribution.map((item, i) => <Cell key={item.type} fill={colors[i % colors.length]} />)}</Pie><Tooltip contentStyle={tooltipStyle} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><span className="text-2xl font-semibold text-brand-900">{number(branchTotal)}</span><span className="text-xs text-muted-foreground">Branches</span></div></div><div className="mt-3 space-y-2">{distribution.map((item, i) => <div key={item.type} className="flex items-center gap-2 text-xs"><span className="size-2" style={{ background: colors[i % colors.length] }} /><span className="text-muted-foreground">{item.label}</span><span className="ml-auto font-medium tabular-nums">{number(item.count)}</span></div>)}</div></> : <Empty>No branches available.</Empty>}</Panel></div>
+    <div className="grid gap-6 lg:grid-cols-3">
+      <Panel title="Needs attention" description="Configuration items awaiting review."><div className="space-y-4">{data.attention?.map(item => <Link key={item.key} href={item.href} className="flex gap-3 rounded-lg bg-brand-100/40 p-3 hover:bg-brand-100/70"><CircleAlert className="mt-0.5 size-4 shrink-0 text-brand-700" /><div className="flex-1"><p className="text-sm font-medium text-brand-900">{item.label}</p><p className="mt-1 text-xs text-muted-foreground">{item.note}</p></div>{item.available && item.count !== null && <span className="text-lg font-semibold text-brand-800">{number(item.count)}</span>}</Link>)}{!data.attention && <Empty>Attention metrics are unavailable in this response.</Empty>}{data.attention?.length === 0 && <Empty>No configuration items need attention.</Empty>}</div></Panel>
+      <Panel title="Onboarding form setup" description="Field configuration for employee onboarding.">{data.forms ? <><div className="flex items-center gap-3"><ClipboardList className="size-5 text-brand-700" /><p className="text-3xl font-semibold text-brand-900">{data.forms.total_fields}</p><span className="text-xs text-muted-foreground">configured fields</span></div><div className="my-5 space-y-4">{(data.forms.breakdown ?? []).map(item => <div key={item.label} className="flex justify-between border-b border-brand-100 pb-3 text-sm"><span className="text-muted-foreground">{item.label}</span><span className="font-semibold text-brand-900">{item.count}</span></div>)}</div><Button asChild variant="link" className="px-0 text-brand-800"><Link href="/flexi-hq/form-builder">Open form builder<ArrowRight className="size-4" /></Link></Button></> : <Empty>Onboarding configuration is unavailable in this response.</Empty>}</Panel>
+      <Panel title="Approval workflows" description="Published workflows and configuration in progress.">{data.workflows ? <><div className="flex items-center gap-3"><ShieldCheck className="size-5 text-brand-700" /><p className="text-3xl font-semibold text-brand-900">{data.workflows.active}</p><span className="text-xs text-muted-foreground">active workflows</span></div><div className="my-5 space-y-4">{(data.workflows.items ?? []).map(item => <div key={item.name} className="flex items-center justify-between gap-3 border-b border-brand-100 pb-3"><div><p className="text-sm font-medium text-brand-900">{item.name}</p><p className="mt-1 text-xs text-muted-foreground">{item.steps} approval stages</p></div><span className={`rounded-md border px-2 py-1 text-[11px] ${item.status === "Active" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>{item.status}</span></div>)}</div><Button asChild variant="link" className="px-0 text-brand-800"><Link href="/flexi-hq/workflows">Manage workflows<ArrowRight className="size-4" /></Link></Button></> : <Empty>Workflow metrics are unavailable in this response.</Empty>}</Panel>
     </div>
-  );
-}
-
-  const statCards = data ? buildStatCards(data.stats) : [];
-
-  return (
-    <motion.div
-      initial="hidden"
-      animate="show"
-      variants={containerVariants}
-      className="flex min-h-screen flex-col gap-6 bg-white p-6 md:p-8"
-    >
-      {/* ------------------------------------------------------------------ */}
-      {/* Header                                                              */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div variants={itemVariants} className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-brand-900">Flexi HQ</h1>
-        <p className="text-sm text-muted-foreground">
-          Organizational structure and foundation overview
-        </p>
-      </motion.div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Stat cards                                                          */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div variants={itemVariants} className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {isLoading
-          ? Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-[110px] rounded-xl" />
-            ))
-          : statCards.map((stat) => {
-              const Icon = stat.icon;
-              const isDark = stat.textColor === "text-white";
-              const iconBg = isDark ? "bg-white/20" : "bg-[#322E53]/15";
-              return (
-                <Link href={stat.href} key={stat.title}>
-                  <motion.div
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                  >
-                    <Card
-                      className={`overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow ${stat.cardBg} ${(stat as any).ringGlow ?? ""}`}
-                    >
-                      <div className={`p-4 ${stat.textColor}`}>
-                        <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${iconBg}`}>
-                          <Icon className={`h-5 w-5 ${stat.iconColor}`} />
-                        </div>
-                        <div className="text-2xl font-bold">{stat.value}</div>
-                        <div className="mt-1 text-xs opacity-80">{stat.title}</div>
-                      </div>
-                    </Card>
-                  </motion.div>
-                </Link>
-              );
-            })}
-      </motion.div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Quick actions                                                       */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div variants={itemVariants} className="flex flex-wrap gap-2">
-        <TooltipProvider delayDuration={200}>
-          <Button asChild className="bg-brand-800 text-white shadow-sm hover:bg-brand-900">
-            <Link href="/flexi-hq/companies/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> New Company
-            </Link>
-          </Button>
-
-          <UiTooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  toast.info("Branch management is handled within each company record.")
-                }
-                className="border-brand-300 bg-white text-brand-700 hover:bg-brand-100"
-              >
-                <MapPin className="mr-2 h-4 w-4" /> Add Branch
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Managed inside each company record</TooltipContent>
-          </UiTooltip>
-
-          <Button
-            variant="outline"
-            onClick={() => router.push("/flexi-hq/workflows")}
-            className="border-brand-300 bg-white text-brand-700 hover:bg-brand-100"
-          >
-            <Layers className="mr-2 h-4 w-4" /> New Department
-          </Button>
-
-          <UiTooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                onClick={() => router.push("/flexi-meta/grade-bands")}
-                className="border-brand-300 bg-white text-brand-700 hover:bg-brand-100"
-              >
-                <DollarSign className="mr-2 h-4 w-4" /> Grade Bands
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Grade master data is managed in Flexi Meta</TooltipContent>
-          </UiTooltip>
-
-          <Button
-            variant="outline"
-            onClick={() => router.push("/flexi-hq/org-chart")}
-            className="border-brand-300 bg-white text-brand-700 hover:bg-brand-100"
-          >
-            <Network className="mr-2 h-4 w-4" /> View Org Chart
-          </Button>
-
-          <UiTooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                onClick={() => router.push("/pay-edge/pakistan-compliance")}
-                className="border-brand-300 bg-white text-brand-700 hover:bg-brand-100"
-              >
-                <ShieldCheck className="mr-2 h-4 w-4" /> Compliance
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Configure EOBI, WHT, PESSI statutory rates</TooltipContent>
-          </UiTooltip>
-
-          <UiTooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                onClick={() => router.push("/flexi-meta/designations")}
-                className="border-brand-300 bg-white text-brand-700 hover:bg-brand-100"
-              >
-                <BookOpen className="mr-2 h-4 w-4" /> Job Catalog
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Positions and designations in Flexi Meta</TooltipContent>
-          </UiTooltip>
-        </TooltipProvider>
-      </motion.div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Tabs                                                                */}
-      {/* ------------------------------------------------------------------ */}
-      <motion.div variants={itemVariants}>
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className={TAB_LIST_CLS}>
-            <TabsTrigger value="overview"   className={TAB_TRIGGER_CLS}>Overview</TabsTrigger>
-            <TabsTrigger value="companies"  className={TAB_TRIGGER_CLS}>Companies</TabsTrigger>
-            <TabsTrigger value="structure"  className={TAB_TRIGGER_CLS}>Structure</TabsTrigger>
-          </TabsList>
-
-          {/* ---- Overview ---- */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-3">
-
-              {/* Branch distribution */}
-              <Card className="border border-brand-300 bg-white shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center text-base font-semibold text-brand-900">
-                    <PieChart className="mr-2 h-4 w-4 text-brand-600" />
-                    Branch Distribution
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-[220px] w-full rounded" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <RePieChart>
-                        <Pie
-                          data={data!.branch_distribution}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={45}
-                          outerRadius={75}
-                          paddingAngle={3}
-                          dataKey="count"
-                          nameKey="label"
-                        >
-                          {data!.branch_distribution.map((_, i) => (
-                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="white" strokeWidth={2} />
-                          ))}
-                        </Pie>
-                        <Tooltip contentStyle={tooltipStyle} />
-                        <Legend
-                          verticalAlign="bottom"
-                          height={28}
-                          iconSize={8}
-                          wrapperStyle={{ fontSize: 11, color: CHART.sage }}
-                        />
-                      </RePieChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Headcount by grade */}
-              <Card className="border border-brand-300 bg-white shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center text-base font-semibold text-brand-900">
-                    <BarChart3 className="mr-2 h-4 w-4 text-brand-500" />
-                    Headcount by Grade
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {isLoading ? (
-                    <Skeleton className="h-[180px] w-full rounded" />
-                  ) : (
-                    data!.headcount_by_grade.map((g) => (
-                      <div key={g.grade_id} className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="font-medium text-brand-900">{g.grade_name}</span>
-                          <span className="text-brand-700">{g.headcount}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Progress
-                            value={g.headcount > 0 ? 100 : 0}
-                            className="h-1.5 flex-1"
-                          />
-                          <Badge className="border border-brand-300 bg-brand-100 px-1.5 text-[10px] text-brand-700">
-                            {g.level}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Divisions of primary company */}
-              <Card className="border border-brand-300 bg-white shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center text-base font-semibold text-brand-900">
-                    <TrendingUp className="mr-2 h-4 w-4 text-brand-800" />
-                    Divisions
-                  </CardTitle>
-                  <CardDescription className="text-xs text-brand-700">
-                    {data?.org_snapshot[0]?.company.company_name ?? "Primary company"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-[160px] w-full rounded" />
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {data!.org_snapshot
-                        .find((s) => s.divisions_count > 0)
-                        ?.divisions.map((div) => (
-                          <div
-                            key={div.id}
-                            className="rounded-lg border border-brand-200 bg-brand-50 p-3"
-                          >
-                            <p className="text-xs font-semibold text-brand-900">{div.name}</p>
-                            <p className="mt-0.5 text-[10px] text-brand-700">{div.code}</p>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* ---- Companies ---- */}
-          <TabsContent value="companies" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {isLoading
-                ? Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-[120px] rounded-xl" />
-                  ))
-                : data!.org_snapshot.map((snap) => {
-                    const hasData = snap.divisions_count > 0;
-                    return (
-                      <Card
-                        key={snap.company.id}
-                        className="border border-brand-300 bg-white shadow-md hover:shadow-lg transition-shadow"
-                      >
-                        <CardContent className="flex items-start gap-4 pt-4">
-                          <Avatar className="h-10 w-10 border border-brand-200">
-                            <AvatarFallback className="bg-brand-800 text-sm font-semibold text-[#EEC293]">
-                              {getInitials(snap.company.company_name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 space-y-2">
-                            <div>
-                              <p className="text-sm font-semibold text-brand-900">
-                                {snap.company.company_name}
-                              </p>
-                              <p className="text-xs text-brand-700">{snap.company.company_code}</p>
-                            </div>
-                            {hasData ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                <Badge className="border border-[#534AB7]/30 bg-[#EEEDFE] px-2 text-[10px] text-[#3C3489]">
-                                  {snap.divisions_count} divisions
-                                </Badge>
-                                <Badge className="border border-[#0F6E56]/30 bg-[#E1F5EE] px-2 text-[10px] text-[#085041]">
-                                  {snap.dept_count} departments
-                                </Badge>
-                                <Badge className="border border-[#854F0B]/30 bg-[#FAEEDA] px-2 text-[10px] text-[#633806]">
-                                  {snap.desig_count} positions
-                                </Badge>
-                                <Badge className="border border-brand-300 bg-brand-100 px-2 text-[10px] text-brand-800">
-                                  {snap.branches_count} branches
-                                </Badge>
-                              </div>
-                            ) : (
-                              <Badge className="border border-brand-200 bg-brand-50 px-2 text-[10px] text-brand-600">
-                                No structure configured
-                              </Badge>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-            </div>
-          </TabsContent>
-
-          {/* ---- Structure ---- */}
-          <TabsContent value="structure" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-
-              {/* Departments per division */}
-              <Card className="border border-brand-300 bg-white shadow-md">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base text-brand-900">Departments per Division</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-[260px] w-full rounded" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={deptChartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${CHART.sand}60`} vertical={false} />
-                        <XAxis
-                          dataKey="division"
-                          tick={{ fontSize: 10, fill: CHART.sage }}
-                          axisLine={false}
-                          tickLine={false}
-                          interval={0}
-                          angle={-10}
-                          textAnchor="end"
-                          height={40}
-                        />
-                        <YAxis hide />
-                        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#F5E6D040" }} />
-                        <Bar dataKey="count" fill={CHART.navy} radius={[4, 4, 0, 0]} barSize={28} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Positions per department */}
-              <Card className="border border-brand-300 bg-white shadow-md">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base text-brand-900">Positions per Department</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-[260px] w-full rounded" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={Math.max(posChartData.length * 36 + 40, 260)}>
-                      <BarChart
-                        data={posChartData}
-                        layout="vertical"
-                        margin={{ top: 4, right: 12, left: 80, bottom: 4 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke={`${CHART.sand}60`} horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 10, fill: CHART.sage }} axisLine={false} tickLine={false} />
-                        <YAxis
-                          dataKey="department"
-                          type="category"
-                          tick={{ fontSize: 10, fill: CHART.sage }}
-                          axisLine={false}
-                          tickLine={false}
-                          width={76}
-                        />
-                        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#F5E6D040" }} />
-                        <Bar dataKey="count" fill={CHART.gold} radius={[0, 4, 4, 0]} barSize={14} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </motion.div>
-    </motion.div>
-  );
+    <div className="grid items-start gap-6 xl:grid-cols-3"><div className="min-w-0 xl:col-span-2"><Panel title="Company overview" description="Configured organisation structure for each company."><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="relative w-full sm:max-w-xs"><Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="Search companies" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search company or code…" className="h-9 pl-9 text-sm" /></div><Button asChild variant="link" className="h-8 px-0 text-xs text-brand-800"><Link href="/flexi-hq/companies">View companies<ArrowRight className="size-3.5" /></Link></Button></div><div className="overflow-x-auto border border-brand-200"><table className="w-full min-w-[560px] text-left text-[13px]"><thead className="border-b border-brand-200 bg-brand-100/50 text-xs text-brand-700"><tr>{["Company", "Divisions", "Departments", "Positions", "Branches"].map((name, i) => <th scope="col" key={name} className={`px-4 py-3 font-medium ${i ? "text-right" : ""}`}>{name}</th>)}</tr></thead><tbody className="divide-y divide-brand-100">{companies.map(item => <tr key={item.company.id} className="hover:bg-brand-100/30"><td className="px-4 py-3"><p className="font-medium text-brand-900">{item.company.company_name}</p><p className="mt-1 text-xs text-muted-foreground">{item.company.company_code}</p></td>{[item.divisions_count, item.dept_count, item.desig_count, item.branches_count].map((value, i) => <td key={i} className="px-4 py-3 text-right tabular-nums text-brand-800">{number(value)}</td>)}</tr>)}{!companies.length && <tr><td colSpan={5} className="py-12 text-center text-muted-foreground">{snapshots.length ? "No companies match your search." : "No company records available."}</td></tr>}</tbody></table></div><p className="mt-3 text-xs text-muted-foreground">Showing {companies.length} of {snapshots.length} companies in this overview.</p></Panel></div>
+    <Panel title="Headcount by grade" description="Employee distribution across configured grades.">{grades.length ? <><div className="mb-4 flex items-baseline gap-2 border-b border-brand-100 pb-4"><span className="text-2xl font-semibold tabular-nums text-brand-900">{number(headcount)}</span><span className="text-xs text-muted-foreground">employees across grades</span></div><div className="max-h-80 space-y-4 overflow-y-auto pr-1">{grades.map((grade, i) => <div key={grade.grade_id ?? "ungraded"}><div className="mb-2 flex justify-between gap-3 text-xs"><span className="text-brand-800">{grade.grade_name}<span className="ml-1 text-muted-foreground">{grade.grade_code}</span></span><span className="font-semibold tabular-nums">{number(grade.headcount)}</span></div><div className="h-1.5 overflow-hidden bg-brand-100"><div className="h-full" style={{ width: `${headcount ? Math.min(100, grade.headcount / headcount * 100) : 0}%`, background: colors[i % colors.length] }} /></div></div>)}</div></> : <Empty>No grade headcount available.</Empty>}</Panel></div>
+  </div>;
 }

@@ -20,10 +20,10 @@ import {
 } from "@/components/shared/directory-ui";
 import { useAppSelector } from "@/store/hooks";
 import { usePermissions } from "@/hooks/use-permissions";
-import {createDemoProfileService, type DemoProfileService} from "./demo-profile";
+import { essProfileService } from "@/services/ess-profile.service";
 import { parseApiError } from "@/lib/api-error";
 import type { EssField, EssMeta, EssRequest } from "@/types/ess-profile";
-import { ProfileSummaries } from "./profile-summaries";
+
 
 export default function ESSProfilePage() {
   const company = useAppSelector((state) => state.auth.company?.id);
@@ -33,8 +33,8 @@ export default function ESSProfilePage() {
 function Profile({ company, user }: { company?: string; user?: string }) {
   const client = useQueryClient();
   const { canVisit } = usePermissions();
-  const [service] = useState(createDemoProfileService);
-  const prefix = ["ess-profile-demo", company, user];
+  const service = essProfileService;
+  const prefix = ["ess-profile", company, user];
   const [tab, setTab] = useState("overview");
   const [editing, setEditing] = useState<EssField | null>(null);
   const [cancelling, setCancelling] = useState<EssRequest | null>(null);
@@ -73,7 +73,7 @@ function Profile({ company, user }: { company?: string; user?: string }) {
     await client.invalidateQueries({ queryKey: prefix });
   }
   const download = useMutation({
-    mutationFn: service.download,
+    mutationFn: ({ uuid, name }: { uuid: string; name: string }) => service.download(uuid, name),
     onSuccess: ({ blob, filename }) => {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -137,15 +137,16 @@ function Profile({ company, user }: { company?: string; user?: string }) {
   const editable = (field: EssField) =>
     data.capabilities.can_request_change &&
     field.can_request_change &&
+    ["text", "email", "phone", "textarea"].includes(field.type) &&
     !field.pending_request_uuid &&
     !field.sensitive;
   return (
-    <div className="space-y-5 font-sans">
+    <div className="space-y-5 font-sidebar">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-brand-900">My profile</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            Sample profile · Changes are for preview only and reset on reload.
+            Manage your profile, documents and correction requests.
           </p>
         </div>
         <Button
@@ -290,7 +291,7 @@ function Profile({ company, user }: { company?: string; user?: string }) {
                   </div>
                 ))}
               </div>
-              <ProfileSummaries />
+              
             </>
           )}
           {sections.map((section) => (
@@ -467,7 +468,7 @@ function Profile({ company, user }: { company?: string; user?: string }) {
                               variant="ghost"
                               size="sm"
                               disabled={download.isPending}
-                              onClick={() => download.mutate(item.uuid!)}
+                              onClick={() => download.mutate({ uuid: item.uuid!, name: item.name })}
                             >
                               <Download className="h-3.5 w-3.5" />
                               Download
@@ -543,7 +544,7 @@ function Correction({
   onRefresh,
   onSaved,
 }: {
-  service: DemoProfileService;
+  service: typeof essProfileService;
   field: EssField;
   onClose: () => void;
   onRefresh: () => Promise<void>;
@@ -565,7 +566,7 @@ function Correction({
     retry: false,
     onSuccess: async () => {
       await onRefresh();
-      toast.success("Preview request saved");
+      toast.success("Profile change request submitted");
       onSaved();
     },
     onError: async (error) => {
@@ -584,7 +585,11 @@ function Correction({
       next.requested_value = ["Enter a new value."];
     if (value.trim() === (field.value === null ? "" : String(field.value)))
       next.requested_value = ["Enter a different value."];
-    if (value.length > (field.validation?.max_length ?? 5000))
+    if (value.trim() && field.validation?.min_length !== undefined && value.trim().length < field.validation.min_length)
+      next.requested_value = [`Enter at least ${field.validation.min_length} characters.`];
+    if (value.trim() && field.validation?.exact_length !== undefined && value.trim().length !== field.validation.exact_length)
+      next.requested_value = [`Enter exactly ${field.validation.exact_length} characters.`];
+    if (value.trim().length > (field.validation?.max_length ?? 5000))
       next.requested_value = ["The value is too long."];
     if (reason.trim().length < 3 || reason.trim().length > 1000)
       next.reason = ["Enter a reason between 3 and 1,000 characters."];
@@ -689,7 +694,7 @@ function Cancellation({
   onClose,
   onRefresh,
 }: {
-  service: DemoProfileService;
+  service: typeof essProfileService;
   request: EssRequest;
   onClose: () => void;
   onRefresh: () => Promise<void>;
