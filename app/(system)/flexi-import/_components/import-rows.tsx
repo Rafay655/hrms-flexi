@@ -17,6 +17,11 @@ import type {FieldDefinition} from '@/lib/flexi-import';
 import {editablePreviewRow} from '@/lib/import-preview';
 import SearchableSelect from '@/components/ui/searchable-select';
 import {fieldForColumn,importFieldValue,previewFieldKey,useImportPreviewSchema,RowCorrectionDialog,readImportPreviewPage,type DraftImportRow,type SavedRowCorrection} from './PreviewRowEditor';
+function managerRowNumber(issue:{message?:string;manager_row_number?:number}) {
+ const number=issue.manager_row_number??Number(issue.message?.match(/^Manager in spreadsheet row (\d+) has validation errors\./)?.[1]);
+ return Number.isSafeInteger(number)&&number>0?number:undefined;
+}
+
 export function ImportRows({uuid,revision,scope,mode,importType='employees',templateUuid,templateVersion,canEdit=false,onQueued,onRefresh,previewFields,columnMapping={},totalRows,onRecheck,rechecking=false,hasDraftCorrections=false,jumpTarget,onJumpHandled}:{uuid:string;revision:number;scope:string;mode?:FormMode;importType?:string;templateUuid?:string|null;templateVersion?:number|null;canEdit?:boolean;previewFields?:FieldDefinition[];columnMapping?:Record<string,string>;totalRows?:number;onRecheck?:()=>void;rechecking?:boolean;hasDraftCorrections?:boolean;jumpTarget?:{rowNumber:number}|null;onJumpHandled?:()=>void;onQueued?:(result:SavedRowCorrection)=>void;onRefresh?:()=>void}){
  const [status,setStatus]=useState(''),[page,setPage]=useState(1),[search,setSearch]=useState(''),[action,setAction]=useState(''),[hidden,setHidden]=useState<string[]>([]),[columnsOpen,setColumnsOpen]=useState(false),[detail,setDetail]=useState<DraftImportRow|null>(null),[editing,setEditing]=useState<DraftImportRow|null>(null),[view,setView]=useState<'data'|'issues'|'changes'>('data'),[warningsOnly,setWarningsOnly]=useState(false);
  const [focusFieldKey,setFocusFieldKey]=useState<string>();
@@ -39,10 +44,9 @@ export function ImportRows({uuid,revision,scope,mode,importType='employees',temp
   retry:false,
  });
 
- useEffect(()=>{
-  if(!jumpTarget)return;
+ function jumpToRow(rowNumber:number){
   previewElement.current?.scrollIntoView({block:'start'});
-  setActiveJump(jumpTarget);
+  setActiveJump({rowNumber});
   setIssuePager({context:'',page:1});
   setStatus('');
   setPage(1);
@@ -51,6 +55,11 @@ export function ImportRows({uuid,revision,scope,mode,importType='employees',temp
   setWarningsOnly(false);
   setDetail(null);
   setView('data');
+ }
+
+ useEffect(()=>{
+  if(!jumpTarget)return;
+  jumpToRow(jumpTarget.rowNumber);
   onJumpHandled?.();
  },[jumpTarget,onJumpHandled]);
 
@@ -138,7 +147,7 @@ export function ImportRows({uuid,revision,scope,mode,importType='employees',temp
    {[10,25,50].map(size=><option key={size} value={size}>{size}</option>)}
   </select>
  </label>
- {rows.isPending?<p className="text-xs text-muted-foreground">Loading validation findings…</p>:rows.error?<p className="text-xs text-muted-foreground">Validation findings are unavailable for this page.</p>:!pageIssues.length?<div className="rounded-lg border border-brand-800/10 bg-brand-100/50 p-3 text-xs leading-5 text-muted-foreground">No validation findings reported on this page. Overall validation and write eligibility come from the server.</div>:<><div ref={issuesList} className="max-h-[58vh] space-y-2 overflow-auto">{visibleIssues.map(({row,issue},index)=>{const target=fieldForColumn(issue.field??'',definitions,columnMapping);const label=target?.label??issue.field??'Row issue';return <button type="button" key={`${row.row_number}-${issueOffset+index}`} onClick={()=>editable&&editablePreviewRow(row.status)&&target&&editableKeys.has(target.key)?openEditor(row,target.key):setDetail(row)} className={`w-full rounded-lg border border-l-[3px] bg-card p-3 text-left transition-colors hover:bg-brand-100/40 ${issue.severity==='warning'?'border-border border-l-brand-500':'border-border border-l-brand-400'}`}><span className="block text-xs font-semibold text-brand-900">Row {row.row_number} · {label}</span><span className="mt-1 block text-[10px] font-semibold text-muted-foreground">{issueCategory(issue)}</span><span className="mt-1.5 block text-xs leading-5 text-muted-foreground">{issue.message}</span></button>;})}</div>
+ {rows.isPending?<p className="text-xs text-muted-foreground">Loading validation findings…</p>:rows.error?<p className="text-xs text-muted-foreground">Validation findings are unavailable for this page.</p>:!pageIssues.length?<div className="rounded-lg border border-brand-800/10 bg-brand-100/50 p-3 text-xs leading-5 text-muted-foreground">No validation findings reported on this page. Overall validation and write eligibility come from the server.</div>:<><div ref={issuesList} className="max-h-[58vh] space-y-2 overflow-auto">{visibleIssues.map(({row,issue},index)=>{const target=fieldForColumn(issue.field??'',definitions,columnMapping);const label=target?.label??issue.field??'Row issue';const managerRow=managerRowNumber(issue);return <button type="button" key={`${row.row_number}-${issueOffset+index}`} onClick={()=>managerRow?jumpToRow(managerRow):editable&&editablePreviewRow(row.status)&&target&&editableKeys.has(target.key)?openEditor(row,target.key):setDetail(row)} className={`w-full rounded-lg border border-l-[3px] bg-card p-3 text-left transition-colors hover:bg-brand-100/40 ${issue.severity==='warning'?'border-border border-l-brand-500':'border-border border-l-brand-400'}`}><span className="block text-xs font-semibold text-brand-900">Row {row.row_number} · {label}</span><span className="mt-1 block text-[10px] font-semibold text-muted-foreground">{issueCategory(issue)}</span><span className="mt-1.5 block text-xs leading-5 text-muted-foreground">{issue.message}</span>{managerRow&&<span className="mt-2 block text-xs font-medium text-brand-800 underline">Jump to manager row {managerRow}</span>}</button>;})}</div>
  <nav aria-label="Validation issue pages" className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
   <span aria-live="polite">{issueOffset+1}–{issueOffset+visibleIssues.length} of {pageIssues.length}</span>
   <div className="flex items-center gap-1">
@@ -147,7 +156,10 @@ export function ImportRows({uuid,revision,scope,mode,importType='employees',temp
   </div>
  </nav></>}</aside></div>
 
- {detail&&<Modal title={`Spreadsheet row ${detail.row_number}`} description="Server validation and proposed changes for this row." onClose={()=>setDetail(null)} footer={<><Button variant="outline" onClick={()=>setDetail(null)}>Close</Button>{editable&&editablePreviewRow(detail.status)&&<Button className={importPrimary} onClick={()=>{openEditor(detail);setDetail(null);}}>Correct row</Button>}</>}><ul className="space-y-2">{detail.validation_errors?.map((error,index)=><li key={index} className="text-sm text-destructive">{issueCategory(error)}: {error.message}</li>)}</ul><dl className="grid gap-3 sm:grid-cols-2">{fields.map(field=><div key={field.key}><dt className="text-xs font-medium">{field.label}</dt><dd className="break-all text-sm text-muted-foreground">{displayImportValue(importFieldValue(detail,{key:field.requestKey,label:field.label},columnMapping,field.key))}</dd></div>)}</dl></Modal>}
+ {detail&&<Modal title={`Spreadsheet row ${detail.row_number}`} description="Server validation and proposed changes for this row." onClose={()=>setDetail(null)} footer={<><Button variant="outline" onClick={()=>setDetail(null)}>Close</Button>{editable&&editablePreviewRow(detail.status)&&<Button className={importPrimary} onClick={()=>{openEditor(detail);setDetail(null);}}>Correct row</Button>}</>}><ul className="space-y-2">{detail.validation_errors?.map((error,index)=>{
+  const manager=managerRowNumber(error);
+  return <li key={index} className="text-sm text-destructive">{issueCategory(error)}: {error.message}{manager&&<Button type="button" variant="link" size="sm" onClick={()=>jumpToRow(manager)}>Jump to manager row {manager}</Button>}</li>;
+ })}</ul><dl className="grid gap-3 sm:grid-cols-2">{fields.map(field=><div key={field.key}><dt className="text-xs font-medium">{field.label}</dt><dd className="break-all text-sm text-muted-foreground">{displayImportValue(importFieldValue(detail,{key:field.requestKey,label:field.label},columnMapping,field.key))}</dd></div>)}</dl></Modal>}
  {editing&&mode&&onQueued&&<RowCorrectionDialog uuid={uuid} scope={scope} mode={mode} templateUuid={templateUuid} templateVersion={templateVersion} canEdit={editable} previewFields={editorFields} columnMapping={columnMapping} focusFieldKey={focusFieldKey} row={editing} onClose={()=>setEditing(null)} onQueued={result=>{setEditing(null);onQueued(result);}} onRefresh={onRefresh??(()=>void rows.refetch())} />}
  </div>;
 }
