@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation,useQueryClient } from '@tanstack/react-query';
 import { ExternalLink,CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,14 +10,63 @@ import SearchableSelect from '@/components/ui/searchable-select';
 import { Modal } from '@/components/shared/directory-ui';
 import { employeeImportService as service,type GapReport,type GapDecision,type GapResolutionResult,type GapTable,type ReferenceGap,type GapExtraField } from '@/services/employee-import.service';
 import { gapIdentity,gapSetupPath,displayImportValue,normalizeGapSuggestion,gapFieldLabel } from '@/lib/employee-import';
+import toast from 'react-hot-toast';
+import {useAppSelector} from '@/store/hooks';
 import { showApiError } from '@/lib/error-toast';
+import {api} from '@/lib/api';
+import {rowCorrectionMutationKey,type SavedRowCorrection} from './PreviewRowEditor';
 import { ImportErrorFeedback } from './import-error-feedback';
 import { importAccent,importPrimary } from './import-ui';
 type Draft={action:string;extra:Record<string,string>};
+type PendingGap=ReferenceGap&{
+ pending_reference_decision?:boolean;
+ pending_correction_rows?:number;
+ remaining_rows?:number[];
+ bulk_replacement?:{value:string;rows:number}|null;
+};
 function extraDescriptor(raw:GapExtraField|string):GapExtraField{return typeof raw==='string'?{key:raw,label:raw.replaceAll('_',' ').replace(/^./,s=>s.toUpperCase()),type:raw.includes('date')||raw==='effective_from'?'date':'text',required:true}:raw;}
 export function ReferenceGaps({uuid,report,disabled,onResolved,onRefresh,onJumpToRow}:{uuid:string;report:GapReport;disabled:boolean;onResolved:(result:GapResolutionResult)=>void;onRefresh:()=>void;onJumpToRow?:(rowNumber:number)=>void}){
  const [drafts,setDrafts]=useState<Record<string,Draft>>({}),[result,setResult]=useState<GapResolutionResult|null>(null),[confirmCreate,setConfirmCreate]=useState(false);
- const tables=report.tables.map(table=>({...table,values:table.values.map(value=>({...value,suggestion:normalizeGapSuggestion(value.suggestion)}))}));
+ const client=useQueryClient();
+ const company=useAppSelector(state=>state.auth.company?.id),user=useAppSelector(state=>state.auth.user?.id);
+ const scope=String(company)+':'+String(user);
+ const [applyTarget,setApplyTarget]=useState<PendingGap|null>(null);
+ const apply=useMutation({
+  mutationKey:rowCorrectionMutationKey(scope,uuid),
+  mutationFn:async(target:PendingGap)=>{
+   const replacement=target.bulk_replacement;
+   if(!replacement)throw new Error('Save a correction first.');
+   const {data:response}=await api.post(`/flexi-import/batches/${uuid}/gaps/apply-to-remaining`,{
+    source_key:target.source_key,
+    parent_id:target.parent_id??null,
+    value:target.value,
+    replacement:replacement.value,
+    remaining_rows:replacement.rows,
+   });
+   return response.data as SavedRowCorrection;
+  },
+  retry:false,
+  onSuccess:()=>{setApplyTarget(null);toast.success('Corrections saved. Re-check when you finish editing.');void client.invalidateQueries({queryKey:['employee-import',scope,uuid]});},
+  onError:(error:unknown)=>{showApiError(error);onRefresh();},
+ });
+ let hiddenCount=0;
+ const tables=report.tables.map(table=>{
+  const values=table.values.flatMap((value:PendingGap)=>{
+   const pending=value.pending_correction_rows??0;
+   const remaining=Math.max(0,(value.row_count??0)-pending);
+   if(value.pending_reference_decision||pending>0&&remaining===0){
+    hiddenCount++;
+    return [];
+   }
+   return [{
+    ...value,
+    ...(pending>0?{row_count:remaining,rows:value.remaining_rows??value.rows}:{}),
+    suggestion:normalizeGapSuggestion(value.suggestion),
+   }];
+  });
+  return {...table,values};
+ }).filter(table=>table.values.length>0);
+ const visibleCount=tables.reduce((total,table)=>total+table.values.length,0);
  const values=tables.flatMap(table=>table.values.map(value=>({table,value,key:gapIdentity(value)})));
  const selected=values.filter(({key})=>drafts[key]?.action);
  const creationCount=selected.filter(({key})=>drafts[key].action==='create').length;
@@ -43,9 +92,12 @@ export function ReferenceGaps({uuid,report,disabled,onResolved,onRefresh,onJumpT
   onResolved(response);
  },onError:(error:unknown)=>{showApiError(error);onRefresh();}});
  return <div className="space-y-4">
-  <p className="text-xs text-muted-foreground">{report.total_gap_values} missing reference {report.total_gap_values===1?'value':'values'} across {tables.length} {tables.length===1?'source':'sources'}.</p>
+  <p className="text-xs text-muted-foreground">{visibleCount} missing reference {visibleCount===1?'value':'values'} across {tables.length} {tables.length===1?'source':'sources'}.</p>
+  {hiddenCount>0&&<p role="status" className="text-xs font-medium text-brand-800">
+   {hiddenCount} saved {hiddenCount===1?'item is':'items are'} awaiting re-check.
+  </p>}
   <div className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">Master records are saved when you apply decisions. Canceling or rolling back this employee import does not delete those reference records.</div>
-  {tables.length===0?<div className="flex items-center gap-2 rounded-lg border border-brand-800/10 bg-brand-100 p-4 text-sm text-brand-800"><CheckCircle2 className="h-4 w-4" />No missing reference values.</div>:tables.map(table=><div key={table.source_key} className="overflow-hidden rounded-lg border border-border"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-brand-100 px-4 py-3"><h3 className="text-sm font-semibold text-brand-800">{gapFieldLabel(table.values[0]??{source_key:table.source_key,source_table:table.source_table})}</h3><span className="text-xs text-muted-foreground">Reference table: {table.source_table}</span></div>{table.warning&&<p className="border-b border-brand-500/30 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">{table.warning}</p>}{table.blocked_reason&&<p className="border-b border-border px-4 py-3 text-xs leading-5 text-muted-foreground">{table.blocked_reason}</p>}<div className="divide-y divide-border">{table.values.map(value=>{
+  {tables.length===0?<div className="flex items-center gap-2 rounded-lg border border-brand-800/10 bg-brand-100 p-4 text-sm text-brand-800"><CheckCircle2 className="h-4 w-4" /> {hiddenCount>0?'No remaining values to review. Re-check the batch to validate saved changes.':'No missing reference values.'}</div>:tables.map(table=><div key={table.source_key} className="overflow-hidden rounded-lg border border-border"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-brand-100 px-4 py-3"><h3 className="text-sm font-semibold text-brand-800">{gapFieldLabel(table.values[0]??{source_key:table.source_key,source_table:table.source_table})}</h3><span className="text-xs text-muted-foreground">Reference table: {table.source_table}</span></div>{table.warning&&<p className="border-b border-brand-500/30 bg-brand-500/10 px-4 py-3 text-xs leading-5 text-brand-800">{table.warning}</p>}{table.blocked_reason&&<p className="border-b border-border px-4 py-3 text-xs leading-5 text-muted-foreground">{table.blocked_reason}</p>}<div className="divide-y divide-border">{table.values.map(value=>{
    const key=gapIdentity(value),draft=drafts[key]??{action:'',extra:{}},creatable=canCreate(table,value);
    return <div key={key} className="grid gap-4 p-4 md:grid-cols-2"><div className="min-w-0"><p className="break-words text-sm font-semibold text-foreground">{value.value}</p>{value.suggestion&&<p className="mt-1 text-xs text-muted-foreground">Suggested existing value: <strong className="text-brand-800">{value.suggestion.label}</strong>{value.suggestion.confidence!==undefined&&<span className="ml-2 rounded-md bg-brand-100 px-2 py-0.5 text-brand-700">{value.suggestion.confidence}% match</span>}</p>}{value.row_count!==undefined&&<p className="mt-2 text-xs text-muted-foreground">{value.row_count.toLocaleString()} affected {value.row_count===1?'row':'rows'}</p>}
     {!!value.rows?.length&&<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -56,6 +108,9 @@ export function ReferenceGaps({uuid,report,disabled,onResolved,onRefresh,onJumpT
      {value.rows.length>50&&<span>…</span>}
     </div>}
     {value.parent_label&&<p className="mt-2 text-xs text-muted-foreground">Under {value.parent_source_key?.replaceAll('_',' ')??'parent'}: {value.parent_label}</p>}{value.message&&<p className="mt-2 text-xs leading-5 text-muted-foreground">{value.message}</p>}{!!value.decision&&<p className="mt-2 text-xs font-medium text-brand-700">A decision is saved. Revalidate to refresh this preview.</p>}</div><div className="min-w-0 space-y-3">
+    {value.bulk_replacement&&<Button size="sm" variant="outline" disabled={disabled||resolve.isPending||apply.isPending} onClick={()=>setApplyTarget(value)}>
+     Apply “{value.bulk_replacement.value}” to {value.bulk_replacement.rows} remaining {value.bulk_replacement.rows===1?'row':'rows'}
+    </Button>}
     {(value.suggestion||creatable)&&<SearchableSelect aria-label={`Resolution for ${value.value}`} widthClass="w-full" value={draft.action} allLabel="Select an action…" disabled={disabled||resolve.isPending} options={[...(value.suggestion?[{value:'use_existing',label:`Use existing “${value.suggestion.label}”`}]:[]),...(creatable?[{value:'create',label:`Create “${value.value}”`}]:[])]} onChange={action=>update(key,{action})} />}
     {draft.action==='create'&&creatable&&(table.extra_fields??[]).map(raw=>{const field=extraDescriptor(raw);return <div key={field.key} className="space-y-1.5"><Label htmlFor={`gap-${key}-${field.key}`}>{field.label}{field.required?' *':''}</Label>{field.options?.length?<SearchableSelect aria-label={`${field.label} for ${value.value}`} widthClass="w-full" allowAll={false} value={draft.extra[field.key]??String(field.default??'')} disabled={disabled||resolve.isPending} options={field.options.map(option=>({value:String(option.value??option.id??''),label:option.label}))} onChange={input=>update(key,{extra:{...draft.extra,[field.key]:input}})} />:['boolean','checkbox','toggle'].includes(field.type)?<Checkbox id={`gap-${key}-${field.key}`} aria-label={`${field.label} for ${value.value}`} disabled={disabled||resolve.isPending} checked={['1','true'].includes(draft.extra[field.key]??String(field.default??''))} onCheckedChange={checked=>update(key,{extra:{...draft.extra,[field.key]:checked===true?'1':'0'}})} />:<Input id={`gap-${key}-${field.key}`} type={['date','number','email'].includes(field.type)?field.type:'text'} required={field.required} disabled={disabled||resolve.isPending} value={draft.extra[field.key]??String(field.default??'')} onChange={event=>update(key,{extra:{...draft.extra,[field.key]:event.target.value}})} />}</div>;})}
     {!creatable&&<a href={gapSetupPath(value)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-brand-800 underline">Open setup<ExternalLink className="h-3 w-3" /></a>}
@@ -65,6 +120,13 @@ export function ReferenceGaps({uuid,report,disabled,onResolved,onRefresh,onJumpT
   {selected.length>0&&<div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{selected.length} selected · Up to 500 decisions per request</p><Button className={importAccent} disabled={disabled||resolve.isPending||selected.length>500} onClick={()=>creationCount?setConfirmCreate(true):resolve.mutate()}>{resolve.isPending?'Applying decisions…':'Apply decisions'}</Button></div>}
   {result&&<div role="status" className="space-y-2 rounded-lg border border-brand-800/15 bg-brand-100 p-4 text-sm text-brand-800"><p>{result.decided} decisions applied · {result.created.length} master records created.</p>{result.failed.length>0?<><p className="font-medium">{result.failed.length} decisions still need attention:</p><ul className="space-y-1 text-xs">{result.failed.map((failure,index)=><li key={index}>{[failure.value,failure.message??failure.error??Object.values(failure.errors??{}).flat().join(' ')].filter(Boolean).join(': ')||'A reference decision could not be applied.'}</li>)}</ul></>:<p className="text-xs">Revalidate the file to refresh row validation and changes.</p>}</div>}
   <ImportErrorFeedback error={resolve.error} />
+  {applyTarget?.bulk_replacement&&<Modal title="Apply the saved correction?" description="The updated rows will be checked when you re-check the batch." busy={apply.isPending} onClose={()=>setApplyTarget(null)} footer={<>
+   <Button variant="outline" disabled={apply.isPending} onClick={()=>setApplyTarget(null)}>Cancel</Button>
+   <Button className={importPrimary} disabled={disabled||apply.isPending} onClick={()=>apply.mutate(applyTarget)}>{apply.isPending?'Saving…':'Apply to remaining'}</Button>
+  </>}>
+   <p className="text-sm">Replace “{applyTarget.value}” with “{applyTarget.bulk_replacement.value}” on {applyTarget.bulk_replacement.rows} {applyTarget.bulk_replacement.rows===1?'row':'rows'}.</p>
+   <ImportErrorFeedback error={apply.error} />
+  </Modal>}
   {confirmCreate&&<Modal title="Create reference records?" description="These records are saved immediately and are shared wherever this reference source is used." busy={resolve.isPending} onClose={()=>setConfirmCreate(false)} footer={<><Button variant="outline" disabled={resolve.isPending} onClick={()=>setConfirmCreate(false)}>Cancel</Button><Button className={importPrimary} disabled={resolve.isPending||disabled} onClick={()=>resolve.mutate()}>{resolve.isPending?'Applying…':'Create & apply decisions'}</Button></>}><p className="text-sm text-muted-foreground">You are creating {creationCount} new master record{creationCount===1?'':'s'}. They remain if this employee import is canceled or rolled back.</p><ul className="mt-3 space-y-1 text-xs text-foreground">{selected.filter(({key})=>drafts[key].action==='create').map(({value,key})=><li key={key}>{gapFieldLabel(value)}: {displayImportValue(value.value)}</li>)}</ul><ImportErrorFeedback error={resolve.error} /></Modal>}
  </div>;
 }

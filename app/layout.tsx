@@ -1,21 +1,24 @@
 // app/layout.tsx
 import ReduxProvider from "@/store/ReduxProvider";
 import "./globals.css";
-import { League_Spartan, Poppins } from "next/font/google";
+import localFont from "next/font/local";
 import QueryProvider from "@/lib/QueryProvider";
 import { Toaster } from "react-hot-toast";
 import { DeviceTokenProvider } from "@/components/DeviceTokenProvider";
 import { ApiSessionNotice } from "@/components/api-session-notice";
 
-const leagueSpartan = League_Spartan({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const leagueSpartan = localFont({
+  src: "./fonts/dfs/LeagueSpartan-variable.ttf",
+  weight: "400 700",
   variable: "--font-league-spartan",
   display: "swap",
 });
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const poppins = localFont({
+  src: [
+    { path: "./fonts/dfs/Poppins-Regular.ttf", weight: "400" },
+    { path: "./fonts/dfs/Poppins-Medium.ttf", weight: "500" },
+    { path: "./fonts/dfs/Poppins-SemiBold.ttf", weight: "600" },
+  ],
   variable: "--font-poppins",
   display: "swap",
 });
